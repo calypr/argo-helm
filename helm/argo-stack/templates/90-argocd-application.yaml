@@ -1,0 +1,20 @@
+{{- if .Values.argocdApplication.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .Values.argocdApplication.name }}
+  namespace: {{ .Values.namespaces.argocd }}
+spec:
+  project: {{ .Values.argocdApplication.project }}
+  source:
+    repoURL: {{ .Values.argocdApplication.repoURL | quote }}
+    targetRevision: {{ .Values.argocdApplication.targetRevision | quote }}
+    path: {{ .Values.argocdApplication.path | quote }}
+  destination:
+    name: in-cluster
+    namespace: {{ .Values.argocdApplication.destinationNamespace }}
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+{{- end }}

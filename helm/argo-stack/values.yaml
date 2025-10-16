@@ -1,0 +1,61 @@
+namespaces:
+  argo: argo
+  argocd: argocd
+  tenant: wf-poc
+  security: security
+
+argoWorkflows:
+  enabled: true
+  serverAuthMode: server   # or sso
+
+argo-cd:
+  fullnameOverride: argocd
+  global:
+    domain: ""
+  configs: {}
+argoCD:
+  enabled: true
+
+authzAdapter:
+  image: ghcr.io/yourorg/authz-adapter:latest
+  fenceBase: "https://calypr-dev.ohsu.edu/user"
+  replicas: 2
+
+s3:
+  enabled: false
+  hostname: ""        # on-prem S3 host (required when enabled)
+  bucket: ""          # artifacts bucket
+  region: "us-west-2"
+  insecure: false
+  pathStyle: true
+  accessKey: ""
+  secretKey: ""
+
+argocdApplication:
+  enabled: true
+  name: nextflow-hello
+  project: default
+  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
+  targetRevision: "main"
+  path: "."
+  destinationNamespace: "{{ .Values.namespaces.tenant }}"
+
+ingress:
+  argoWorkflows:
+    enabled: true
+    host: "argo.localtest.me"
+    tls:
+      enabled: false
+      secretName: ""
+  argocd:
+    enabled: true
+    host: "argocd.localtest.me"
+    tls:
+      enabled: false
+      secretName: ""
+
+# Auth annotations for NGINX
+ingressAuth:
+  enabled: true
+  authURL: "http://authz-adapter.security.svc.cluster.local:8080/check"
+  passAuthorization: true

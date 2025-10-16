@@ -1,0 +1,33 @@
+{{- if .Values.s3.enabled }}
+apiVersion: v1
+kind: Secret
+metadata:
+  name: s3-credentials
+  namespace: {{ .Values.namespaces.tenant }}
+type: Opaque
+stringData:
+  AWS_ACCESS_KEY_ID: "{{ .Values.s3.accessKey }}"
+  AWS_SECRET_ACCESS_KEY: "{{ .Values.s3.secretKey }}"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: artifact-repositories
+  namespace: {{ .Values.namespaces.argo }}
+data:
+  default-v1: |
+    archiveLogs: true
+    s3:
+      bucket: {{ .Values.s3.bucket }}
+      endpoint: {{ .Values.s3.hostname }}
+      region: {{ .Values.s3.region }}
+      insecure: {{ .Values.s3.insecure }}
+      accessKeySecret:
+        name: s3-credentials
+        key: AWS_ACCESS_KEY_ID
+      secretKeySecret:
+        name: s3-credentials
+        key: AWS_SECRET_ACCESS_KEY
+      useSDKCreds: false
+      pathStyle: {{ .Values.s3.pathStyle }}
+{{- end }}

@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authz-adapter
+  namespace: {{ .Values.namespaces.security }}
+spec:
+  replicas: {{ .Values.authzAdapter.replicas }}
+  selector:
+    matchLabels: { app: authz-adapter }
+  template:
+    metadata:
+      labels: { app: authz-adapter }
+    spec:
+      containers:
+      - name: adapter
+        image: {{ .Values.authzAdapter.image | quote }}
+        imagePullPolicy: IfNotPresent
+        env:
+        - name: FENCE_BASE
+          value: {{ .Values.authzAdapter.fenceBase | quote }}
+        ports: [{ containerPort: 8080 }]
+        readinessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+        livenessProbe:
+          httpGet: { path: /healthz, port: 8080 }
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authz-adapter
+  namespace: {{ .Values.namespaces.security }}
+spec:
+  selector: { app: authz-adapter }
+  ports:
+  - name: http
+    port: 8080
+    targetPort: 8080

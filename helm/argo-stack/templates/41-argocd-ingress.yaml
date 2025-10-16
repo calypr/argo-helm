@@ -1,0 +1,37 @@
+{{- if .Values.ingress.argocd.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: argocd-server
+  namespace: {{ .Values.namespaces.argocd }}
+  annotations:
+    kubernetes.io/ingress.class: nginx
+    {{- if .Values.ingressAuth.enabled }}
+    nginx.ingress.kubernetes.io/auth-url: {{ .Values.ingressAuth.authURL | quote }}
+    nginx.ingress.kubernetes.io/auth-method: "GET"
+    nginx.ingress.kubernetes.io/auth-snippet: |
+      {{- if .Values.ingressAuth.passAuthorization }}
+      proxy_set_header Authorization $http_authorization;
+      {{- end }}
+      proxy_set_header X-Original-URI $request_uri;
+      proxy_set_header X-Original-Method $request_method;
+    nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Groups"
+    {{- end }}
+spec:
+  {{- if .Values.ingress.argocd.tls.enabled }}
+  tls:
+    - hosts: [{{ .Values.ingress.argocd.host | quote }}]
+      secretName: {{ .Values.ingress.argocd.tls.secretName | quote }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.argocd.host | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: argocd-server
+                port:
+                  number: 80
+{{- end }}
