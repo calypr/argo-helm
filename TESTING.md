@@ -76,7 +76,7 @@ helm dependency build helm/argo-stack
 ct lint --config .ct.yaml
 
 # Install and smoke test
-ct install --config .ct.yaml --print-logs
+ct install --config .ct.yaml --debug
 ```
 
 **Notes**
@@ -132,7 +132,7 @@ Open:
   Keep skipping `CustomResourceDefinition|Application|Workflow|WorkflowTemplate` or provide schemas for these CRDs.
 
 - **`ct install` hangs or times out**  
-  Use `--print-logs` to inspect controller/server logs. Ensure Docker has enough CPU/RAM for kind.
+  Use `--debug` to inspect controller/server logs. Ensure Docker has enough CPU/RAM for kind.
 
 - **Argo CD Application points to a repo path with no manifests**  
   That’s fine as a placeholder; it syncs “empty”. Add K8s manifests or a `kustomization.yaml` in that repo path for real resources.
@@ -155,7 +155,7 @@ kubeconform -strict -ignore-missing-schemas -skip 'CustomResourceDefinition|Appl
 # kind + ct
 kind create cluster
 ct lint --config .ct.yaml
-ct install --config .ct.yaml --print-logs
+ct install --config .ct.yaml --debug
 
 # adapter tests
 cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q
