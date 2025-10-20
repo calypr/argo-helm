@@ -4,4 +4,18 @@ charts:
   - helm/argo-stack
 check-version-increment: false
 validate-maintainers: false
-helm-extra-args: --timeout 15m -f helm/argo-stack/ci-values.yaml
+
+# Safe for all helm commands (incl. uninstall)
+helm-extra-args: --timeout 15m
+
+# Only applied to install/upgrade — OK to tweak values here
+helm-extra-set-args: >
+  --set argo-cd.enabled=false
+  --set argocdApplication.enabled=false
+  --set ingress.argoWorkflows.enabled=false
+  --set ingress.argocd.enabled=false
+  --set authzAdapter.replicas=1
+  --set s3.enabled=false
+  --set argo-workflows.server.enabled=true
+  --set argo-workflows.server.secure=false
+  --set argo-workflows.server.extraArgs[0]=--auth-mode=server
