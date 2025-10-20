@@ -4,7 +4,6 @@ metadata:
   name: argocd-server
   namespace: argocd
   annotations:
-    kubernetes.io/ingress.class: nginx
     nginx.ingress.kubernetes.io/auth-url: "http://authz-adapter.security.svc.cluster.local:8080/check"
     nginx.ingress.kubernetes.io/auth-method: "GET"
     nginx.ingress.kubernetes.io/auth-snippet: |
@@ -13,6 +12,7 @@ metadata:
       proxy_set_header X-Original-Method $request_method;
     nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Groups"
 spec:
+  ingressClassName: nginx
   rules:
     - host: argocd.localtest.me
       http:

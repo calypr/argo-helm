@@ -1,0 +1,31 @@
+name: authz-adapter unit tests
+
+on:
+  pull_request:
+    paths:
+      - 'authz-adapter/**'
+      - '.github/workflows/ci-adapter.yaml'
+  push:
+    branches: [ main ]
+    paths:
+      - 'authz-adapter/**'
+      - '.github/workflows/ci-adapter.yaml'
+
+jobs:
+  pytest:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: authz-adapter
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Install deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt pytest
+      - name: Run tests
+        run: pytest -q
