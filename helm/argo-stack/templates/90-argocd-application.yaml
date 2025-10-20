@@ -12,7 +12,7 @@ spec:
     path: {{ .Values.argocdApplication.path | quote }}
   destination:
     name: in-cluster
-    namespace: {{ .Values.argocdApplication.destinationNamespace }}
+    namespace: {{ default .Values.namespaces.tenant .Values.argocdApplication.destinationNamespace }}
   syncPolicy:
     automated:
       prune: false
