@@ -12,4 +12,4 @@ dependencies:
   - name: argo-cd
     version: 7.6.12
     repository: https://argoproj.github.io/argo-helm
-    condition: argoCD.enabled
+    condition: argo-cd.enabled
