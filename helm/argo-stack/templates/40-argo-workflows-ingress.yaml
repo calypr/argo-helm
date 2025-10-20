@@ -5,7 +5,6 @@ metadata:
   name: argo-workflows
   namespace: {{ .Values.namespaces.argo }}
   annotations:
-    kubernetes.io/ingress.class: nginx
     {{- if .Values.ingressAuth.enabled }}
     nginx.ingress.kubernetes.io/auth-url: {{ .Values.ingressAuth.authURL | quote }}
     nginx.ingress.kubernetes.io/auth-method: "GET"
@@ -18,6 +17,7 @@ metadata:
     nginx.ingress.kubernetes.io/auth-response-headers: "X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Groups"
     {{- end }}
 spec:
+  ingressClassName: nginx
   {{- if .Values.ingress.argoWorkflows.tls.enabled }}
   tls:
     - hosts: [{{ .Values.ingress.argoWorkflows.host | quote }}]
