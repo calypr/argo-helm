@@ -1,0 +1,7 @@
+chart-dirs:
+  - helm
+charts:
+  - helm/argo-stack
+check-version-increment: false
+validate-maintainers: false
+helm-extra-args: --timeout 10m
