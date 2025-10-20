@@ -17,7 +17,7 @@ argo-workflows:
 
 # Argo CD dependency values
 argo-cd:
-  enabled: true
+  enabled: false
   fullnameOverride: argocd
   global:
     domain: ""
