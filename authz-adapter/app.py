@@ -9,14 +9,40 @@ SERVICE_TOKEN = os.environ.get("FENCE_SERVICE_TOKEN", "")
 
 app = Flask(__name__)
 
-def decide_groups(doc):
+def decide_groups(
+    doc,
+    verb=None,
+    group=None,
+    version=None,
+    resource=None,
+    namespace=None,
+):
+    """
+    Map Fence-style authz JSON into coarse-grained groups Argo/ArgoCD can use.
+    Backward compatible: extra args are optional.
+    If Argo resource context is provided, only grant runner for Argo resources.
+    """
     groups = []
     if not doc.get("active"):
         return groups
+
     authz = doc.get("authz", {})
-    gw = authz.get("/services/workflow/gen3-workflow", [])
-    if any(x.get("method") in ["create", "*"] for x in gw):
-        groups.append("argo-runner")
+    # Default policy: grant runner if user can create gen3 workflow tasks
+    has_gen3_create = any(
+        (item.get("method") in ("create", "*"))
+        for item in authz.get("/services/workflow/gen3-workflow", [])
+    )
+
+    # If the call includes resource context, scope the decision to Argo resources
+    if group == "argoproj.io" and resource in {"workflows", "workflowtemplates"}:
+        if has_gen3_create:
+            groups.append("argo-runner")
+    else:
+        # No resource context provided: be permissive with the same rule
+        if has_gen3_create:
+            groups.append("argo-runner")
+
+    # Everyone active gets viewer
     groups.append("argo-viewer")
     return groups
 
