@@ -31,11 +31,11 @@ jobs:
       - name: Build dependencies
         run: helm dependency build helm/argo-stack
       - name: Helm lint (umbrella chart)
-        run: helm lint helm/argo-stack --values helm/argo-stack/values.yaml
+        run: helm lint helm/argo-stack --values helm/argo-stack/ci-values.yaml
       - name: Template chart (default values)
         run: |
           helm template argo-stack helm/argo-stack \
-            --values helm/argo-stack/values.yaml \
+            --values helm/argo-stack/ci-values.yaml \
             --namespace argocd > rendered.yaml
       - name: Setup kubeconform
         uses: bmuschko/setup-kubeconform@v1

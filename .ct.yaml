@@ -6,7 +6,7 @@ check-version-increment: false
 validate-maintainers: false
 
 # Safe for all helm commands (incl. uninstall)
-helm-extra-args: --timeout 20m
+helm-extra-args: --timeout 15m
 
 # Only applied to install/upgrade — OK to tweak values here
 helm-extra-set-args: >
