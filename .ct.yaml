@@ -4,4 +4,4 @@ charts:
   - helm/argo-stack
 check-version-increment: false
 validate-maintainers: false
-helm-extra-args: --timeout 10m
+helm-extra-args: --timeout 15m -f helm/argo-stack/ci-values.yaml
