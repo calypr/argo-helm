@@ -68,4 +68,5 @@ argocdApplication:
   repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
   targetRevision: "main"
   path: "."
-  destinationNamespace: "{{ .Values.namespaces.tenant }}"  # This is in a *template* file, so OK
+  # IMPORTANT: do not template here. Either leave empty or set a literal default.
+  destinationNamespace: ""   # leave empty and let the template default to .Values.namespaces.tenant
