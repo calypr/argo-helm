@@ -25,7 +25,8 @@ kind:
 
 ct: deps
 	ct lint --config .ct.yaml --debug
-	ct install --config .ct.yaml --debug
+	helm upgrade --install argo-stack ./helm/argo-stack
+	# ct install --config .ct.yaml --debug --helm-extra-args "--timeout 1m" --namespace argo-stack-foobar --release-label argo-stack-foobar
 
 adapter:
 	cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q
