@@ -1,6 +1,3 @@
-"""Tests for authorization group decision logic."""
-
-import pytest
 import importlib.util
 import pathlib
 

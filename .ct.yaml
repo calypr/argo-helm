@@ -15,7 +15,6 @@ lint-conf: .ci/lintconf.yaml
 # Only applied to install/upgrade — OK to tweak values here
 helm-extra-set-args: >
   --set argo-cd.enabled=false
-  --set argoCD.enabled=false
   --set argocdApplication.enabled=false
   --set ingress.argoWorkflows.enabled=false
   --set ingress.argocd.enabled=false
