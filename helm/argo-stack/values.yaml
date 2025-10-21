@@ -4,42 +4,42 @@ namespaces:
   tenant: wf-poc
   security: security
 
-argoWorkflows:
-  enabled: true
-  serverAuthMode: server   # or sso
+# Argo Workflows dependency values (no templating here)
+argo-workflows:
+  server:
+    enabled: true
+    secure: false           # so the ingress can talk HTTP to the server
+    extraArgs:
+      - --auth-mode=server  # change to sso when you wire OIDC
+  controller:
+    workflowNamespaces:
+      - wf-poc              # keep in sync with namespaces.tenant
 
+# Argo CD dependency values
 argo-cd:
+  enabled: false
   fullnameOverride: argocd
   global:
     domain: ""
-  configs: {}
-argoCD:
-  enabled: true
 
+# Our adapter settings
 authzAdapter:
-  image: ghcr.io/yourorg/authz-adapter:latest
+  image: ghcr.io/calypr/argo-helm:latest
   fenceBase: "https://calypr-dev.ohsu.edu/user"
   replicas: 2
 
+# On-prem S3 artifacts for Argo Workflows
 s3:
   enabled: false
-  hostname: ""        # on-prem S3 host (required when enabled)
-  bucket: ""          # artifacts bucket
+  hostname: ""
+  bucket: ""
   region: "us-west-2"
   insecure: false
   pathStyle: true
   accessKey: ""
   secretKey: ""
 
-argocdApplication:
-  enabled: true
-  name: nextflow-hello
-  project: default
-  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
-  targetRevision: "main"
-  path: "."
-  destinationNamespace: "{{ .Values.namespaces.tenant }}"
-
+# Ingresses we ship (toggle/hosts)
 ingress:
   argoWorkflows:
     enabled: true
@@ -54,8 +54,19 @@ ingress:
       enabled: false
       secretName: ""
 
-# Auth annotations for NGINX
+# NGINX auth to the adapter
 ingressAuth:
   enabled: true
   authURL: "http://authz-adapter.security.svc.cluster.local:8080/check"
   passAuthorization: true
+
+# Optional: Argo CD Application pointing to nextflow repo
+argocdApplication:
+  enabled: true
+  name: nextflow-hello
+  project: default
+  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
+  targetRevision: "main"
+  path: "."
+  # IMPORTANT: do not template here. Either leave empty or set a literal default.
+  destinationNamespace: ""   # leave empty and let the template default to .Values.namespaces.tenant

@@ -1,0 +1,40 @@
+# Keep namespaces as-is; they’re used in templates
+namespaces:
+  argo: argo
+  argocd: argocd
+  tenant: wf-poc
+  security: security
+
+# Turn off Argo CD & the Application in ct
+argo-cd:
+  enabled: false
+
+argocdApplication:
+  enabled: false
+
+# Disable ingresses for ct
+ingress:
+  argoWorkflows:
+    enabled: false
+  argocd:
+    enabled: false
+
+# Keep the adapter minimal
+authzAdapter:
+  replicas: 1
+
+# No S3 for ct smoke
+s3:
+  enabled: false
+
+# Ensure Argo Workflows server is up (HTTP) and controller installs
+argo-workflows:
+  server:
+    enabled: true
+    secure: false
+    extraArgs:
+      - --auth-mode=server
+  controller:
+    # Let controller manage all namespaces (or leave empty array)
+    workflowNamespaces: []
+

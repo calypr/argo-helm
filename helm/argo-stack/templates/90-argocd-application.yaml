@@ -1,4 +1,6 @@
 {{- if .Values.argocdApplication.enabled }}
+{{- $crd := lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" "applications.argoproj.io" -}}
+{{- if $crd }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
@@ -12,9 +14,10 @@ spec:
     path: {{ .Values.argocdApplication.path | quote }}
   destination:
     name: in-cluster
-    namespace: {{ .Values.argocdApplication.destinationNamespace }}
+    namespace: {{ default .Values.namespaces.tenant .Values.argocdApplication.destinationNamespace }}
   syncPolicy:
     automated:
       prune: false
       selfHeal: true
+{{- end }}
 {{- end }}

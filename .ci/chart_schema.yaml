@@ -1,0 +1,21 @@
+# .ci/chart_schema.yaml (Yamale)
+name: str(required=True)
+apiVersion: str(required=True)
+version: str(required=True)
+type: str(required=False)
+description: str(required=False)
+appVersion: any(required=False)
+kubeVersion: str(required=False)
+
+dependencies: list(include('dep'), required=False)
+---
+dep:
+  name: str(required=True)
+  version: str(required=True)
+  repository: str(required=True)
+  alias: str(required=False)
+  condition: str(required=False)
+  tags: list(str(), required=False)
+  import-values: any(required=False)
+  description: str(required=False)
+
