@@ -24,7 +24,7 @@ argo-cd:
 
 # Our adapter settings
 authzAdapter:
-  image: ghcr.io/yourorg/authz-adapter:latest
+  image: ghcr.io/calypr/argo-helm:latest
   fenceBase: "https://calypr-dev.ohsu.edu/user"
   replicas: 2
 
