@@ -68,12 +68,14 @@ python3 -m pip install --upgrade pip && pip install yamllint
 git clone https://github.com/calypr/argo-helm
 cd argo-helm
 export GITHUB_PATH=$PWD
-# ? 
-#sudo yum install go -y
-#mkdir -p $HOME/.cosign
-#GOBIN=$(go env GOPATH)/bin
-#go install github.com/sigstore/cosign/cmd/cosign@main
-#ln -s $GOBIN/cosign $HOME/.cosign/cosign
+
+# If you need to build cosign from source (instead of using the prebuilt binary above),
+# you will need Go installed. Uncomment and run the following commands:
+# sudo yum install go -y
+# mkdir -p $HOME/.cosign
+# GOBIN=$(go env GOPATH)/bin
+# go install github.com/sigstore/cosign/cmd/cosign@main
+# ln -s $GOBIN/cosign $HOME/.cosign/cosign
 # echo "$HOME/.cosign" >> $GITHUB_PATH
 
 # chart testing
