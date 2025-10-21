@@ -24,8 +24,8 @@ kind:
 	kind create cluster
 
 ct: deps
-	ct lint --config .ct.yaml
-	ct install --config .ct.yaml --print-logs
+	ct lint --config .ct.yaml --debug
+	ct install --config .ct.yaml --debug
 
 adapter:
 	cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q
