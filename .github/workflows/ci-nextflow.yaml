@@ -1,12 +1,6 @@
 name: Nextflow Workflow CI (kind + Argo Workflows)
 
 on:
-  pull_request:
-    paths:
-      - 'helm/**'
-      - 'authz-adapter/**'
-      - '.github/workflows/ci-nextflow.yaml'
-      - 'test-workflows/**'
   push:
     branches:
       - main

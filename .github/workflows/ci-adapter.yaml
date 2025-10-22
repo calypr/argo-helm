@@ -1,10 +1,6 @@
 name: authz-adapter unit tests
 
 on:
-  pull_request:
-    paths:
-      - 'authz-adapter/**'
-      - '.github/workflows/ci-adapter.yaml'
   push:
     branches:
       - main
