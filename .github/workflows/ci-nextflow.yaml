@@ -179,6 +179,9 @@ jobs:
                   cpu: "500m"
           EOF
 
+          # create namespace if not exists
+          kubectl get namespace argocd || kubectl create namespace argocd
+          
           # Render the Helm template
           helm template argo-stack helm/argo-stack \
             --values ci-nextflow-values.yaml \
