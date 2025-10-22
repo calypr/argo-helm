@@ -6,7 +6,10 @@ on:
       - 'authz-adapter/**'
       - '.github/workflows/ci-adapter.yaml'
   push:
-    branches: [ main ]
+    branches:
+      - main
+      - feature/*
+      - debug/*
     paths:
       - 'authz-adapter/**'
       - '.github/workflows/ci-adapter.yaml'
