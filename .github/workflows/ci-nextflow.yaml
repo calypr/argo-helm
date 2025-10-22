@@ -180,12 +180,16 @@ jobs:
           EOF
 
           # create namespace if not exists
-          kubectl get namespace argocd || kubectl create namespace argocd
-          
+          # kubectl get namespace argocd || kubectl create namespace argocd
+          # kubectl label namespace argocd app.kubernetes.io/managed-by=Helm --overwrite
+
           # Render the Helm template
           helm template argo-stack helm/argo-stack \
+            --create-namespace \
             --values ci-nextflow-values.yaml \
-            --namespace argocd > rendered.yaml
+            --namespace argocd \
+            --wait
+
 
           # Install the stack
           helm upgrade --install argo-stack helm/argo-stack \
