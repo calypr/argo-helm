@@ -35,7 +35,7 @@ class ArgoWorkflowTester:
         
         response = requests.post(url, json=request_body, headers=headers)
         
-        if response.status_code == 201:
+        if response.status_code in [200, 201]:
             workflow = response.json()
             print(f"✓ Workflow submitted successfully: {workflow['metadata']['name']}")
             return workflow
