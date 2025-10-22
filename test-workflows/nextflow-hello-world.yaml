@@ -1,0 +1,127 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: nextflow-hello-world-
+  namespace: argo-workflows
+  labels:
+    workflows.argoproj.io/test: nextflow-hello
+    test-type: integration
+spec:
+  entrypoint: nextflow-hello
+  ttlStrategy:
+    secondsAfterCompletion: 300  # Clean up after 5 minutes
+  
+  templates:
+  - name: nextflow-hello
+    container:
+      image: nextflow/nextflow:23.10.0
+      command: ["/bin/bash"]
+      args:
+        - -c
+        - |
+          echo "=== Nextflow Hello World Workflow Test ==="
+          echo "Nextflow version:"
+          nextflow -version
+          
+          echo "Creating simple hello world script..."
+          cat > hello.nf << 'NFEOF'
+          #!/usr/bin/env nextflow
+          
+          process sayHello {
+              input:
+              val x
+              
+              output:
+              stdout
+              
+              script:
+              """
+              echo "Hello World from Nextflow! Input: $x"
+              echo "Current date: \$(date)"
+              echo "Hostname: \$(hostname)"
+              echo "Running in container: \$(cat /proc/1/cgroup | head -1)"
+              """
+          }
+          
+          process createReport {
+              input:
+              val messages
+              
+              output:
+              path "report.txt"
+              
+              script:
+              """
+              echo "Nextflow Hello World Test Report" > report.txt
+              echo "=================================" >> report.txt
+              echo "" >> report.txt
+              echo "Test executed at: \$(date)" >> report.txt
+              echo "Number of messages processed: \$(echo '$messages' | wc -w)" >> report.txt
+              echo "" >> report.txt
+              echo "Messages:" >> report.txt
+              echo '$messages' | tr ' ' '\n' >> report.txt
+              echo "" >> report.txt
+              echo "Test completed successfully!" >> report.txt
+              """
+          }
+          
+          workflow {
+              // Create input channel with test data
+              input_ch = Channel.of('CI-Test', 'Argo-Workflows', 'Kind-Cluster', 'Nextflow-Integration')
+              
+              // Process each input and collect results
+              results = input_ch | sayHello | collect
+              
+              // Create a summary report
+              createReport(results.join(' '))
+              
+              // Display results
+              results | view
+          }
+          NFEOF
+          
+          echo "Running Nextflow hello world workflow..."
+          nextflow run hello.nf -with-trace trace.txt -with-report report.html
+          
+          echo "=== Workflow execution completed ==="
+          echo "Generated files:"
+          ls -la
+          
+          if [ -f "report.txt" ]; then
+              echo "=== Test Report ==="
+              cat report.txt
+          fi
+          
+          if [ -f "trace.txt" ]; then
+              echo "=== Execution Trace ==="
+              cat trace.txt
+          fi
+          
+          echo "=== Nextflow Hello World test successful! ==="
+      
+      resources:
+        requests:
+          memory: "512Mi"
+          cpu: "200m"
+        limits:
+          memory: "1Gi"
+          cpu: "500m"
+      
+      env:
+      - name: NXF_HOME
+        value: "/tmp/.nextflow"
+      - name: NXF_WORK
+        value: "/tmp/work"
+    
+    # Define outputs for the workflow
+    outputs:
+      artifacts:
+      - name: workflow-report
+        path: /tmp/report.txt
+        optional: true
+      - name: execution-trace
+        path: /tmp/trace.txt
+        optional: true
+      - name: execution-report
+        path: /tmp/report.html
+        optional: true
