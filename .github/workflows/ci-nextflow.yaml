@@ -178,11 +178,15 @@ jobs:
                   memory: "512Mi"
                   cpu: "500m"
           EOF
-          
+
+          # Render the Helm template
+          helm template argo-stack helm/argo-stack \
+            --values ci-nextflow-values.yaml \
+            --namespace argocd > rendered.yaml
+
           # Install the stack
-          helm upgrade --install argo-stack ./helm/argo-stack \
+          helm upgrade --install argo-stack helm/argo-stack \
             --namespace argocd \
-            --create-namespace \
             --values ci-nextflow-values.yaml \
             --wait --timeout=10m
 
