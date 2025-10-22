@@ -228,7 +228,8 @@ jobs:
           echo "Running Nextflow workflow execution test..."
           cd test-workflows
           ./setup-rbac.sh
-          python test_nextflow_execution.py
+          cd ..
+          python test-workflows/test_nextflow_execution.py
 
       - name: Check final cluster state
         run: |
