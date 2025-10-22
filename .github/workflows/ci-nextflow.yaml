@@ -196,20 +196,24 @@ jobs:
       - name: Wait for Argo Workflows to be ready
         run: |
           echo "Waiting for Argo Workflows controller..."
-          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argo-workflows-controller \
-            -n argo-workflows --timeout=300s
+          kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/component=workflow-controller   --timeout=120s
+          # kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argo-workflows-controller \
+          #   -n argo-workflows --timeout=300s
           
           echo "Waiting for Argo Workflows server..."
-          kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argo-workflows-server \
-            -n argo-workflows --timeout=300s
+          kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/component=workflow-server   --timeout=120s
+          # kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argo-workflows-server \
+          #   -n argo-workflows --timeout=300s
           
           echo "Checking pod status..."
-          kubectl get pods -n argo-workflows
+          # kubectl get pods -n argo-workflows
+          kubectl get pods
           kubectl get pods -n authz-security || true
 
       - name: Setup port forwarding for Argo Workflows
         run: |
-          kubectl port-forward -n argo-workflows svc/argo-workflows-server 2746:2746 &
+          # kubectl port-forward -n argo-workflows svc/argo-workflows-server 2746:2746 &
+          kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 &
           sleep 10
           
           # Test connectivity
