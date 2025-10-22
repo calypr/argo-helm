@@ -185,17 +185,13 @@ jobs:
 
           # Render the Helm template
           helm template argo-stack helm/argo-stack \
-            --create-namespace \
-            --values ci-nextflow-values.yaml \
-            --namespace argocd \
-            --wait
+          --values helm/argo-stack/values.yaml \
+          --namespace argocd > rendered.yaml
 
 
           # Install the stack
           # --values ci-nextflow-values.yaml \
-          helm upgrade --install argo-stack helm/argo-stack \
-            --namespace argocd \
-            --wait --timeout=10m
+           helm upgrade --install argo-stack ./helm/argo-stack
 
       - name: Wait for Argo Workflows to be ready
         run: |
