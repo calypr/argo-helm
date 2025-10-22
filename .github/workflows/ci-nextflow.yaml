@@ -192,9 +192,9 @@ jobs:
 
 
           # Install the stack
+          # --values ci-nextflow-values.yaml \
           helm upgrade --install argo-stack helm/argo-stack \
             --namespace argocd \
-            --values ci-nextflow-values.yaml \
             --wait --timeout=10m
 
       - name: Wait for Argo Workflows to be ready
