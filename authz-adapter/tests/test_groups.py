@@ -1,5 +1,6 @@
 import importlib.util
 import pathlib
+import pytest
 
 # Load the adapter module directly so we can call decide_groups
 APP_PATH = pathlib.Path(__file__).resolve().parents[1] / "app.py"

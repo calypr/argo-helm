@@ -54,10 +54,20 @@ def fetch_user_doc(auth_header):
         headers["Authorization"] = "Bearer " + SERVICE_TOKEN
     else:
         return None, "no token"
-    r = requests.get(USERINFO_URL, headers=headers, timeout=TIMEOUT)
-    if r.status_code != 200:
-        return None, f"userinfo status {r.status_code}"
-    return r.json(), None
+    
+    try:
+        r = requests.get(USERINFO_URL, headers=headers, timeout=TIMEOUT)
+        if r.status_code != 200:
+            return None, f"userinfo status {r.status_code}"
+        return r.json(), None
+    except requests.exceptions.Timeout:
+        return None, "timeout"
+    except requests.exceptions.ConnectionError:
+        return None, "connection error"
+    except requests.exceptions.RequestException as e:
+        return None, f"request error: {e}"
+    except Exception as e:
+        return None, f"unexpected error: {e}"
 
 @app.route("/check", methods=["GET"])
 def check():

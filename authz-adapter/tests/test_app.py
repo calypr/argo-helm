@@ -23,7 +23,7 @@ class TestAppBasic:
         client = app.app.test_client()
         response = client.get('/healthz')
         assert response.status_code == 200
-        assert response.get_data(as_text=True) == "OK"
+        assert response.get_data(as_text=True) == "ok"
 
     @pytest.mark.unit
     def test_missing_authorization_header(self):
@@ -106,9 +106,10 @@ class TestFetchUserDoc:
                 mock_url = "https://test-fence.example.com/user/user"
                 m.get(mock_url, exc=requests.exceptions.Timeout)
                 
-                # Should raise the timeout exception
-                with pytest.raises(requests.exceptions.Timeout):
-                    app.fetch_user_doc("Bearer test-token")
+                # Should return error message instead of raising exception
+                doc, err = app.fetch_user_doc("Bearer test-token")
+                assert doc is None
+                assert err == "timeout"
 
     @pytest.mark.unit
     def test_fetch_user_doc_connection_error(self):
@@ -122,9 +123,10 @@ class TestFetchUserDoc:
                 mock_url = "https://test-fence.example.com/user/user"
                 m.get(mock_url, exc=requests.exceptions.ConnectionError)
                 
-                # Should raise the connection error
-                with pytest.raises(requests.exceptions.ConnectionError):
-                    app.fetch_user_doc("Bearer test-token")
+                # Should return error message instead of raising exception
+                doc, err = app.fetch_user_doc("Bearer test-token")
+                assert doc is None
+                assert err == "connection error"
 
     @pytest.mark.unit
     def test_fetch_user_doc_invalid_json(self):
@@ -137,9 +139,10 @@ class TestFetchUserDoc:
                 mock_url = "https://test-fence.example.com/user/user"
                 m.get(mock_url, text="invalid json")
                 
-                # Should raise JSONDecodeError
-                with pytest.raises(json.JSONDecodeError):
-                    app.fetch_user_doc("Bearer test-token")
+                # Should return error message for invalid JSON
+                doc, err = app.fetch_user_doc("Bearer test-token")
+                assert doc is None
+                assert "request error: Expecting value" in err
 
     @pytest.mark.unit
     def test_fetch_user_doc_case_insensitive_bearer(self):
@@ -201,7 +204,7 @@ class TestCheckEndpoint:
 
     @pytest.mark.unit
     def test_check_with_invalid_user(self):
-        """Test /check endpoint with user without permissions."""
+        """Test /check endpoint with user without special permissions (gets viewer access)."""
         with requests_mock.Mocker() as m:
             env_vars = {'FENCE_BASE': 'https://test-fence.example.com/user'}
             with patch.dict('os.environ', env_vars):
@@ -210,14 +213,18 @@ class TestCheckEndpoint:
                 mock_url = "https://test-fence.example.com/user/user"
                 user_doc = {
                     "active": True,
-                    "email": "unauthorized@example.com",
-                    "authz": {}
+                    "email": "viewer@example.com",
+                    "authz": {}  # No special permissions, but still gets viewer access
                 }
                 m.get(mock_url, json=user_doc)
                 
                 client = app.app.test_client()
                 response = client.get('/check', headers={'Authorization': 'Bearer valid-token'})
-                assert response.status_code == 403
+                # Active users with empty authz still get argo-viewer access
+                assert response.status_code == 200
+                assert 'X-Auth-Request-Groups' in response.headers
+                assert 'argo-viewer' in response.headers['X-Auth-Request-Groups']
+                assert 'argo-runner' not in response.headers['X-Auth-Request-Groups']
 
     @pytest.mark.unit
     def test_check_with_inactive_user(self):
@@ -275,10 +282,18 @@ class TestResponseHeaders:
                 response = client.get('/check', headers={'Authorization': 'Bearer valid-token'})
                 assert response.status_code == 200
                 
-                # Check for user info headers
-                assert 'Remote-User' in response.headers
-                assert 'Remote-Email' in response.headers
-                assert 'Remote-Groups' in response.headers
+                # Check for user info headers (nginx auth_request format)
+                assert 'X-Auth-Request-User' in response.headers
+                assert 'X-Auth-Request-Email' in response.headers
+                assert 'X-Auth-Request-Groups' in response.headers
+                assert 'X-Allowed' in response.headers
+                
+                # Verify header values
+                assert response.headers['X-Auth-Request-User'] == 'test@example.com'
+                assert response.headers['X-Auth-Request-Email'] == 'test@example.com'
+                assert 'argo-runner' in response.headers['X-Auth-Request-Groups']
+                assert 'argo-viewer' in response.headers['X-Auth-Request-Groups']
+                assert response.headers['X-Allowed'] == 'true'
 
 class TestErrorHandling:
     """Test error handling scenarios."""

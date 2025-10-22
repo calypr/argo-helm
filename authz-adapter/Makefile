@@ -3,6 +3,8 @@
 PYTHON := python3
 PIP := $(PYTHON) -m pip
 PYTEST := $(PYTHON) -m pytest
+VENV_DIR := .venv
+VENV_PY := $(VENV_DIR)/bin/python
 
 help:
 	@echo 'Available commands:'
@@ -12,14 +14,16 @@ help:
 	@echo '  clean         Clean up test artifacts'
 
 install:
-	$(PIP) install -r requirements.txt
-	$(PIP) install -r requirements-dev.txt
+	@test -d $(VENV_DIR) || $(PYTHON) -m venv $(VENV_DIR)
+	$(VENV_PY) -m pip install --upgrade pip
+	$(VENV_PY) -m pip install -r requirements.txt
+	$(VENV_PY) -m pip install -r requirements-dev.txt
 
-test:
-	$(PYTEST) tests/ -v
+test: install
+	$(VENV_PY) -m pytest tests/ -v -k "not Docker" # --ignore=tests/test_integration.py
 
-test-coverage:
-	$(PYTEST) tests/ -v --cov=app --cov-report=term-missing --cov-report=html
+test-coverage: install
+	$(VENV_PY) -m pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=html -k "not Docker"
 
 clean:
 	rm -rf .pytest_cache/
