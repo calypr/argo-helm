@@ -2,11 +2,12 @@ apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: nextflow-hello-world-
-  namespace: argo-workflows
+  namespace: wf-poc
   labels:
     workflows.argoproj.io/test: nextflow-hello
     test-type: integration
 spec:
+  serviceAccountName: nextflow-workflow-sa
   entrypoint: nextflow-hello
   ttlStrategy:
     secondsAfterCompletion: 300  # Clean up after 5 minutes

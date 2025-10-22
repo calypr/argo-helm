@@ -21,13 +21,19 @@ class ArgoWorkflowTester:
         with open(workflow_yaml, 'r') as f:
             workflow_spec = yaml.safe_load(f)
         
-        url = f"{self.api_url}/workflows/argo-workflows"
+        url = f"{self.api_url}/workflows/wf-poc"
         headers = {'Content-Type': 'application/json'}
         
         print(f"Submitting workflow to {url}")
         print(f"Workflow name pattern: {workflow_spec['metadata']['generateName']}")
+
+        # Argo Workflows API expects the workflow to be wrapped in a request body
+        request_body = {
+            "workflow": workflow_spec
+        }
         
-        response = requests.post(url, json=workflow_spec, headers=headers)
+        
+        response = requests.post(url, json=request_body, headers=headers)
         
         if response.status_code == 201:
             workflow = response.json()
@@ -36,6 +42,18 @@ class ArgoWorkflowTester:
         else:
             print(f"✗ Failed to submit workflow: {response.status_code}")
             print(f"Response: {response.text}")
+            
+            # Check for RBAC issues
+            if "forbidden" in response.text.lower() or response.status_code == 403:
+                print("\n🔒 RBAC Permission Issue Detected!")
+                print("This appears to be a Kubernetes RBAC (Role-Based Access Control) issue.")
+                print("Please ensure the following resources are applied:")
+                print("  kubectl apply -f rbac/workflow-rbac.yaml")
+                print("\nOr create the necessary RBAC resources manually:")
+                print("  1. ServiceAccount: nextflow-workflow-sa")
+                print("  2. Role with pod creation permissions")
+                print("  3. RoleBinding linking the ServiceAccount to the Role")
+            
             raise Exception(f"Workflow submission failed: {response.status_code}")
     
     def get_workflow_status(self, namespace: str, name: str) -> Dict[str, Any]:
@@ -73,6 +91,15 @@ class ArgoWorkflowTester:
                 
                 elapsed = int(time.time() - start_time)
                 print(f"[{elapsed:3d}s] Workflow {name} status: {phase} (progress: {progress})")
+                
+                # Check for RBAC errors in workflow status
+                if phase == 'Failed':
+                    status = workflow.get('status', {})
+                    message = status.get('message', '')
+                    if 'forbidden' in message.lower() or 'serviceaccount' in message.lower():
+                        print(f"\n🔒 RBAC Error detected in workflow: {message}")
+                        print("Please apply RBAC configuration: kubectl apply -f rbac/workflow-rbac.yaml")
+                        return workflow
                 
                 if phase in ['Succeeded', 'Failed', 'Error']:
                     return workflow
@@ -163,6 +190,11 @@ def main():
     print("===================================")
     print(f"Argo Workflows URL: {args.argo_url}")
     print(f"Workflow file: {args.workflow_file}")
+    print()
+    print("📋 Prerequisites:")
+    print("  1. Argo Workflows server running and accessible")
+    print("  2. RBAC resources applied: kubectl apply -f rbac/workflow-rbac.yaml")
+    print("  3. Workflow namespace 'wf-poc' exists")
     print()
     
     # Test connectivity to Argo Workflows
