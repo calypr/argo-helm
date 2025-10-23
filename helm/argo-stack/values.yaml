@@ -16,9 +16,9 @@ argo-workflows:
       - wf-poc              # keep in sync with namespaces.tenant
 
 # Argo CD dependency values
-argo-cd:
+argocd:
   enabled: false
-  fullnameOverride: argocd
+  # fullnameOverride: argocd
   global:
     domain: ""
 
