@@ -39,7 +39,7 @@ deploy: kind
 	echo starting port forwards
 	kubectl -n default port-forward svc/argo-stack-argo-workflows-server 2746:2746 --address=0.0.0.0 &
 	kubectl port-forward svc/argocd-server -n argocd 8080:443 --address=0.0.0.0 &
-	echo UIs available of port 2746 and port 8080
+	echo UIs available on port 2746 and port 8080
 
 adapter:
 	cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q
