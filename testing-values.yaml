@@ -38,8 +38,6 @@ argoWorkflows:
 argocd:
   enabled: true
 
-argo-cd:
-  enabled: true
 
 # 🎯 Sample Application (Optional)
 argocdApplication:
