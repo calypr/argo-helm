@@ -9,12 +9,12 @@ namespaces:
 # For a real aws bucket
 s3:
   enabled: true
-  bucket: "TODO"
+  bucket: "${S3_BUCKET}"             # Set via environment variable
   region: "us-east-1"
   insecure: false                    # Set false for HTTPS
   pathStyle: false                   # MinIO compatibility
-  accessKey: "TODO"       # S3 credentials
-  secretKey: "TODO"
+  accessKey: "${S3_ACCESS_KEY}"      # Set via environment variable
+  secretKey: "${S3_SECRET_KEY}"      # Set via environment variable
 
 # 🔐 Authorization Adapter
 #authzAdapter:
