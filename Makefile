@@ -29,9 +29,8 @@ ct: deps
 
 deploy: kind 
 	helm template argo-stack helm/argo-stack \
-          --values my-values.yaml \
+          --values testing-values.yaml \
           --namespace argocd > rendered.yaml
-	# kubectl create namespace argocd || true
 	helm upgrade --install argo-stack ./helm/argo-stack
 	kubectl apply -n argocd -f https://raw.githubusercontent.com/argoproj/argo-cd/stable/manifests/install.yaml
 	echo waiting for pods
