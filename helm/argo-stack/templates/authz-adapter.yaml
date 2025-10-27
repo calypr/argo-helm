@@ -1,3 +1,4 @@
+{{- if .Values.authzAdapter.enabled | default true }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -5,6 +6,9 @@ metadata:
   namespace: {{ .Values.namespaces.security }}
   labels:
     app: authz-adapter
+    app.kubernetes.io/name: authz-adapter
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   replicas: {{ .Values.authzAdapter.replicas }}
   selector:
@@ -31,9 +35,13 @@ metadata:
   namespace: {{ .Values.namespaces.security }}
   labels:
     app: authz-adapter
+    app.kubernetes.io/name: authz-adapter
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
 spec:
   selector:
     app: authz-adapter
   ports:
   - port: 8080
     targetPort: 8080
+{{- end }}
