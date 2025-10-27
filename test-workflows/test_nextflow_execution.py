@@ -175,6 +175,57 @@ def test_connectivity(base_url: str) -> bool:
         print(f"✗ Cannot access Argo Workflows API at {base_url}: {e}")
         return False
 
+def verify_namespace_setup() -> bool:
+    """Verify that required namespaces and RBAC are properly configured."""
+    try:
+        import subprocess
+        
+        print("🔍 Verifying namespace and RBAC setup...")
+        
+        # Check if required namespaces exist
+        required_namespaces = ['argo-workflows', 'wf-poc', 'security']
+        
+        for ns in required_namespaces:
+            result = subprocess.run(['kubectl', 'get', 'namespace', ns], 
+                                  capture_output=True, text=True)
+            if result.returncode == 0:
+                print(f"✓ Namespace '{ns}' exists")
+            else:
+                print(f"✗ Namespace '{ns}' not found")
+                print(f"  Create with: kubectl create namespace {ns}")
+                return False
+        
+        # Check if ServiceAccount exists in wf-poc namespace
+        result = subprocess.run(['kubectl', 'get', 'serviceaccount', 'nextflow-workflow-sa', '-n', 'wf-poc'], 
+                              capture_output=True, text=True)
+        if result.returncode == 0:
+            print("✓ ServiceAccount 'nextflow-workflow-sa' exists in wf-poc namespace")
+        else:
+            print("✗ ServiceAccount 'nextflow-workflow-sa' not found in wf-poc namespace")
+            print("  Apply RBAC with: kubectl apply -f rbac/workflow-rbac.yaml")
+            return False
+        
+        # Check Argo Workflows deployment location
+        result = subprocess.run(['kubectl', 'get', 'deployment', '-l', 'app.kubernetes.io/name=argo-workflows-server', '--all-namespaces'], 
+                              capture_output=True, text=True)
+        if result.returncode == 0:
+            print("🔍 Argo Workflows server deployment locations:")
+            lines = result.stdout.strip().split('\n')[1:]  # Skip header
+            for line in lines:
+                if line.strip():
+                    parts = line.split()
+                    namespace = parts[0]
+                    deployment = parts[1]
+                    print(f"  - {deployment} in namespace '{namespace}'")
+                    if namespace != 'argo-workflows':
+                        print(f"    ⚠️  Expected in 'argo-workflows' namespace, found in '{namespace}'")
+        
+        return True
+        
+    except Exception as e:
+        print(f"Error verifying setup: {e}")
+        return False
+
 def main():
     parser = argparse.ArgumentParser(description='Test Nextflow workflow execution in Argo Workflows')
     parser.add_argument('--argo-url', default='http://localhost:2746', 
@@ -191,10 +242,17 @@ def main():
     print(f"Argo Workflows URL: {args.argo_url}")
     print(f"Workflow file: {args.workflow_file}")
     print()
-    print("📋 Prerequisites:")
+    
+    # Verify namespace setup first
+    if not verify_namespace_setup():
+        print("\n❌ Namespace/RBAC setup verification failed!")
+        print("Please fix the issues above before running workflows.")
+        sys.exit(1)
+    
+    print("\n📋 Prerequisites:")
     print("  1. Argo Workflows server running and accessible")
     print("  2. RBAC resources applied: kubectl apply -f rbac/workflow-rbac.yaml")
-    print("  3. Workflow namespace 'wf-poc' exists")
+    print("  3. All required namespaces exist and are properly configured")
     print()
     
     # Test connectivity to Argo Workflows

@@ -1,0 +1,39 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: authz-adapter
+  namespace: {{ .Values.namespaces.security }}
+  labels:
+    app: authz-adapter
+spec:
+  replicas: {{ .Values.authzAdapter.replicas }}
+  selector:
+    matchLabels:
+      app: authz-adapter
+  template:
+    metadata:
+      labels:
+        app: authz-adapter
+    spec:
+      containers:
+      - name: authz-adapter
+        image: {{ .Values.authzAdapter.image }}
+        env:
+        - name: FENCE_BASE
+          value: {{ .Values.authzAdapter.fenceBase | quote }}
+        ports:
+        - containerPort: 8080
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: authz-adapter
+  namespace: {{ .Values.namespaces.security }}
+  labels:
+    app: authz-adapter
+spec:
+  selector:
+    app: authz-adapter
+  ports:
+  - port: 8080
+    targetPort: 8080
