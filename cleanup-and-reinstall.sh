@@ -34,6 +34,11 @@ for ns in argo-workflows argo argocd; do
     fi
 done
 
+# Fix CRD ownership conflicts
+echo "🔧 Fixing CRD ownership conflicts..."
+chmod +x fix-crd-ownership.sh
+./fix-crd-ownership.sh
+
 # Clean up specific resources that might be orphaned
 echo "Cleaning up potentially orphaned resources..."
 
@@ -48,7 +53,6 @@ echo "Waiting for resources to be fully deleted..."
 sleep 5
 
 # Optionally clean up namespaces (commented out by default to be safe)
-# Uncomment if you want to start completely fresh
 # echo "Cleaning up namespaces (uncomment if desired)..."
 # kubectl delete namespace wf-poc argocd argo-workflows security --ignore-not-found
 
