@@ -1,7 +1,7 @@
 # 🏗️ Namespace Configuration
 namespaces:
   argo: argo                    # Argo Workflows namespace
-  argocd: argocd               # Argo CD namespace
+  argocd: argocd # Argo CD namespace
   tenant: wf-poc               # Workflow execution namespace
   security: security           # AuthZ adapter namespace
 
