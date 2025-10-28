@@ -31,13 +31,13 @@ deploy: kind
 	helm template argo-stack helm/argo-stack \
           --values testing-values.yaml \
           --namespace argocd > rendered.yaml
-	helm upgrade --install argo-stack ./helm/argo-stack  --values testing-values.yaml 
+	helm upgrade --install argo-stack ./helm/argo-stack # --debug #  --values testing-values.yaml 
 	echo waiting for pods
 	sleep 10
-	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s # -n argocd
+	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
 	echo starting port forwards
-	kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 --address=0.0.0.0 -n default & # -n argo
-	kubectl port-forward svc/argo-stack-argocd-server         8080:443  --address=0.0.0.0 -n default & # -n argocd 
+	kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 --address=0.0.0.0 -n argo-workflows &
+	kubectl port-forward svc/argo-stack-argocd-server         8080:443  --address=0.0.0.0 -n argocd &
 	echo UIs available on port 2746 and port 8080
 
 adapter:
@@ -45,6 +45,6 @@ adapter:
 
 password:
 	kubectl get secret argocd-initial-admin-secret \
-          -o jsonpath="{.data.password}"  -n default | base64 -d; echo  #  -n argocd 
+          -o jsonpath="{.data.password}"  -n argocd | base64 -d; echo  #  -n argocd 
 
 all: lint template validate kind ct adapter
