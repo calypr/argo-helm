@@ -190,12 +190,12 @@ jobs:
       - name: Wait for Argo Workflows to be ready
         run: |
           echo "Waiting for Argo Workflows controller..."
-          kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/component=workflow-controller   --timeout=120s
+          kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/component=workflow-controller   --timeout=120s --all-workflows
           # kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argo-workflows-controller \
           #   -n argo-workflows --timeout=300s
           
           echo "Waiting for Argo Workflows server..."
-          kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/component=server   --timeout=120s
+          kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/component=server   --timeout=120s --all-workflows
           # kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=argo-workflows-server \
           #   -n argo-workflows --timeout=300s
           
