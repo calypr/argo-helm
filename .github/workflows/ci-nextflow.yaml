@@ -206,8 +206,7 @@ jobs:
 
       - name: Setup port forwarding for Argo Workflows
         run: |
-          # kubectl port-forward -n argo-workflows svc/argo-workflows-server 2746:2746 &
-          kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 &
+          kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 -n argo-workflows &
           sleep 10
           
           # Test connectivity
