@@ -3,7 +3,7 @@ namespaces:
   argo: argo                    # Argo Workflows namespace
   argocd: argocd # Argo CD namespace
   tenant: wf-poc               # Workflow execution namespace
-  security: security           # AuthZ adapter namespace
+  security: security # AuthZ adapter namespace
 
 # 🗄️ S3 Artifact Storage
 # For a real aws bucket
