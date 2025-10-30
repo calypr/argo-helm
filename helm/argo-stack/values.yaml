@@ -24,6 +24,7 @@ argo-cd:
   applications:
     enabled: true
     namespace: argocd                       # where Argo CD runs
+  namespaceOverride: argocd
 
 
 # Our adapter settings
