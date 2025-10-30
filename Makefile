@@ -46,6 +46,6 @@ password:
           -o jsonpath="{.data.password}"  -n argocd | base64 -d; echo  #  -n argocd 
 
 login:
-	argocd login localhost:8080 --skip-test-tls --insecure --name admin --password `kubectl get secret argocd-initial-admin-secret           -o jsonpath="{.data.password}"  -n argocd | base64 -d`
+	argocd login localhost:8080 --skip-test-tls --insecure --name admin --password `kubectl get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"  -n argocd | base64 -d`
 
 all: lint template validate kind ct adapter
