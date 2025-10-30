@@ -20,17 +20,11 @@ argo-workflows:
   namespaceOverride: argo-workflows
 
 # Argo CD dependency values
-argocd:
-  enabled: true
-  # Force namespace for ArgoCD
-  namespace: argocd
-  global:
-    domain: ""
-
 argo-cd:
-  namespaceOverride: argocd
-# Disable automatic namespace creation by subchart
-  createNamespace: false
+  applications:
+    enabled: true
+    namespace: argocd                       # where Argo CD runs
+
 
 # Our adapter settings
 authzAdapter:
@@ -76,7 +70,7 @@ ingressAuth:
 argocdApplication:
   enabled: true
   name: nextflow-hello
-  # project: default
+  project: default
   repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
   targetRevision: "main"
   path: "."
