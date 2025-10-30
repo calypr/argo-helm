@@ -5,6 +5,7 @@ deps:
 	helm repo add argo https://argoproj.github.io/argo-helm
 	helm repo update
 	helm dependency build helm/argo-stack
+	# kubectl apply -k https://github.com/argoproj/argo-cd/manifests/crds\?ref\=stable 
 
 lint:
 	helm lint helm/argo-stack --values helm/argo-stack/values.yaml
@@ -27,11 +28,8 @@ ct: deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
-deploy: kind 
-	helm template argo-stack helm/argo-stack \
-          --values testing-values.yaml \
-          --namespace argocd > rendered.yaml
-	helm upgrade --install argo-stack ./helm/argo-stack # --debug #  --values testing-values.yaml 
+deploy: kind deps
+	helm upgrade --install argo-stack ./helm/argo-stack -n argocd --create-namespace --wait --atomic # --debug #  --values testing-values.yaml 
 	echo waiting for pods
 	sleep 10
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
@@ -46,5 +44,8 @@ adapter:
 password:
 	kubectl get secret argocd-initial-admin-secret \
           -o jsonpath="{.data.password}"  -n argocd | base64 -d; echo  #  -n argocd 
+
+login:
+	argocd login localhost:8080 --skip-test-tls --insecure --name admin --password `kubectl get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"  -n argocd | base64 -d`
 
 all: lint template validate kind ct adapter
