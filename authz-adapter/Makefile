@@ -19,9 +19,18 @@ install:
 	$(VENV_PY) -m pip install -r requirements.txt
 	$(VENV_PY) -m pip install -r requirements-dev.txt
 
-test: install
-	$(VENV_PY) -m pytest tests/ -v -k "not Docker" # --ignore=tests/test_integration.py
+# Run all tests by default
+test: test-coverage
 
+# Run only unit tests
+test-unit: install
+	$(VENV_PY) -m pytest tests/ -v -k "not Docker" --ignore=tests/test_integration.py
+
+# Run unit and integration tests
+test-integration: install
+	$(VENV_PY) -m pytest tests/ -v -k "not Docker"
+
+# Run tests with coverage (excludes Docker tests)
 test-coverage: install
 	$(VENV_PY) -m pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=html -k "not Docker"
 
