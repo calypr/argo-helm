@@ -1,0 +1,47 @@
+# 🏗️ Namespace Configuration
+namespaces:
+  argo: argo                    # Argo Workflows namespace
+  argocd: argocd # Argo CD namespace
+  tenant: wf-poc               # Workflow execution namespace
+  security: security # AuthZ adapter namespace
+
+# 🗄️ S3 Artifact Storage
+# For a real aws bucket
+s3:
+  enabled: true
+  bucket: "${S3_BUCKET}"             # Set via environment variable
+  region: "us-east-1"
+  insecure: false                    # Set false for HTTPS
+  pathStyle: false                   # MinIO compatibility
+  accessKey: "${S3_ACCESS_KEY}"      # Set via environment variable
+  secretKey: "${S3_SECRET_KEY}"      # Set via environment variable
+
+# 🔐 Authorization Adapter
+#authzAdapter:
+#  image: "ghcr.io/yourorg/authz-adapter:latest"
+#  fenceBase: "https://calypr-dev.ohsu.edu/user"
+#  replicas: 2                        # HA deployment
+#  resources:
+#    requests:
+#      cpu: 50m
+#      memory: 128Mi
+#    limits:
+#      cpu: 200m
+#      memory: 256Mi
+
+# 🔄 Argo Workflows Configuration
+argoWorkflows:
+  enabled: true
+  serverAuthMode: "server"           # Options: server, sso, client
+
+# 📦 Argo CD Configuration
+argocd:
+  enabled: true
+
+
+# 🎯 Sample Application (Optional)
+argocdApplication:
+  enabled: true
+  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
+  targetRevision: "main"
+  path: "."

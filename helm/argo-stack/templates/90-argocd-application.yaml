@@ -1,11 +1,11 @@
 {{- if .Values.argocdApplication.enabled }}
-{{- $crd := lookup "apiextensions.k8s.io/v1" "CustomResourceDefinition" "" "applications.argoproj.io" -}}
-{{- if $crd }}
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
   name: {{ .Values.argocdApplication.name }}
   namespace: {{ .Values.namespaces.argocd }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here  
 spec:
   project: {{ .Values.argocdApplication.project }}
   source:
@@ -19,5 +19,4 @@ spec:
     automated:
       prune: false
       selfHeal: true
-{{- end }}
 {{- end }}

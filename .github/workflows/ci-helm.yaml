@@ -1,11 +1,6 @@
 name: Helm CI (lint, kubeconform, ct install)
 
 on:
-  pull_request:
-    paths:
-      - 'helm/**'
-      - '.github/workflows/ci-helm.yaml'
-      - '.ct.yaml'
   push:
     branches:
       - main

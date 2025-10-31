@@ -1,32 +1,39 @@
 namespaces:
-  argo: argo
+  argo: argo-workflows
   argocd: argocd
   tenant: wf-poc
   security: security
 
-# Argo Workflows dependency values (no templating here)
+# Argo Workflows dependency values
 argo-workflows:
   server:
     enabled: true
-    secure: false           # so the ingress can talk HTTP to the server
+    secure: false
     extraArgs:
-      - --auth-mode=server  # change to sso when you wire OIDC
+      - --auth-mode=server
   controller:
     workflowNamespaces:
-      - wf-poc              # keep in sync with namespaces.tenant
+      - wf-poc
+    # Ensure controller uses correct namespace
+    namespaceInstallMode: true
+  # Force namespace for all Argo Workflows components
+  namespaceOverride: argo-workflows
 
 # Argo CD dependency values
 argo-cd:
-  enabled: false
-  fullnameOverride: argocd
-  global:
-    domain: ""
+  applications:
+    enabled: true
+    namespace: argocd                       # where Argo CD runs
+  namespaceOverride: argocd
+
 
 # Our adapter settings
 authzAdapter:
   image: ghcr.io/calypr/argo-helm:latest
   fenceBase: "https://calypr-dev.ohsu.edu/user"
   replicas: 2
+  # Ensure adapter uses security namespace
+  namespace: security
 
 # On-prem S3 artifacts for Argo Workflows
 s3:
@@ -69,4 +76,4 @@ argocdApplication:
   targetRevision: "main"
   path: "."
   # IMPORTANT: do not template here. Either leave empty or set a literal default.
-  destinationNamespace: ""   # leave empty and let the template default to .Values.namespaces.tenant
+#   destinationNamespace: ""   # leave empty and let the template default to .Values.namespaces.tenant
