@@ -30,7 +30,7 @@ test-unit: install
 test-integration: install
 	$(VENV_PY) -m pytest tests/ -v -k "not Docker"
 
-# Run unit, integration, and coverage tests
+# Run tests with coverage (excludes Docker tests)
 test-coverage: install
 	$(VENV_PY) -m pytest tests/ -v --cov=app --cov-report=term-missing --cov-report=html -k "not Docker"
 
