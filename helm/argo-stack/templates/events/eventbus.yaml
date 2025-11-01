@@ -1,0 +1,15 @@
+{{- if and .Values.events.enabled .Values.events.eventBus.create }}
+apiVersion: argoproj.io/v1alpha1
+kind: EventBus
+metadata:
+  name: {{ .Values.events.eventBus.name | default "default" }}
+  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  labels:
+    app.kubernetes.io/name: argo-events
+    app.kubernetes.io/part-of: argo-stack
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here      
+spec:
+  nats:
+    native: {{ toYaml (.Values.events.eventBus.natsNative | default dict) | nindent 8 }}
+{{- end }}

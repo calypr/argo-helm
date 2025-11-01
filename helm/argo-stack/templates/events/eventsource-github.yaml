@@ -1,0 +1,70 @@
+{{- if and .Values.events.enabled .Values.events.github.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: {{ .Values.events.github.name | default "github" }}
+  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  labels:
+    app.kubernetes.io/name: argo-events
+    app.kubernetes.io/part-of: argo-stack
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here      
+spec:
+  github:
+    {{ .Values.events.github.eventName | default "repo-push" }}:
+      owner: {{ .Values.events.github.owner | quote }}
+      repository: {{ .Values.events.github.repository | quote }}
+      events: {{ toYaml (.Values.events.github.events | default (list "push")) | nindent 8 }}
+      active: {{ .Values.events.github.active | default true }}
+      {{- with .Values.events.github.webhook }}
+      webhook:
+        endpoint: {{ .endpoint | default "/events" | quote }}
+        port: "{{ .port | default 12000 }}"
+      {{- end }}
+      {{- if .Values.events.github.secret.name }}
+      secret:
+        name: {{ .Values.events.github.secret.name }}
+        key: {{ .Values.events.github.secret.tokenKey | default "token" }}
+      {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.events.github.name | default "github" }}-eventsource-svc
+  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  labels:
+    eventsource-name: {{ .Values.events.github.name | default "github" }}
+spec:
+  selector:
+    eventsource-name: {{ .Values.events.github.name | default "github" }}
+  ports:
+    - name: webhook
+      port: {{ .Values.events.github.webhook.port | default 12000 }}
+      targetPort: 12000
+  type: {{ .Values.events.github.webhook.service.type | default "ClusterIP" }}
+{{- if .Values.events.github.webhook.ingress.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.events.github.name | default "github" }}-eventsource
+  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.events.github.webhook.ingress.className | default "nginx" | quote }}
+spec:
+  rules:
+  {{- range $h := (.Values.events.github.webhook.ingress.hosts | default list) }}
+    - host: {{ $h }}
+      http:
+        paths:
+          - path: {{ $.Values.events.github.webhook.endpoint | default "/events" }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Values.events.github.name | default "github" }}-eventsource-svc
+                port:
+                  number: {{ $.Values.events.github.webhook.port | default 12000 }}
+  {{- end }}
+  tls: {{ toYaml (.Values.events.github.webhook.ingress.tls | default list) | nindent 4 }}
+{{- end }}
+{{- end }}
