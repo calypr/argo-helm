@@ -13,3 +13,7 @@ dependencies:
     version: 7.6.12
     repository: https://argoproj.github.io/argo-helm
     condition: argo-cd.enabled
+  - name: argo-events
+    version: "2.x.x"
+    repository: "https://argoproj.github.io/argo-helm"
+    condition: events.enabled    
