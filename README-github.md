@@ -150,12 +150,7 @@ workflow-controller-…
 
 2. Watch Argo Workflows:
    ```bash
-   kubectl get wf -n argo
-   ```
-
-3. Or open the UI:
-   ```bash
-   kubectl -n argo port-forward svc/argo-workflows-server 2746:2746
+   kubectl get wf -n argo-workflows
    open http://localhost:2746
    ```
 
