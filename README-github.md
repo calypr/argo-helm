@@ -91,7 +91,7 @@ events:
   sensor:
     enabled: true
     name: run-nextflow-on-push
-    workflowNamespace: argo
+    workflowNamespace: argo-workflows
     workflowTemplateRef: nextflow-hello-template
 ```
 
