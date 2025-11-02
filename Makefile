@@ -5,7 +5,6 @@ deps:
 	helm repo add argo https://argoproj.github.io/argo-helm
 	helm repo update
 	helm dependency build helm/argo-stack
-	# kubectl apply -k https://github.com/argoproj/argo-cd/manifests/crds\?ref\=stable 
 
 lint:
 	helm lint helm/argo-stack --values helm/argo-stack/values.yaml
@@ -29,7 +28,17 @@ ct: deps
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
 deploy: kind deps
-	helm upgrade --install argo-stack ./helm/argo-stack -n argocd --create-namespace --wait --atomic # --debug #  --values testing-values.yaml 
+ifndef GITHUB_PAT
+	$(error GITHUB_PAT is undefined. Run 'export GITHUB_PAT=...' before installing)
+endif
+ifndef ARGOCD_SECRET_KEY
+        $(error ARGOCD_SECRET_KEY is undefined. Run 'export ARGOCD_SECRET_KEY=...' before installing)
+endif
+	helm upgrade --install \
+		argo-stack ./helm/argo-stack -n argocd --create-namespace \
+		--wait --atomic \
+		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
+		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" # --debug #  --values testing-values.yaml 
 	echo waiting for pods
 	sleep 10
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
