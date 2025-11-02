@@ -33,7 +33,7 @@ The Argo Events controller listens for GitHub push events, verifies them with yo
   - **Argo CD** (optional, for GitOps sync)
 - Helm v3+
 - Cluster namespaces:
-  - `argo` (for workflows)
+  - `argo-workflows` (for workflows)
   - `argo-events` (for event sources)
 - Access to a GitHub repository where you can manage webhooks.
 
