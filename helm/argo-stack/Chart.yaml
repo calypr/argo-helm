@@ -17,4 +17,3 @@ dependencies:
     version: "2.x.x"
     repository: "https://argoproj.github.io/argo-helm"
     condition: events.enabled
-    
