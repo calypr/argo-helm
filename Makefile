@@ -34,6 +34,9 @@ endif
 ifndef ARGOCD_SECRET_KEY
         $(error ARGOCD_SECRET_KEY is undefined. Run 'export ARGOCD_SECRET_KEY=...' before installing)
 endif
+ifndef ARGO_HOSTNAME
+        $(error ARGO_HOSTNAME is undefined. Run 'export ARGO_HOSTNAME=...' before installing)
+endif
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
