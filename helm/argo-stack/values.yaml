@@ -31,7 +31,7 @@ argo-cd:
     secret:
       create: true
       # provide a strong random key (hex or base64 is fine)
-      extra:
+      extra: {}  # MUST be a map, not a string/boolean
       # Never commit your real token in a Git repo. instead, override it at deploy time using:
       # export ARGO_CD_SECRET=replace with output of: openssl rand -hex 32
       # helm upgrade --install ... argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}"
@@ -126,7 +126,7 @@ events:
       service:
         type: ClusterIP
       ingress:
-        enabled: false
+        enabled: true
         className: nginx
         hosts: []
         tls: []
@@ -134,7 +134,7 @@ events:
   sensor:
     enabled: true
     name: run-nextflow-on-push
-    workflowNamespace: argo-workflows
+    workflowNamespace: wf-poc
     workflowTemplateRef: nextflow-hello-template
     parameters:
       - name: git_revision
