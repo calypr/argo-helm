@@ -1,0 +1,43 @@
+{{- if and .Values.events.enabled .Values.events.sensor.enabled }}
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: {{ .Values.events.sensor.name | default "run-nextflow-on-push" }}
+  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  labels:
+    app.kubernetes.io/name: argo-events
+    app.kubernetes.io/part-of: argo-stack
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here     
+spec:
+  dependencies:
+    - name: push
+      eventSourceName: {{ .Values.events.github.name | default "github" }}
+      eventName: {{ .Values.events.github.eventName | default "repo-push" }}
+  triggers:
+    - template:
+        name: submit-wf
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: nextflow-hello-
+                namespace: {{ .Values.events.sensor.workflowNamespace | default "argo" }}
+              spec:
+                entrypoint: main
+                arguments:
+                  parameters:
+                  # ✅ simplest: print the whole expression, then quote it
+                    - name: git_revision
+                      value: {{ printf "{{(events.push.body.head_commit.id)}}" | quote }}                    
+                workflowTemplateRef:
+                  name: {{ .Values.events.sensor.workflowTemplateRef | default "nextflow-hello-template" }}
+    - template:
+        name: log-event
+        log:
+          intervalSeconds: 1
+          compressEvents: false
+{{- end }}
