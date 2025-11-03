@@ -123,6 +123,7 @@ events:
     webhook:
       endpoint: /events
       port: 12000
+      # set `url` as set-string events.github.webhook.url
       service:
         type: ClusterIP
       ingress:

@@ -39,7 +39,8 @@ endif
 		--wait --atomic \
 		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
 		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
-		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} # --debug #  --values testing-values.yaml 
+		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
+		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000 # --debug #  --values testing-values.yaml 
 	echo waiting for pods
 	sleep 10
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
