@@ -539,6 +539,9 @@ kubectl -n argo get workflows
 
 # Argo CD health  
 kubectl -n argocd get applications
+
+# Logs
+stern --all-namespaces 'argo.*' --since 1h | grep error
 ```
 
 ### 📝 Logging

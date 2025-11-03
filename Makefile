@@ -5,7 +5,6 @@ deps:
 	helm repo add argo https://argoproj.github.io/argo-helm
 	helm repo update
 	helm dependency build helm/argo-stack
-	# kubectl apply -k https://github.com/argoproj/argo-cd/manifests/crds\?ref\=stable 
 
 lint:
 	helm lint helm/argo-stack --values helm/argo-stack/values.yaml
@@ -29,14 +28,27 @@ ct: deps
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
 deploy: kind deps
-	helm upgrade --install argo-stack ./helm/argo-stack -n argocd --create-namespace --wait --atomic # --debug #  --values testing-values.yaml 
+ifndef GITHUB_PAT
+	$(error GITHUB_PAT is undefined. Run 'export GITHUB_PAT=...' before installing)
+endif
+ifndef ARGOCD_SECRET_KEY
+        $(error ARGOCD_SECRET_KEY is undefined. Run 'export ARGOCD_SECRET_KEY=...' before installing)
+endif
+	helm upgrade --install \
+		argo-stack ./helm/argo-stack -n argocd --create-namespace \
+		--wait --atomic \
+		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
+		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
+		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
+		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000 # --debug #  --values testing-values.yaml 
 	echo waiting for pods
 	sleep 10
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
 	echo starting port forwards
 	kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 --address=0.0.0.0 -n argo-workflows &
 	kubectl port-forward svc/argo-stack-argocd-server         8080:443  --address=0.0.0.0 -n argocd &
-	echo UIs available on port 2746 and port 8080
+	kubectl port-forward svc/github-eventsource-svc 12000:12000             --address=0.0.0.0 -n argo-events &
+	echo UIs available on port 2746 and port 8080, event exposed on 12000
 
 adapter:
 	cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q

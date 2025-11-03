@@ -3,12 +3,14 @@ namespaces:
   argocd: argocd
   tenant: wf-poc
   security: security
+  argo-events: argo-events
 
 # Argo Workflows dependency values
 argo-workflows:
   server:
     enabled: true
     secure: false
+    namespaced: true
     extraArgs:
       - --auth-mode=server
   controller:
@@ -25,7 +27,15 @@ argo-cd:
     enabled: true
     namespace: argocd                       # where Argo CD runs
   namespaceOverride: argocd
-
+  configs:
+    secret:
+      create: true
+      # provide a strong random key (hex or base64 is fine)
+      extra: {}  # MUST be a map, not a string/boolean
+      # Never commit your real token in a Git repo. instead, override it at deploy time using:
+      # export ARGO_CD_SECRET=replace with output of: openssl rand -hex 32
+      # helm upgrade --install ... argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}"
+      # server.secretkey: "<?= replace with output of: openssl rand -hex 32 ?>"
 
 # Our adapter settings
 authzAdapter:
@@ -77,3 +87,66 @@ argocdApplication:
   path: "."
   # IMPORTANT: do not template here. Either leave empty or set a literal default.
 #   destinationNamespace: ""   # leave empty and let the template default to .Values.namespaces.tenant
+
+
+events:
+  enabled: true
+  namespace: argo-events
+
+  eventBus:
+    create: true
+    name: default
+    natsNative: {}  # use NATS native by default
+
+  github:
+    enabled: true
+    name: github
+    eventName: repo-push
+    owner: bwalsh           # <-- change as needed
+    repository: nextflow-hello-project   # <-- change as needed
+    events: ["push"]
+    active: true
+
+    # --- GitHub Secret configuration ---
+    # Secret holding either a GitHub PAT (for webhook management)
+    # or a webhook secret. If tokenValue is empty, no Secret will be created.
+    secret:
+      create: true                       # chart will render a Secret manifest
+      name: github-secret                # name of the Secret object
+      tokenKey: token                    # key inside the Secret
+      # Never commit your real token in a Git repo. instead, override it at deploy time using:
+      # export GITHUB_PAT=github_pat_XXXXXXXX
+      # helm upgrade --install --set-string events.github.secret.tokenValue=$GITHUB_PAT
+
+
+    # Webhook service exposed by EventSource
+    webhook:
+      endpoint: /events
+      port: 12000
+      # set `url` as set-string events.github.webhook.url
+      service:
+        type: ClusterIP
+      ingress:
+        enabled: true
+        className: nginx
+        hosts: []
+        tls: []
+
+  sensor:
+    enabled: true
+    name: run-nextflow-on-push
+    workflowNamespace: wf-poc
+    workflowTemplateRef: nextflow-hello-template
+    parameters:
+      - name: git_revision
+        valueFrom: "{{(events.push.body.head_commit.id)}}"  # from GitHub payload
+
+workflowTemplates:
+  createExample: true
+  namespace: argo-workflows
+  nextflowHello:
+    name: nextflow-hello-template
+    image: alpine:3.20
+    command: ["/bin/sh", "-c"]
+    args:
+      - echo "Hello from Argo Events!"
