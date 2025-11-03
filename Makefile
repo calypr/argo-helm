@@ -23,7 +23,7 @@ kind:
 	kind delete cluster || true
 	kind create cluster
 
-ct: deps
+ct: kind deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
