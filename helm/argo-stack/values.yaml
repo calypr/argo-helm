@@ -34,7 +34,7 @@ argo-cd:
       extra:
       # Never commit your real token in a Git repo. instead, override it at deploy time using:
       # export ARGO_CD_SECRET=replace with output of: openssl rand -hex 32
-      # helm upgrade --install ... argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" 
+      # helm upgrade --install ... argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}"
       # server.secretkey: "<?= replace with output of: openssl rand -hex 32 ?>"
 
 # Our adapter settings
@@ -108,6 +108,8 @@ events:
     active: true
 
     # --- GitHub Secret configuration ---
+    # Secret holding either a GitHub PAT (for webhook management)
+    # or a webhook secret. If tokenValue is empty, no Secret will be created.
     secret:
       create: true                       # chart will render a Secret manifest
       name: github-secret                # name of the Secret object
@@ -129,16 +131,6 @@ events:
         hosts: []
         tls: []
 
-    # Secret holding either a GitHub PAT (for webhook management)
-    # or a webhook secret. If tokenValue is empty, no Secret will be created.
-    # Let Helm create the Secret (simple for testing)
-    # kubectl -n argo-events create secret generic github-secret   --from-literal=token=github_pat_XXXXXXXX
-    secret:
-      create: false
-      name: github-secret
-      tokenKey: token
-      # tokenValue: ""
-
   sensor:
     enabled: true
     name: run-nextflow-on-push
@@ -157,4 +149,3 @@ workflowTemplates:
     command: ["/bin/sh", "-c"]
     args:
       - echo "Hello from Argo Events!"
-
