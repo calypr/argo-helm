@@ -157,6 +157,34 @@ events:
   github:
     enabled: true
     name: github
+    
+    # ========================================================================
+    # Multi-Repository Support (RECOMMENDED)
+    # ========================================================================
+    # Define multiple repositories in an array. Each repository gets its own
+    # event name within the same EventSource.
+    #
+    # Example:
+    # repositories:
+    #   - eventName: repo-push-project1
+    #     owner: bwalsh
+    #     repository: nextflow-hello-project
+    #     events: ["push"]
+    #     active: true
+    #   - eventName: repo-push-project2
+    #     owner: bwalsh
+    #     repository: nextflow-hello-project-2
+    #     events: ["push"]
+    #     active: true
+    #
+    repositories: []
+    
+    # ========================================================================
+    # DEPRECATED: Single Repository Configuration (backward compatibility)
+    # ========================================================================
+    # If 'repositories' is empty, falls back to single repository mode.
+    # Use 'repositories' array above for multiple repositories.
+    #
     eventName: repo-push
     owner: bwalsh           # <-- change as needed
     repository: nextflow-hello-project   # <-- change as needed
