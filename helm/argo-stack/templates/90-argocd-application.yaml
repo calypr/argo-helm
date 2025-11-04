@@ -1,4 +1,4 @@
-{{- if .Values.argocdApplication.enabled }}
+{{- if and .Values.argocdApplication .Values.argocdApplication.enabled }}
 # ============================================================================
 # ⚠️  DEPRECATION WARNING
 # ============================================================================
