@@ -246,12 +246,36 @@ argoWorkflows:
 argoCD:
   enabled: true
   
-# 🎯 Sample Application (Optional)
-argocdApplication:
-  enabled: true
-  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
-  targetRevision: "main"
-  path: "."
+# 🎯 Argo CD Applications (Multi-Application Support)
+# Deploy one or more applications using the applications array
+applications:
+  - name: nextflow-hello-project
+    project: default
+    repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
+    targetRevision: "main"
+    path: "."
+    destination:
+      namespace: wf-poc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+  
+  - name: nextflow-hello-project-2
+    project: default
+    repoURL: "https://github.com/bwalsh/nextflow-hello-project-2.git"
+    targetRevision: "main"
+    path: "."
+    destination:
+      namespace: wf-poc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+
+# ⚠️ DEPRECATED: Single application configuration (use 'applications' array above)
+# argocdApplication:
+#   enabled: false
 YAML
 ```
 
@@ -574,6 +598,84 @@ kubectl -n wf-poc run test-s3 --image=amazon/aws-cli:latest \
 ---
 
 ## 🎯 Advanced Usage
+
+### 📦 Multi-Application Deployment
+
+The chart supports deploying multiple Argo CD Applications using the `applications` array. This is useful for managing multiple repositories or projects from a single Helm deployment.
+
+#### Example: Deploying Multiple Applications
+
+```yaml
+applications:
+  - name: nextflow-hello-project
+    project: default
+    repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: wf-poc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+
+  - name: nextflow-hello-project-2
+    project: default
+    repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: wf-poc
+    syncPolicy:
+      automated:
+        prune: false
+        selfHeal: true
+```
+
+#### Migration from Deprecated `argocdApplication`
+
+The single-application `argocdApplication` configuration is **deprecated** and will be removed in a future release. Please migrate to the `applications` array syntax.
+
+**Migration Steps:**
+
+1. **Old Configuration (Deprecated):**
+```yaml
+argocdApplication:
+  enabled: true
+  name: nextflow-hello
+  project: default
+  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
+  targetRevision: "main"
+  path: "."
+```
+
+2. **New Configuration (Recommended):**
+```yaml
+applications:
+  - name: nextflow-hello
+    project: default
+    repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
+    targetRevision: "main"
+    path: "."
+    destination:
+      namespace: wf-poc  # Specify target namespace
+    syncPolicy:
+      automated:
+        prune: false
+        selfHeal: true
+```
+
+3. **Disable the deprecated configuration:**
+```yaml
+argocdApplication:
+  enabled: false  # Turn off deprecated single application
+```
+
+**Benefits of the new syntax:**
+- ✅ Deploy multiple applications from a single chart
+- ✅ More explicit destination configuration
+- ✅ Better alignment with Argo CD's multi-tenancy model
+- ✅ Easier to manage complex deployments
 
 ### 🔧 Custom Authorization Logic
 

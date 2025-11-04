@@ -1,4 +1,16 @@
 {{- if .Values.argocdApplication.enabled }}
+# ============================================================================
+# ⚠️  DEPRECATION WARNING
+# ============================================================================
+# The 'argocdApplication' configuration is DEPRECATED and will be removed
+# in a future release. Please migrate to the '.Values.applications' array.
+#
+# Migration example:
+#   OLD: argocdApplication: { enabled: true, name: "app", repoURL: "..." }
+#   NEW: applications: [{ name: "app", repoURL: "..." }]
+#
+# See values.yaml for detailed migration instructions.
+# ============================================================================
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:

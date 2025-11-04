@@ -77,7 +77,63 @@ ingressAuth:
   authURL: "http://authz-adapter.security.svc.cluster.local:8080/check"
   passAuthorization: true
 
-# Optional: Argo CD Application pointing to nextflow repo
+# ============================================================================
+# Argo CD Applications - Multi-Application Support (RECOMMENDED)
+# ============================================================================
+# Use this array to deploy multiple Argo CD Applications.
+# Each entry creates a separate Application resource.
+#
+# Example:
+# applications:
+#   - name: nextflow-hello-project
+#     project: default
+#     repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+#     targetRevision: main
+#     path: "."
+#     destination:
+#       server: https://kubernetes.default.svc
+#       namespace: argo
+#     syncPolicy:
+#       automated:
+#         prune: true
+#         selfHeal: true
+#
+#   - name: nextflow-hello-project-2
+#     project: default
+#     repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
+#     targetRevision: main
+#     path: "."
+#     destination:
+#       namespace: argo
+#     syncPolicy:
+#       automated:
+#         prune: true
+#         selfHeal: true
+#
+applications: []
+
+# ============================================================================
+# DEPRECATED: Single Application Support (Use 'applications' array instead)
+# ============================================================================
+# This single-application configuration is deprecated and will be removed
+# in a future release. Please migrate to the 'applications' array above.
+#
+# Migration Example:
+# OLD:
+#   argocdApplication:
+#     enabled: true
+#     name: nextflow-hello
+#     repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+#     targetRevision: main
+#     path: "."
+#
+# NEW:
+#   applications:
+#     - name: nextflow-hello
+#       repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+#       targetRevision: main
+#       path: "."
+#
 argocdApplication:
   enabled: true
   name: nextflow-hello

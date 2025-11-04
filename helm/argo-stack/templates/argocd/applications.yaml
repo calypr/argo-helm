@@ -1,0 +1,53 @@
+{{- range .Values.applications }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ .name }}
+  namespace: {{ $.Values.namespaces.argocd | default "argocd" }}
+  labels:
+    app.kubernetes.io/name: {{ .name }}
+    app.kubernetes.io/part-of: argo-stack
+  {{- if .annotations }}
+  annotations:
+{{ toYaml .annotations | indent 4 }}
+  {{- else }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+  {{- end }}
+spec:
+  project: {{ .project | default "default" }}
+  source:
+    repoURL: {{ .repoURL | quote }}
+    targetRevision: {{ .targetRevision | default "main" | quote }}
+    path: {{ .path | default "." | quote }}
+  destination:
+    {{- if .destination }}
+    {{- if .destination.server }}
+    server: {{ .destination.server | quote }}
+    {{- else }}
+    name: in-cluster
+    {{- end }}
+    namespace: {{ .destination.namespace | default $.Values.namespaces.tenant | default "argo" }}
+    {{- else }}
+    name: in-cluster
+    namespace: {{ $.Values.namespaces.tenant | default "argo" }}
+    {{- end }}
+  {{- if .syncPolicy }}
+  syncPolicy:
+    {{- if .syncPolicy.automated }}
+    automated:
+      prune: {{ .syncPolicy.automated.prune | default false }}
+      selfHeal: {{ .syncPolicy.automated.selfHeal | default false }}
+    {{- end }}
+    {{- if .syncPolicy.syncOptions }}
+    syncOptions:
+{{ toYaml .syncPolicy.syncOptions | indent 6 }}
+    {{- end }}
+  {{- else }}
+  syncPolicy:
+    automated:
+      prune: false
+      selfHeal: true
+  {{- end }}
+{{- end }}
