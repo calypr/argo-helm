@@ -226,13 +226,17 @@ events:
     webhook:
       endpoint: /events
       port: 12000
-      # set `url` as set-string events.github.webhook.url
+      # IMPORTANT: Set the webhook URL that GitHub will call when events occur.
+      # This must be publicly accessible from GitHub. Example:
+      #   --set-string events.github.webhook.url=http://your-domain.com:12000
+      # Or use the ingress configuration below with a proper hostname.
+      # url: ""  # Set this via --set-string at deployment time
       service:
         type: ClusterIP
       ingress:
         enabled: true
         className: nginx
-        hosts: []
+        hosts: []  # Add your public hostname, e.g., ["webhooks.example.com"]
         tls: []
 
   sensor:

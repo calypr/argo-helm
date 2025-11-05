@@ -22,7 +22,9 @@ spec:
       webhook:
         endpoint: {{ .endpoint | default "/events" | quote }}
         port: "{{ .port | default 12000 }}"
+        {{- if .url }}
         url: {{ .url }}
+        {{- end }}
       {{- end }}
       {{- if $.Values.events.github.secret.name }}
       apiToken:
@@ -40,7 +42,9 @@ spec:
       webhook:
         endpoint: {{ .endpoint | default "/events" | quote }}
         port: "{{ .port | default 12000 }}"
+        {{- if .url }}
         url: {{ .url }}
+        {{- end }}
       {{- end }}
       {{- if .Values.events.github.secret.name }}
       apiToken:
