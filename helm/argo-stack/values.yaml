@@ -186,12 +186,12 @@ events:
     #
     # Example:
     repositories:
-      - eventName: nextflow-hello
+      - eventName: repo-push
         owner: bwalsh
         repository: nextflow-hello-project
         events: ["push"]
         active: true
-      - eventName: nextflow-hello-2
+      - eventName: repo-push
         owner: bwalsh
         repository: nextflow-hello-project-2
         events: ["push"]
