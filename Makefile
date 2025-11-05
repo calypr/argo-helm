@@ -11,8 +11,12 @@ lint:
 
 template: deps
 	helm template argo-stack helm/argo-stack \
-	  --values helm/argo-stack/values.yaml \
-	  --namespace argocd > rendered.yaml
+		--values helm/argo-stack/values.yaml \
+		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
+		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
+		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
+		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000  \
+		--namespace argocd > rendered.yaml
 
 validate:
 	kubeconform -strict -ignore-missing-schemas \
