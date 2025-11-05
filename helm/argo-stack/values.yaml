@@ -110,7 +110,27 @@ ingressAuth:
 #         prune: true
 #         selfHeal: true
 #
-applications: []
+applications:
+  - name: nextflow-hello
+    repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: argo
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true    
+  - name: nextflow-hello-2
+    repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: argo
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true 
 
 # ============================================================================
 # DEPRECATED: Single Application Support (Use 'applications' array instead)
@@ -134,15 +154,15 @@ applications: []
 #       targetRevision: main
 #       path: "."
 #
-argocdApplication:
-  enabled: true
-  name: nextflow-hello
-  project: default
-  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
-  targetRevision: "main"
-  path: "."
-  # IMPORTANT: do not template here. Either leave empty or set a literal default.
-#   destinationNamespace: ""   # leave empty and let the template default to .Values.namespaces.tenant
+#argocdApplication:
+#  enabled: true
+#  name: nextflow-hello
+#  project: default
+#  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
+#  targetRevision: "main"
+#  path: "."
+#  # IMPORTANT: do not template here. Either leave empty or set a literal default.
+##   destinationNamespace: ""   # leave empty and let the template default to .Values.namespaces.tenant
 
 
 events:
@@ -165,19 +185,18 @@ events:
     # event name within the same EventSource.
     #
     # Example:
-    # repositories:
-    #   - eventName: repo-push-project1
-    #     owner: bwalsh
-    #     repository: nextflow-hello-project
-    #     events: ["push"]
-    #     active: true
-    #   - eventName: repo-push-project2
-    #     owner: bwalsh
-    #     repository: nextflow-hello-project-2
-    #     events: ["push"]
-    #     active: true
-    #
-    repositories: []
+    repositories:
+      - eventName: nextflow-hello
+        owner: bwalsh
+        repository: nextflow-hello-project
+        events: ["push"]
+        active: true
+      - eventName: nextflow-hello-2
+        owner: bwalsh
+        repository: nextflow-hello-project-2
+        events: ["push"]
+        active: true
+    
     
     # ========================================================================
     # DEPRECATED: Single Repository Configuration (backward compatibility)
@@ -185,11 +204,11 @@ events:
     # If 'repositories' is empty, falls back to single repository mode.
     # Use 'repositories' array above for multiple repositories.
     #
-    eventName: repo-push
-    owner: bwalsh           # <-- change as needed
-    repository: nextflow-hello-project   # <-- change as needed
-    events: ["push"]
-    active: true
+    # eventName: repo-push
+    # owner: bwalsh           # <-- change as needed
+    # repository: nextflow-hello-project   # <-- change as needed
+    # events: ["push"]
+    # active: true
 
     # --- GitHub Secret configuration ---
     # Secret holding either a GitHub PAT (for webhook management)
