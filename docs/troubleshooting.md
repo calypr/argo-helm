@@ -1,12 +1,13 @@
-
-```
-argo-workflows-server shows the following error at /event-sources/ 
-""" Not Found: the server could not find the requested resource (get eventsources.argoproj.io) """
-```
+> [!CAUTION]
+> Error:
+> ```
+> argo-workflows-server shows the following error at /event-sources/ 
+> """ Not Found: the server could not find the requested resource (get eventsources.argoproj.io) """
+> ```
 
 That error means the **Argo Events CRDs aren’t installed** (or the argo-server RBAC can’t read them). `eventsources.argoproj.io` is a CRD from **Argo Events**, not Argo Workflows. Fix it like this:
 
-### 1) Verify the CRD is missing
+# 1. Verify the CRD is missing
 
 ```bash
 kubectl get crd | grep eventsources

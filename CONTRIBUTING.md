@@ -39,146 +39,109 @@ python -m pytest tests/ -v
 docker build -t authz-adapter:dev .
 ```
 
-## 📝 Contribution Types
-
-### 🐛 Bug Reports
-
-- Use the GitHub issue tracker
-- Include detailed reproduction steps
-- Provide logs and configuration details
-- Test with the latest version first
-
-### ✨ Feature Requests
-
-- Open a GitHub issue with the `enhancement` label
-- Describe the use case and expected behavior
-- Consider backward compatibility
-
-### 🔧 Code Contributions
-
-1. **Write tests** for new functionality
-2. **Follow code style** guidelines (see below)
-3. **Update documentation** as needed
-4. **Ensure all tests pass**
-5. **Submit a pull request**
-
-## 📋 Code Style
-
-### Python (authz-adapter)
-
-- Follow PEP 8
-- Use type hints where possible
-- Maximum line length: 88 characters (Black formatter)
-- Use meaningful variable and function names
-
-### YAML/Helm
-
-- Use 2 spaces for indentation
-- Keep lines under 120 characters
-- Use descriptive comments for complex logic
-
-### Shell Scripts
-
-- Use `#!/usr/bin/env bash`
-- Set `set -euo pipefail`
-- Quote variables: `"$VAR"`
-- Use meaningful function names
-
 ## 🧪 Testing
 
-### Python Tests
+### Quick Start
+
+```bash
+# Fast checks
+helm repo add argo https://argoproj.github.io/argo-helm && helm repo update
+helm lint helm/argo-stack --values helm/argo-stack/values.yaml
+helm dependency build helm/argo-stack
+helm template argo-stack helm/argo-stack --values helm/argo-stack/values.yaml --namespace argocd > rendered.yaml
+kubeconform -strict -ignore-missing-schemas -skip 'CustomResourceDefinition|Application|Workflow|WorkflowTemplate' -summary rendered.yaml
+
+# kind + ct
+kind create cluster
+ct lint --config .ct.yaml
+ct install --config .ct.yaml --debug
+
+# adapter tests
+cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q
+```
+
+### 0. Prerequisites
+
+```bash
+# Helm
+brew install helm || sudo snap install helm --classic
+
+# kind (Kubernetes-in-Docker)
+brew install kind || GO111MODULE="on" go install sigs.k8s.io/kind@v0.23.0
+
+# Python tooling for adapter tests
+python3 -m pip install --upgrade pip
+python3 -m pip install pytest
+
+# chart-testing (ct)
+brew install chart-testing || pipx install chart-testing
+
+# kubeconform (schema validation)
+brew install kubeconform ||   curl -L https://github.com/yannh/kubeconform/releases/latest/download/kubeconform-linux-amd64.tar.gz   | tar xz && sudo mv kubeconform /usr/local/bin/
+```
+
+### 1. Helm lint, template, kubeconform
+
+```bash
+# From repo root
+helm repo add argo https://argoproj.github.io/argo-helm
+helm repo update
+
+# Lint the umbrella chart
+helm lint helm/argo-stack --values helm/argo-stack/values.yaml
+
+# Render the chart to plain YAML
+helm dependency build helm/argo-stack
+helm template argo-stack helm/argo-stack --values helm/argo-stack/values.yaml --namespace argocd > rendered.yaml
+
+# Validate rendered manifests (skip CRDs and Argo custom resources)
+kubeconform -strict -ignore-missing-schemas -skip 'CustomResourceDefinition|Application|Workflow|WorkflowTemplate' -summary rendered.yaml
+```
+
+### 2. Chart Testing (ct)
+
+This replicates CI: spin up kind, lint, then install the chart and smoke test it.
+
+```bash
+# Fresh kind cluster
+kind delete cluster || true
+kind create cluster
+
+# Ensure dependencies are built
+helm dependency build helm/argo-stack
+
+# Lint using ct (uses .ct.yaml)
+ct lint --config .ct.yaml
+
+# Install and smoke test
+ct install --config .ct.yaml --debug
+```
+
+**Notes**
+- `ct` uses the working tree and `.ct.yaml` to find `helm/argo-stack`.
+- To test with custom values, commit a `ci-values.yaml` or temporarily edit `values.yaml` before running.
+
+### 3. authz-adapter unit tests
 
 ```bash
 cd authz-adapter
-python -m pytest tests/ -v --cov=app
+python3 -m pip install -r requirements.txt pytest
+pytest -q
 ```
 
-### Helm Chart Testing
+What’s tested:
+- `decide_groups(...)` logic (mapping `/user/user` authz JSON to groups like `argo-runner` and `argo-viewer`).
 
-```bash
-# Lint charts
-helm lint helm/argo-stack/
+### 4. Troubleshooting
 
-# Template validation
-helm template test-release helm/argo-stack/ --values helm/argo-stack/ci-values.yaml
+- **kubeconform errors on CRDs**  
+  Keep skipping `CustomResourceDefinition|Application|Workflow|WorkflowTemplate` or provide schemas for these CRDs.
 
-# Install in test cluster
-helm upgrade --install test-stack helm/argo-stack/ \
-  --namespace test --create-namespace \
-  --values test-values.yaml \
-  --dry-run
-```
+- **`ct install` hangs or times out**  
+  Use `--debug` to inspect controller/server logs. Ensure Docker has enough CPU/RAM for kind.
 
-## 📤 Pull Request Process
+- **Argo CD Application points to a repo path with no manifests**  
+  That’s fine as a placeholder; it syncs “empty”. Add K8s manifests or a `kustomization.yaml` in that repo path for real resources.
 
-1. **Update documentation** for any user-facing changes
-2. **Add/update tests** for new functionality
-3. **Ensure CI passes** (GitHub Actions)
-4. **Use descriptive commit messages**:
-   ```
-   feat: add support for external OIDC providers
-   fix: resolve authz-adapter timeout issues
-   docs: update installation instructions
-   ```
-5. **Request review** from maintainers
-
-### Commit Message Format
-
-```
-<type>(<scope>): <subject>
-
-<body>
-
-<footer>
-```
-
-**Types:**
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `style`: Code style changes
-- `refactor`: Code refactoring
-- `test`: Adding tests
-- `chore`: Maintenance tasks
-
-## 🔒 Security
-
-- **Report security issues** privately to the maintainers
-- **Don't commit secrets** or credentials
-- **Use secrets management** for sensitive configuration
-- **Follow security best practices** in code
-
-## 📋 Review Criteria
-
-Pull requests will be reviewed for:
-
-- **Functionality**: Does it work as intended?
-- **Testing**: Are there adequate tests?
-- **Documentation**: Is it properly documented?
-- **Style**: Does it follow project conventions?
-- **Security**: Are there any security concerns?
-- **Performance**: Does it impact performance?
-
-## 🏷️ Release Process
-
-1. **Version bumping** follows semantic versioning
-2. **Changelog** is maintained in CHANGELOG.md
-3. **Releases** are tagged and published via GitHub
-4. **Container images** are built and pushed automatically
-
-## 🤝 Community
-
-- Be respectful and inclusive
-- Follow the Code of Conduct
-- Help others in issues and discussions
-- Share knowledge and best practices
-
-## 📞 Getting Help
-
-- **GitHub Issues**: For bugs and feature requests
-- **Discussions**: For general questions and ideas
-- **Documentation**: Check the README and wiki first
-
-## 📄 License
-
-By contributing, you agree that your contributions will be licensed under the Apache License 2.0.
+- **Port-forward conflicts**  
+  Change the left port: e.g., `8081:80`, `2747:2746`.
