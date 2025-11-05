@@ -21,18 +21,14 @@ sequenceDiagram
     AW-->>GH: (optional status)
 ```
 
----
-
-## 🧩 Step 1 — Prepare Your GitHub Repository
+## 1. Prepare Your GitHub Repository
 
 Ensure your repository contains:
 - A `main.nf` or equivalent Nextflow script.
 - Any configuration files (`nextflow.config`, `params.json`, etc.).
 - (Optional) a small test dataset.
 
----
-
-## 🔑 Step 2 — Create a Personal Access Token (PAT)
+## 2. Create a Personal Access Token (PAT)
 
 Argo uses this token to create a webhook automatically.
 
@@ -46,9 +42,7 @@ Argo uses this token to create a webhook automatically.
 
 Send this token to your Argo admin (securely), or store it locally if you’ll register the webhook manually.
 
----
-
-## 🌐 Step 3 — Connect Your Repo to the Argo Platform
+## 3. Connect Your Repo to the Argo Platform
 
 If your admin has automated onboarding, they’ll request:
 - Your **GitHub repo URL**
@@ -68,9 +62,7 @@ If manual setup is needed, go to your **GitHub repo → Settings → Webhooks �
 
 Click **Add webhook** and verify you see a green ✅ next to it.
 
----
-
-## 🚀 Step 4 — Push to Trigger a Workflow
+## 4. Push to Trigger a Workflow
 
 Make a commit in your repo and push it:
 
@@ -81,21 +73,18 @@ git push
 
 Argo will automatically start a new run using your latest commit.
 
----
+## 5. Viewing Your Workflow
 
-## 🧭 Step 5 — Viewing Your Workflow
+### Web UI
 
-### Option A — Web UI
-Visit:
-
-```
-http://<argo-workflows-host>:2746
-```
+Visit: http://<argo-workflows-host>:2746
 
 You’ll see your workflow under the **Workflows** list.
+
 Click the workflow name to view its DAG and live logs.
 
-### Option B — Command Line
+### Command Line
+
 ```bash
 argo -n argo list
 argo -n argo get @latest
@@ -106,9 +95,7 @@ To stream logs:
 argo -n argo logs @latest
 ```
 
----
-
-## 📦 Step 6 — Retrieving Results
+## 6. Retrieving Results
 
 Each workflow runs inside the cluster and writes outputs to object storage.
 
@@ -123,9 +110,7 @@ argo -n argo get @latest -o yaml | grep -A2 artifactRepositoryRef
 
 If your workflow includes a results collection step, it will post a summary to the Workflows UI under **Artifacts**.
 
----
-
-## 🪵 Step 7 — Inspecting Logs and History
+## 7. Inspecting Logs and History
 
 - **Argo Workflows UI → Workflow → Logs tab**  
   View stdout/stderr for each task.
@@ -142,25 +127,8 @@ If your workflow includes a results collection step, it will post a summary to t
 
 Each workflow corresponds to one Git commit (shown as `git_revision` in parameters).
 
----
-
-## 🧹 Step 8 — Disconnect or Pause Automation
+## 8. Disconnect or Pause Automation
 
 If you want to stop automatic triggering:
 1. Delete the webhook from your GitHub repo (**Settings → Webhooks → Delete**)
 2. Notify your admin if you want to disable event listening for your repo.
-
----
-
-## ✅ Quick Recap
-
-| Step | Action | Result |
-|------|--------|--------|
-| 1 | Prepare your repo | Contains Nextflow pipeline |
-| 2 | Create a PAT | Grants webhook access |
-| 3 | Connect to Argo | Webhook registered |
-| 4 | Push a commit | Workflow triggered |
-| 5 | View in UI or CLI | Workflow visible |
-| 6 | Download results | From S3 or artifacts tab |
-
-Your Nextflow workflows are now fully automated — every `git push` runs the pipeline and records the results for reproducibility.
