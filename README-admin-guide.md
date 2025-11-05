@@ -8,7 +8,7 @@ This document describes how administrators configure the Argo environment so tha
 
 ```mermaid
 flowchart LR
-  A[GitHub Repo] -->|push webhook| B[Argo Events\nEventSource]
+  A[GitHub Repo] -->|push webhook| B[Argo Events<br>EventSource]
   B -->|event| C[Sensor]
   C -->|submit| D[Argo Workflows]
   D -->|run| E[(Nextflow Pipeline)]
