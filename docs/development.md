@@ -202,12 +202,3 @@ This removes all Argo resources and namespaces.
   ```bash
   make logs
   ```
-
----
-
-**End of README**
-
-```
-
----
-
