@@ -11,5 +11,8 @@ metadata:
     "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here      
 spec:
   nats:
-    native: {{ toYaml (.Values.events.eventBus.natsNative | default dict) | nindent 8 }}
+    native:
+      {{- if .Values.events.eventBus.natsNative }}
+      {{- toYaml .Values.events.eventBus.natsNative | nindent 6 }}
+      {{- end }}
 {{- end }}
