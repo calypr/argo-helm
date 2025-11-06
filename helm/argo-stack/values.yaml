@@ -142,7 +142,7 @@ applications:
     syncPolicy:
       automated:
         prune: true
-        selfHeal: true    
+        selfHeal: true
   - name: nextflow-hello-2
     repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
     targetRevision: main
@@ -152,7 +152,7 @@ applications:
     syncPolicy:
       automated:
         prune: true
-        selfHeal: true 
+        selfHeal: true
 
 # ============================================================================
 # DEPRECATED: Single Application Support (Use 'applications' array instead)
@@ -199,7 +199,7 @@ events:
   github:
     enabled: true
     name: github
-    
+
     # ========================================================================
     # Multi-Repository Support (RECOMMENDED)
     # ========================================================================
@@ -218,8 +218,8 @@ events:
         repository: nextflow-hello-project-2
         events: ["push"]
         active: true
-    
-    
+
+
     # ========================================================================
     # DEPRECATED: Single Repository Configuration (backward compatibility)
     # ========================================================================
