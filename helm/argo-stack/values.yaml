@@ -77,16 +77,92 @@ ingressAuth:
   authURL: "http://authz-adapter.security.svc.cluster.local:8080/check"
   passAuthorization: true
 
-# Optional: Argo CD Application pointing to nextflow repo
-argocdApplication:
-  enabled: true
-  name: nextflow-hello
-  project: default
-  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
-  targetRevision: "main"
-  path: "."
-  # IMPORTANT: do not template here. Either leave empty or set a literal default.
-#   destinationNamespace: ""   # leave empty and let the template default to .Values.namespaces.tenant
+# ============================================================================
+# Argo CD Applications - Multi-Application Support (RECOMMENDED)
+# ============================================================================
+# Use this array to deploy multiple Argo CD Applications.
+# Each entry creates a separate Application resource.
+#
+# Example:
+# applications:
+#   - name: nextflow-hello-project
+#     project: default
+#     repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+#     targetRevision: main
+#     path: "."
+#     destination:
+#       server: https://kubernetes.default.svc
+#       namespace: argo
+#     syncPolicy:
+#       automated:
+#         prune: true
+#         selfHeal: true
+#
+#   - name: nextflow-hello-project-2
+#     project: default
+#     repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
+#     targetRevision: main
+#     path: "."
+#     destination:
+#       namespace: argo
+#     syncPolicy:
+#       automated:
+#         prune: true
+#         selfHeal: true
+#
+applications:
+  - name: nextflow-hello
+    repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: argo
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true    
+  - name: nextflow-hello-2
+    repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: argo
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true 
+
+# ============================================================================
+# DEPRECATED: Single Application Support (Use 'applications' array instead)
+# ============================================================================
+# This single-application configuration is deprecated and will be removed
+# in a future release. Please migrate to the 'applications' array above.
+#
+# Migration Example:
+# OLD:
+#   argocdApplication:
+#     enabled: true
+#     name: nextflow-hello
+#     repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+#     targetRevision: main
+#     path: "."
+#
+# NEW:
+#   applications:
+#     - name: nextflow-hello
+#       repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+#       targetRevision: main
+#       path: "."
+#
+#argocdApplication:
+#  enabled: true
+#  name: nextflow-hello
+#  project: default
+#  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
+#  targetRevision: "main"
+#  path: "."
+#  # IMPORTANT: do not template here. Either leave empty or set a literal default.
+##   destinationNamespace: ""   # leave empty and let the template default to .Values.namespaces.tenant
 
 
 events:
@@ -101,11 +177,38 @@ events:
   github:
     enabled: true
     name: github
-    eventName: repo-push
-    owner: bwalsh           # <-- change as needed
-    repository: nextflow-hello-project   # <-- change as needed
-    events: ["push"]
-    active: true
+    
+    # ========================================================================
+    # Multi-Repository Support (RECOMMENDED)
+    # ========================================================================
+    # Define multiple repositories in an array. Each repository gets its own
+    # event name within the same EventSource.
+    #
+    # Example:
+    repositories:
+      - eventName: repo-push  # Must align with sensor event
+        owner: bwalsh
+        repository: nextflow-hello-project
+        events: ["push"]
+        active: true
+      - eventName: repo-push
+        owner: bwalsh
+        repository: nextflow-hello-project-2
+        events: ["push"]
+        active: true
+    
+    
+    # ========================================================================
+    # DEPRECATED: Single Repository Configuration (backward compatibility)
+    # ========================================================================
+    # If 'repositories' is empty, falls back to single repository mode.
+    # Use 'repositories' array above for multiple repositories.
+    #
+    # eventName: repo-push
+    # owner: bwalsh           # <-- change as needed
+    # repository: nextflow-hello-project   # <-- change as needed
+    # events: ["push"]
+    # active: true
 
     # --- GitHub Secret configuration ---
     # Secret holding either a GitHub PAT (for webhook management)
@@ -123,13 +226,17 @@ events:
     webhook:
       endpoint: /events
       port: 12000
-      # set `url` as set-string events.github.webhook.url
+      # IMPORTANT: Set the webhook URL that GitHub will call when events occur.
+      # This must be publicly accessible from GitHub. Example:
+      #   --set-string events.github.webhook.url=http://your-domain.com:12000
+      # Or use the ingress configuration below with a proper hostname.
+      # url: ""  # Set this via --set-string at deployment time
       service:
         type: ClusterIP
       ingress:
         enabled: true
         className: nginx
-        hosts: []
+        hosts: []  # Add your public hostname, e.g., ["webhooks.example.com"]
         tls: []
 
   sensor:
@@ -143,7 +250,7 @@ events:
 
 workflowTemplates:
   createExample: true
-  namespace: argo-workflows
+  namespace: wf-poc
   nextflowHello:
     name: nextflow-hello-template
     image: alpine:3.20

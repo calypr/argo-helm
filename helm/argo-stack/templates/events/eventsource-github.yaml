@@ -11,6 +11,28 @@ metadata:
     "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here      
 spec:
   github:
+    {{- if .Values.events.github.repositories }}
+    {{- range $repo := .Values.events.github.repositories }}
+    {{ $repo.eventName | default (printf "repo-push-%s" $repo.repository) }}:
+      owner: {{ $repo.owner | quote }}
+      repository: {{ $repo.repository | quote }}
+      events: {{ toYaml ($repo.events | default (list "push")) | nindent 8 }}
+      active: {{ $repo.active | default true }}
+      {{- with $.Values.events.github.webhook }}
+      webhook:
+        endpoint: {{ .endpoint | default "/events" | quote }}
+        port: "{{ .port | default 12000 }}"
+        {{- if .url }}
+        url: {{ .url }}
+        {{- end }}
+      {{- end }}
+      {{- if $.Values.events.github.secret.name }}
+      apiToken:
+        name: {{ $.Values.events.github.secret.name }}
+        key: {{ $.Values.events.github.secret.tokenKey | default "token" }}
+      {{- end }}
+    {{- end }}
+    {{- else }}
     {{ .Values.events.github.eventName | default "repo-push" }}:
       owner: {{ .Values.events.github.owner | quote }}
       repository: {{ .Values.events.github.repository | quote }}
@@ -20,13 +42,16 @@ spec:
       webhook:
         endpoint: {{ .endpoint | default "/events" | quote }}
         port: "{{ .port | default 12000 }}"
+        {{- if .url }}
         url: {{ .url }}
+        {{- end }}
       {{- end }}
       {{- if .Values.events.github.secret.name }}
       apiToken:
         name: {{ .Values.events.github.secret.name }}
         key: {{ .Values.events.github.secret.tokenKey | default "token" }}
       {{- end }}
+    {{- end }}
 ---
 apiVersion: v1
 kind: Service

@@ -1,0 +1,78 @@
+# Test values for multi-application support
+# This file demonstrates deploying multiple Argo CD Applications
+
+# Keep namespaces as-is; they're used in templates
+namespaces:
+  argo: argo-workflows
+  argocd: argocd
+  tenant: wf-poc
+  security: security
+  argo-events: argo-events
+
+# Turn off deprecated single application
+argocdApplication:
+  enabled: false
+
+# Use new multi-application array
+applications:
+  - name: nextflow-hello-project
+    project: default
+    repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: wf-poc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+
+  - name: nextflow-hello-project-2
+    project: default
+    repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: wf-poc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+
+# Turn off Argo CD dependency for testing
+argo-cd:
+  enabled: false
+
+# Disable ingresses for testing
+ingress:
+  argoWorkflows:
+    enabled: false
+  argocd:
+    enabled: false
+
+# Keep the adapter minimal
+authzAdapter:
+  replicas: 1
+
+# No S3 for testing
+s3:
+  enabled: false
+
+# No events for testing
+events:
+  enabled: false
+
+# No workflow templates for testing
+workflowTemplates:
+  createExample: false
+
+# Ensure Argo Workflows server is up (HTTP) and controller installs
+argo-workflows:
+  server:
+    enabled: true
+    secure: false
+    extraArgs:
+      - --auth-mode=server
+  controller:
+    # Let controller manage all namespaces (or leave empty array)
+    workflowNamespaces: []
