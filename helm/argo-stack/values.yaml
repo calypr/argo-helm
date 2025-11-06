@@ -258,7 +258,7 @@ events:
       ingress:
         enabled: true
         className: nginx
-        hosts: []  # Add your public hostname, e.g., ["webhooks.example.com"]
+        hosts: []  # Add your public hostname to create Ingress, e.g., ["webhooks.example.com"]
         tls: []
 
   sensor:
