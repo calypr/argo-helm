@@ -26,6 +26,14 @@ applications:
       automated:
         prune: true
         selfHeal: true
+    # Per-repository artifact configuration
+    artifacts:
+      bucket: calypr-nextflow-hello
+      keyPrefix: workflows/
+      endpoint: https://s3.us-west-2.amazonaws.com
+      region: us-west-2
+      insecure: false
+      credentialsSecret: s3-cred-nextflow-hello
 
   - name: nextflow-hello-project-2
     project: default
@@ -38,6 +46,14 @@ applications:
       automated:
         prune: true
         selfHeal: true
+    # Per-repository artifact configuration
+    artifacts:
+      bucket: calypr-nextflow-hello-2
+      keyPrefix: workflows/
+      endpoint: https://s3.us-west-2.amazonaws.com
+      region: us-west-2
+      insecure: false
+      credentialsSecret: s3-cred-nextflow-hello-2
 
 # Turn off Argo CD dependency for testing
 argo-cd:
