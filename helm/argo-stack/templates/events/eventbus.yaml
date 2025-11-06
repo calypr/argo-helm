@@ -12,7 +12,10 @@ metadata:
 spec:
   nats:
     native:
-      {{- if .Values.events.eventBus.natsNative }}
-      {{- toYaml .Values.events.eventBus.natsNative | nindent 6 }}
+      {{- $natsNative := .Values.events.eventBus.natsNative }}
+      {{- if $natsNative }}
+      {{- toYaml $natsNative | nindent 6 }}
+      {{- else }}
+      {}
       {{- end }}
 {{- end }}
