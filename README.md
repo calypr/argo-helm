@@ -260,6 +260,13 @@ applications:
       automated:
         prune: true
         selfHeal: true
+    # 🪣 Per-repository artifact storage (optional)
+    artifacts:
+      bucket: calypr-nextflow-hello
+      keyPrefix: workflows/
+      endpoint: https://s3.us-west-2.amazonaws.com
+      region: us-west-2
+      credentialsSecret: s3-cred-nextflow-hello
   
   - name: nextflow-hello-project-2
     project: default
@@ -272,12 +279,22 @@ applications:
       automated:
         prune: true
         selfHeal: true
+    # 🪣 Per-repository artifact storage (optional)
+    artifacts:
+      bucket: calypr-nextflow-hello-2
+      keyPrefix: workflows/
+      endpoint: https://s3.us-west-2.amazonaws.com
+      region: us-west-2
+      credentialsSecret: s3-cred-nextflow-hello-2
 
 # ⚠️ DEPRECATED: Single application configuration (use 'applications' array above)
 # argocdApplication:
 #   enabled: false
 YAML
 ```
+
+**Per-Repository Artifact Storage:**
+Each application can have its own S3 bucket for workflow outputs, enabling tenant isolation and traceability. If not specified, applications use the global S3 configuration above. See [docs/admin-guide.md](docs/admin-guide.md) for credential management options (IRSA, Workload Identity, ExternalSecrets).
 
 #### 3️⃣ Deploy the Stack
 

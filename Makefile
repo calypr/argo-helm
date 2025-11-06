@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter all
+.PHONY: deps lint template validate kind ct adapter test-artifacts all
 
 deps:
 	helm repo add argo https://argoproj.github.io/argo-helm
@@ -32,15 +32,9 @@ ct: kind deps
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
 deploy: kind deps
-ifndef GITHUB_PAT
-	$(error GITHUB_PAT is undefined. Run 'export GITHUB_PAT=...' before installing)
-endif
-ifndef ARGOCD_SECRET_KEY
-        $(error ARGOCD_SECRET_KEY is undefined. Run 'export ARGOCD_SECRET_KEY=...' before installing)
-endif
-ifndef ARGO_HOSTNAME
-        $(error ARGO_HOSTNAME is undefined. Run 'export ARGO_HOSTNAME=...' before installing)
-endif
+	@test -n "$(GITHUB_PAT)" || (echo "Error: GITHUB_PAT is undefined. Run 'export GITHUB_PAT=...' before installing" && exit 1)
+	@test -n "$(ARGOCD_SECRET_KEY)" || (echo "Error: ARGOCD_SECRET_KEY is undefined. Run 'export ARGOCD_SECRET_KEY=...' before installing" && exit 1)
+	@test -n "$(ARGO_HOSTNAME)" || (echo "Error: ARGO_HOSTNAME is undefined. Run 'export ARGO_HOSTNAME=...' before installing" && exit 1)
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
@@ -60,6 +54,9 @@ endif
 adapter:
 	cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q
 
+test-artifacts:
+	./test-per-app-artifacts.sh
+
 password:
 	kubectl get secret argocd-initial-admin-secret \
           -o jsonpath="{.data.password}"  -n argocd | base64 -d; echo  #  -n argocd 
@@ -67,4 +64,4 @@ password:
 login:
 	argocd login localhost:8080 --skip-test-tls --insecure --name admin --password `kubectl get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"  -n argocd | base64 -d`
 
-all: lint template validate kind ct adapter
+all: lint template validate kind ct adapter test-artifacts
