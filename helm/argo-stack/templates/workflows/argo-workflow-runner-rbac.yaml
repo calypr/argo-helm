@@ -1,0 +1,46 @@
+# wf-poc/argo-workflow-runner-rbac.yaml
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: wf-runner
+  namespace: wf-poc
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-workflow-runner
+  namespace: wf-poc
+rules:
+# Core pod permissions Argo executor needs
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["create","get","list","watch","update","patch","delete"]
+- apiGroups: [""]
+  resources: ["pods/log"]
+  verbs: ["get"]
+- apiGroups: [""]
+  resources: ["pods/exec"]
+  verbs: ["create","get"]
+# Optional but common:
+- apiGroups: [""]
+  resources: ["configmaps","secrets","serviceaccounts","persistentvolumeclaims"]
+  verbs: ["get","create","update","patch","delete"]
+# To emit Kubernetes events:
+- apiGroups: [""]
+  resources: ["events"]
+  verbs: ["create","patch","update"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflow-runner-binding
+  namespace: wf-poc
+subjects:
+- kind: ServiceAccount
+  name: wf-runner
+  namespace: wf-poc
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-workflow-runner
+

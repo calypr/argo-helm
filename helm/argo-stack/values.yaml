@@ -186,12 +186,12 @@ events:
     #
     # Example:
     repositories:
-      - eventName: repo-push-nextflow-hello-project-1  # Must be unique
+      - eventName: repo-push  # Must be unique ?
         owner: bwalsh
         repository: nextflow-hello-project
         events: ["push"]
         active: true
-      - eventName: repo-push-nextflow-hello-project-2
+      - eventName: repo-push
         owner: bwalsh
         repository: nextflow-hello-project-2
         events: ["push"]
@@ -250,7 +250,7 @@ events:
 
 workflowTemplates:
   createExample: true
-  namespace: argo-workflows
+  namespace: wf-poc
   nextflowHello:
     name: nextflow-hello-template
     image: alpine:3.20

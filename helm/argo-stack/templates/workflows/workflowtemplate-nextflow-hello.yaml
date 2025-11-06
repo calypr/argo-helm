@@ -11,6 +11,7 @@ metadata:
     "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here      
 spec:
   entrypoint: main
+  serviceAccountName: wf-runner
   arguments:
     parameters:
       - name: git_revision
