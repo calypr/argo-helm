@@ -41,7 +41,9 @@ data:
       secretKeySecret:
         name: {{ .artifacts.credentialsSecret }}
         key: {{ .artifacts.secretKeyKey | default "secretKey" }}
+      {{- if not (hasKey .artifacts "useSDKCreds") }}
       useSDKCreds: false
+      {{- end }}
       {{- end }}
       {{- if .artifacts.pathStyle }}
       pathStyle: {{ .artifacts.pathStyle }}

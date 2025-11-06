@@ -33,6 +33,37 @@ spec:
   templates:
     - name: main
       container:
+        {{- if .workflow }}
+        {{- if .workflow.image }}
+        image: {{ .workflow.image | quote }}
+        {{- else }}
+        image: {{ $.Values.workflowTemplates.nextflowHello.image | default "alpine:3.20" | quote }}
+        {{- end }}
+        {{- if .workflow.command }}
+        command:
+{{ toYaml .workflow.command | nindent 10 }}
+        {{- else if $.Values.workflowTemplates.nextflowHello.command }}
+        command:
+{{ toYaml $.Values.workflowTemplates.nextflowHello.command | nindent 10 }}
+        {{- else }}
+        command:
+          - /bin/sh
+          - -c
+        {{- end }}
+        {{- if .workflow.args }}
+        args:
+{{ toYaml .workflow.args | nindent 10 }}
+        {{- else if $.Values.workflowTemplates.nextflowHello.args }}
+        args:
+{{ toYaml $.Values.workflowTemplates.nextflowHello.args | nindent 10 }}
+        {{- else }}
+        args:
+          - |
+            echo "Hello from {{ .name }}!"
+            echo "Git revision: {{`{{inputs.parameters.git_revision}}`}}"
+            echo "Repository: {{`{{inputs.parameters.repo_url}}`}}"
+        {{- end }}
+        {{- else }}
         image: {{ $.Values.workflowTemplates.nextflowHello.image | default "alpine:3.20" | quote }}
         {{- if $.Values.workflowTemplates.nextflowHello.command }}
         command:
@@ -51,6 +82,7 @@ spec:
             echo "Hello from {{ .name }}!"
             echo "Git revision: {{`{{inputs.parameters.git_revision}}`}}"
             echo "Repository: {{`{{inputs.parameters.repo_url}}`}}"
+        {{- end }}
         {{- end }}
 {{- end }}
 {{- end }}

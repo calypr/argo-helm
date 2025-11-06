@@ -77,7 +77,12 @@ EOF
 # Temporarily remove argo-events dependency to allow testing without network
 CHART_YAML_BACKUP="${CHART_DIR}/Chart.yaml.test-backup"
 cp "${CHART_DIR}/Chart.yaml" "${CHART_YAML_BACKUP}"
-sed -i '/argo-events/,+2d' "${CHART_DIR}/Chart.yaml"
+# Create a temporary Chart.yaml without argo-events using awk to properly handle YAML structure
+awk '
+  /- name: argo-events/ { skip = 1; next }
+  skip && /^  - name:/ { skip = 0 }
+  !skip { print }
+' "${CHART_YAML_BACKUP}" > "${CHART_DIR}/Chart.yaml"
 
 cleanup() {
   echo "🧹 Cleaning up..."
@@ -89,7 +94,11 @@ trap cleanup EXIT
 echo ""
 echo "📋 Test 1: Verify per-app artifact ConfigMaps are created"
 echo "-----------------------------------------------------------"
-OUTPUT=$(helm template test "${CHART_DIR}" --values "${TEST_VALUES}" --show-only templates/21-per-app-artifact-repositories.yaml 2>&1)
+if ! OUTPUT=$(helm template test "${CHART_DIR}" --values "${TEST_VALUES}" --show-only templates/21-per-app-artifact-repositories.yaml 2>&1); then
+  echo "❌ helm template command failed"
+  echo "${OUTPUT}"
+  exit 1
+fi
 
 # Check for app1 ConfigMap
 if echo "${OUTPUT}" | grep -q "name: argo-artifacts-test-app-1"; then
@@ -141,7 +150,11 @@ fi
 echo ""
 echo "📋 Test 2: Verify per-app WorkflowTemplates are created"
 echo "-----------------------------------------------------------"
-OUTPUT_WT=$(helm template test "${CHART_DIR}" --values "${TEST_VALUES}" --show-only templates/workflows/per-app-workflowtemplates.yaml 2>&1)
+if ! OUTPUT_WT=$(helm template test "${CHART_DIR}" --values "${TEST_VALUES}" --show-only templates/workflows/per-app-workflowtemplates.yaml 2>&1); then
+  echo "❌ helm template command failed"
+  echo "${OUTPUT_WT}"
+  exit 1
+fi
 
 # Check for app1 WorkflowTemplate
 if echo "${OUTPUT_WT}" | grep -q "name: test-app-1-template"; then

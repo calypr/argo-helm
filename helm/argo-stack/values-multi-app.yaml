@@ -54,6 +54,11 @@ applications:
       region: us-west-2
       insecure: false
       credentialsSecret: s3-cred-nextflow-hello-2
+    # Optional: Per-application workflow template configuration
+    # workflow:
+    #   image: nextflow/nextflow:latest
+    #   command: ["nextflow"]
+    #   args: ["run", "main.nf"]
 
 # Turn off Argo CD dependency for testing
 argo-cd:
