@@ -186,7 +186,7 @@ events:
     #
     # Example:
     repositories:
-      - eventName: repo-push  # Must be unique ?
+      - eventName: repo-push  # Must align with sensor event
         owner: bwalsh
         repository: nextflow-hello-project
         events: ["push"]
