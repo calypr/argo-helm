@@ -1,0 +1,19 @@
+apiVersion: v2
+name: argo-stack
+description: Umbrella chart for Argo Workflows, Argo CD, authz-adapter, RBAC, and optional Argo CD Application
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+dependencies:
+  - name: argo-workflows
+    version: 0.41.7
+    repository: https://argoproj.github.io/argo-helm
+    condition: argoWorkflows.enabled
+  - name: argo-cd
+    version: 7.6.12
+    repository: https://argoproj.github.io/argo-helm
+    condition: argo-cd.enabled
+  - name: argo-events
+    version: "2.x.x"
+    repository: "https://argoproj.github.io/argo-helm"
+    condition: events.enabled
