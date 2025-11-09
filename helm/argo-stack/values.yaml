@@ -1,9 +1,20 @@
+# Default values for argo-stack chart
+# Declare variables to be passed into your templates.
+
+# ============================================================================
+# Global namespace definitions
+# ============================================================================
+
 namespaces:
   argo: argo-workflows
   argocd: argocd
   tenant: wf-poc
   security: security
   argo-events: argo-events
+
+# ============================================================================
+# Argo Workflows and Argo CD settings
+# ============================================================================
 
 # Argo Workflows dependency values
 argo-workflows:
@@ -37,7 +48,10 @@ argo-cd:
       # helm upgrade --install ... argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}"
       # server.secretkey: "<?= replace with output of: openssl rand -hex 32 ?>"
 
-# Our adapter settings
+# ============================================================================
+# Authorization Adapter Settings (Arborist Integration)
+# ============================================================================
+
 authzAdapter:
   image: ghcr.io/calypr/argo-helm:latest
   fenceBase: "https://calypr-dev.ohsu.edu/user"
@@ -45,7 +59,10 @@ authzAdapter:
   # Ensure adapter uses security namespace
   namespace: security
 
-# On-prem S3 artifacts for Argo Workflows
+# ============================================================================
+# Artifact Storage Configuration ( Results of Workflows )
+# ============================================================================
+
 s3:
   enabled: false
   hostname: ""
@@ -132,6 +149,7 @@ ingressAuth:
 # If no artifacts config is provided for an application, it will fall back
 # to the global s3 configuration defined above.
 #
+
 applications:
   - name: nextflow-hello
     repoURL: https://github.com/bwalsh/nextflow-hello-project.git
@@ -155,37 +173,8 @@ applications:
         selfHeal: true
 
 # ============================================================================
-# DEPRECATED: Single Application Support (Use 'applications' array instead)
+# Argo Events Configuration - GitHub EventSource and Sensor
 # ============================================================================
-# This single-application configuration is deprecated and will be removed
-# in a future release. Please migrate to the 'applications' array above.
-#
-# Migration Example:
-# OLD:
-#   argocdApplication:
-#     enabled: true
-#     name: nextflow-hello
-#     repoURL: https://github.com/bwalsh/nextflow-hello-project.git
-#     targetRevision: main
-#     path: "."
-#
-# NEW:
-#   applications:
-#     - name: nextflow-hello
-#       repoURL: https://github.com/bwalsh/nextflow-hello-project.git
-#       targetRevision: main
-#       path: "."
-#
-#argocdApplication:
-#  enabled: true
-#  name: nextflow-hello
-#  project: default
-#  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
-#  targetRevision: "main"
-#  path: "."
-#  # IMPORTANT: do not template here. Either leave empty or set a literal default.
-##   destinationNamespace: ""   # leave empty and let the template default to .Values.namespaces.tenant
-
 
 events:
   enabled: true
@@ -219,22 +208,10 @@ events:
         events: ["push"]
         active: true
 
-
     # ========================================================================
-    # DEPRECATED: Single Repository Configuration (backward compatibility)
+    # Secret for GitHub API Token
     # ========================================================================
-    # If 'repositories' is empty, falls back to single repository mode.
-    # Use 'repositories' array above for multiple repositories.
-    #
-    # eventName: repo-push
-    # owner: bwalsh           # <-- change as needed
-    # repository: nextflow-hello-project   # <-- change as needed
-    # events: ["push"]
-    # active: true
 
-    # --- GitHub Secret configuration ---
-    # Secret holding either a GitHub PAT (for webhook management)
-    # or a webhook secret. If tokenValue is empty, no Secret will be created.
     secret:
       create: true                       # chart will render a Secret manifest
       name: github-secret                # name of the Secret object
