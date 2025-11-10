@@ -67,7 +67,7 @@ s3:
   enabled: false
   hostname: ""
   bucket: ""
-  region: "us-west-2"
+  region: "us-east-1"
   insecure: false
   pathStyle: true
   accessKey: ""
@@ -197,12 +197,12 @@ events:
     #
     # Example:
     repositories:
-      - eventName: repo-push-nextflow-hello-project  # Must align with sensor event, must be unique
+      - eventName: repo_push_nextflow_hello_project  # Must align with sensor event, must be unique
         owner: bwalsh
         repository: nextflow-hello-project
         events: ["push"]
         active: true
-      - eventName: repo-push-nextflow-hello-project-2
+      - eventName: repo_push_nextflow_hello-project_2
         owner: bwalsh
         repository: nextflow-hello-project-2
         events: ["push"]
@@ -256,3 +256,8 @@ workflowTemplates:
     command: ["/bin/sh", "-c"]
     args:
       - echo "Hello from Argo Events!"
+
+workflows:
+  namespace: wf-poc
+  runnerServiceAccount: wf-runner
+  templateRef: nextflow-hello-template

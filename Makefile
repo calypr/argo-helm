@@ -1,6 +1,28 @@
 # Convenience targets for local testing
 .PHONY: deps lint template validate kind ct adapter test-artifacts all
 
+S3_ENABLED           ?= true
+S3_ACCESS_KEY_ID     ?=
+S3_SECRET_ACCESS_KEY ?=
+S3_BUCKET            ?=
+
+
+check-vars:
+	@echo "🔍 Checking required environment variables..."
+	@test -n "$(S3_ENABLED)" || (echo "❌ ERROR: S3_ENABLED must be set (true/false)" && exit 1)
+	@if [ "$(S3_ENABLED)" = "true" ]; then \
+		test -n "$(S3_ACCESS_KEY_ID)" || (echo "❌ ERROR: S3_ACCESS_KEY_ID must be set" && exit 1); \
+		test -n "$(S3_SECRET_ACCESS_KEY)" || (echo "❌ ERROR: S3_SECRET_ACCESS_KEY must be set" && exit 1); \
+		test -n "$(S3_BUCKET)" || (echo "❌ ERROR: S3_BUCKET must be set" && exit 1); \
+	fi
+	@echo "✅ Environment validation passed."
+	@test -n "$(GITHUB_PAT)" || (echo "Error: GITHUB_PAT is undefined. Run 'export GITHUB_PAT=...' before installing" && exit 1)
+        @test -n "$(ARGOCD_SECRET_KEY)" || (echo "Error: ARGOCD_SECRET_KEY is undefined. Run 'export ARGOCD_SECRET_KEY=...' before installing" && exit 1)
+        @test -n "$(ARGO_HOSTNAME)" || (echo "Error: ARGO_HOSTNAME is undefined. Run 'export ARGO_HOSTNAME=...' before installing" && exit 1)
+
+	@echo "✅ Environment validation passed."
+
+
 deps:
 	helm repo add argo https://argoproj.github.io/argo-helm
 	helm repo update
@@ -9,13 +31,18 @@ deps:
 lint:
 	helm lint helm/argo-stack --values helm/argo-stack/values.yaml
 
-template: deps
+template: check-vars deps 
 	helm template argo-stack helm/argo-stack \
+		--debug \
 		--values helm/argo-stack/values.yaml \
 		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
 		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
 		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000  \
+		--set-string s3.enabled=${S3_ENABLED} \
+                --set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
+                --set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
+                --set-string s3.bucket=${S3_BUCKET} \
 		--namespace argocd > rendered.yaml
 
 validate:
@@ -23,25 +50,50 @@ validate:
 	  -skip 'CustomResourceDefinition|Application|Workflow|WorkflowTemplate' \
 	  -summary rendered.yaml
 
+bump-limits:
+	@echo "🔧 Raising inotify and file descriptor limits in Kind nodes..."
+	@NODE=$$(kind get nodes | head -n1); \
+	if [ -z "$$NODE" ]; then \
+		echo "❌ No kind node found. Is your cluster running?"; \
+		exit 1; \
+	fi; \
+	echo "➡️  Applying sysctl updates on $$NODE"; \
+	docker exec "$$NODE" sysctl -w fs.inotify.max_user_watches=1048576; \
+	docker exec "$$NODE" sysctl -w fs.inotify.max_user_instances=1024; \
+	docker exec "$$NODE" sysctl -w fs.file-max=2097152; \
+	echo "✅ Limits updated on $$NODE"
+
+show-limits:
+	@NODE=$$(kind get nodes | head -n1); \
+	if [ -z "$$NODE" ]; then \
+		echo "❌ No kind node found."; \
+		exit 1; \
+	fi; \
+	echo "🔍 Checking limits on $$NODE"; \
+	docker exec "$$NODE" sh -c 'sysctl fs.inotify.max_user_watches fs.inotify.max_user_instances fs.file-max'
+
+
+
 kind:
 	kind delete cluster || true
 	kind create cluster
 
-ct: kind deps
+ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
-deploy: kind deps
-	@test -n "$(GITHUB_PAT)" || (echo "Error: GITHUB_PAT is undefined. Run 'export GITHUB_PAT=...' before installing" && exit 1)
-	@test -n "$(ARGOCD_SECRET_KEY)" || (echo "Error: ARGOCD_SECRET_KEY is undefined. Run 'export ARGOCD_SECRET_KEY=...' before installing" && exit 1)
-	@test -n "$(ARGO_HOSTNAME)" || (echo "Error: ARGO_HOSTNAME is undefined. Run 'export ARGO_HOSTNAME=...' before installing" && exit 1)
+deploy: check-vars kind bump-limits deps
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
 		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
 		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
-		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000 # --debug #  --values testing-values.yaml 
+		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000 \
+		--set-string s3.enabled=${S3_ENABLED} \
+		--set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
+		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
+		--set-string s3.bucket=${S3_BUCKET}
 	echo waiting for pods
 	sleep 10
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd

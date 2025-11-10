@@ -6,8 +6,8 @@ metadata:
   namespace: {{ .Values.namespaces.tenant }}
 type: Opaque
 stringData:
-  AWS_ACCESS_KEY_ID: "{{ .Values.s3.accessKey }}"
-  AWS_SECRET_ACCESS_KEY: "{{ .Values.s3.secretKey }}"
+  AWS_ACCESS_KEY_ID: {{ .Values.s3.accessKeyId | quote  }}
+  AWS_SECRET_ACCESS_KEY: {{ .Values.s3.secretAccessKey | quote  }}
 ---
 apiVersion: v1
 kind: ConfigMap
@@ -24,10 +24,10 @@ data:
       insecure: {{ .Values.s3.insecure }}
       accessKeySecret:
         name: s3-credentials
-        key: AWS_ACCESS_KEY_ID
+        key: {{ .Values.s3.accessKeyId | quote }}
       secretKeySecret:
         name: s3-credentials
-        key: AWS_SECRET_ACCESS_KEY
+        key: {{ .Values.s3.secretAccessKey | quote }}
       useSDKCreds: false
       pathStyle: {{ .Values.s3.pathStyle }}
 {{- end }}
