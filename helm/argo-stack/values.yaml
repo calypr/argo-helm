@@ -202,7 +202,7 @@ events:
         repository: nextflow-hello-project
         events: ["push"]
         active: true
-      - eventName: repo_push_nextflow_hello-project_2
+      - eventName: repo_push_nextflow_hello_project_2
         owner: bwalsh
         repository: nextflow-hello-project-2
         events: ["push"]
