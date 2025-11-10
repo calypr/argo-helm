@@ -13,7 +13,7 @@ spec:
   github:
     {{- if .Values.events.github.repositories }}
     {{- range $repo := .Values.events.github.repositories }}
-    {{ $repo.eventName | default (printf "repo-push-%s" $repo.repository) }}:
+    {{ $repo.eventName | default (printf "repo_push_%s" $repo.repository) }}:
       owner: {{ $repo.owner | quote }}
       repository: {{ $repo.repository | quote }}
       events: {{ toYaml ($repo.events | default (list "push")) | nindent 8 }}
@@ -33,7 +33,7 @@ spec:
       {{- end }}
     {{- end }}
     {{- else }}
-    {{ .Values.events.github.eventName | default "repo-push" }}:
+    {{ .Values.events.github.eventName | default "repo_push" }}:
       owner: {{ .Values.events.github.owner | quote }}
       repository: {{ .Values.events.github.repository | quote }}
       events: {{ toYaml (.Values.events.github.events | default (list "push")) | nindent 8 }}

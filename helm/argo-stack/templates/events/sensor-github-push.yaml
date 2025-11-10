@@ -21,13 +21,13 @@ spec:
   {{ if .Values.events.github.repositories }}
   {{ range $i, $repo := .Values.events.github.repositories }}
     {{ $repoName := (default (printf "repo_%d" (add $i 1)) $repo.repository) }}
-    {{ $ev := (default (printf "repo-push-%s" $repoName) $repo.eventName) }}
+    {{ $ev := (default (printf "repo_push_%s" $repoName) $repo.eventName) }}
   - name: {{ $ev | quote }}
     eventSourceName: {{ $.Values.events.github.name | default "github" | quote }}
     eventName: {{ $ev | quote }}
   {{ end }}
   {{ else }}
-    {{ $single := (default "repo-push" .Values.events.github.eventName) }}
+    {{ $single := (default "repo_push" .Values.events.github.eventName) }}
     {{ $ev := regexReplaceAll "[^A-Za-z0-9_]" (replace $single "-" "_") "_" }}
   - name: {{ $ev | quote }}
     eventSourceName: {{ .Values.events.github.name | default "github" | quote }}
@@ -41,7 +41,7 @@ spec:
   dependencyGroups:
   {{ range $i, $repo := .Values.events.github.repositories }}
     {{ $repoName := (default (printf "repo_%d" (add $i 1)) $repo.repository) }}
-    {{ $raw := (default (printf "repo-push-%s" $repoName) $repo.eventName) }}
+    {{ $raw := (default (printf "repo_push_%s" $repoName) $repo.eventName) }}
     {{ $step1 := replace $raw "-" "_" }}
     {{ $safe := regexReplaceAll "[^A-Za-z0-9_]" $step1 "_" }}
     {{ $safeNonEmpty := (default (printf "repo_push_%d" (add $i 1)) $safe) }}
@@ -60,7 +60,7 @@ spec:
   {{ if .Values.events.github.repositories }}
   {{ range $i, $repo := .Values.events.github.repositories }}
     {{ $repoName := (default (printf "repo_%d" (add $i 1)) $repo.repository) }}
-    {{ $raw := (default (printf "repo-push-%s" $repoName) $repo.eventName) }}
+    {{ $raw := (default (printf "repo_push_%s" $repoName) $repo.eventName) }}
     {{ $step1 := replace $raw "-" "_" }}
     {{ $safe := regexReplaceAll "[^A-Za-z0-9_]" $step1 "_" }}
     {{ $safeNonEmpty := (default (printf "repo_push_%d" (add $i 1)) $safe) }}
@@ -96,7 +96,7 @@ spec:
                   value: '{{`{{ (events.`}}{{ $ev }}{{`.body.ref) }}`}}'
   {{ end }}
   {{ else }}
-    {{ $single := (default "repo-push" .Values.events.github.eventName) }}
+    {{ $single := (default "repo_push" .Values.events.github.eventName) }}
     {{ $ev := regexReplaceAll "[^A-Za-z0-9_]" (replace $single "-" "_") "_" }}
     {{ $grp := printf "grp_%s" $ev }}
   - conditions: {{ $grp | quote }}
