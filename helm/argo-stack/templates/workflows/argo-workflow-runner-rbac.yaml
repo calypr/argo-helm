@@ -29,6 +29,12 @@ rules:
 - apiGroups: [""]
   resources: ["events"]
   verbs: ["create","patch","update"]
+# Argo Workflows custom resources (for task result reporting)
+- apiGroups: ["argoproj.io"]
+  resources:
+    - workflowtaskresults
+    - workflowtasksets
+  verbs: ["create","get","list","watch","patch","update"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
