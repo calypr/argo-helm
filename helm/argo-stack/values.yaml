@@ -71,7 +71,7 @@ s3:
   enabled: false
   hostname: ""
   bucket: ""
-  region: "us-east-1"
+  region: ""
   insecure: false
   pathStyle: true
   accessKey: ""

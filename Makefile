@@ -93,7 +93,10 @@ deploy: check-vars kind bump-limits deps
 		--set-string s3.enabled=${S3_ENABLED} \
 		--set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
 		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
-		--set-string s3.bucket=${S3_BUCKET}
+		--set-string s3.bucket=${S3_BUCKET} \
+		--set-string s3.pathStyle=true \
+		--set-string s3.region=${S3_REGION} \
+		--set-string s3.hostname=${S3_HOSTNAME}
 	echo waiting for pods
 	sleep 10
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
