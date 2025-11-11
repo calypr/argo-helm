@@ -29,6 +29,10 @@ argo-workflows:
       - wf-poc
     # Ensure controller uses correct namespace
     namespaceInstallMode: true
+    # Enable log archiving for all workflows
+    workflowDefaults:
+      spec:
+        archiveLogs: true
   # Force namespace for all Argo Workflows components
   namespaceOverride: argo-workflows
 

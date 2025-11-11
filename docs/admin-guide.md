@@ -90,6 +90,27 @@ applications:
       # secretKeyKey: secretKey        # Custom secret key name
 ```
 
+### Enabling Log Archiving
+
+To enable automatic archiving of workflow logs to S3, configure the Argo Workflows controller with `archiveLogs`:
+
+```yaml
+argo-workflows:
+  controller:
+    workflowNamespaces:
+      - wf-poc
+    workflowDefaults:
+      spec:
+        archiveLogs: true  # Enable log archiving for all workflows
+```
+
+This setting ensures that:
+- All workflow pod logs (stdout/stderr) are automatically uploaded to the configured S3 bucket
+- Logs persist even after pods are deleted
+- Logs are available via the Argo Workflows UI and CLI
+
+**Note**: Each workflow must have an artifact repository configured (either per-app via `artifactRepositoryRef` or globally) for log archiving to work.
+
 ### What Gets Created
 
 When an application has an `artifacts` configuration, the Helm chart creates:

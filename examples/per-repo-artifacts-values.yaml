@@ -20,6 +20,10 @@ argo-workflows:
     workflowNamespaces:
       - wf-poc
     namespaceInstallMode: true
+    # Enable log archiving for all workflows
+    workflowDefaults:
+      spec:
+        archiveLogs: true
   namespaceOverride: argo-workflows
 
 # Argo CD configuration

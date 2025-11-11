@@ -97,3 +97,7 @@ argo-workflows:
   controller:
     # Let controller manage all namespaces (or leave empty array)
     workflowNamespaces: []
+    # Enable log archiving for all workflows
+    workflowDefaults:
+      spec:
+        archiveLogs: true
