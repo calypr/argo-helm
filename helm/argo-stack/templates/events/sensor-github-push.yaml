@@ -1,4 +1,4 @@
-{{ if and .Values.events.enabled .Values.events.github.enabled }}
+{{- if and .Values.events.enabled .Values.events.github.enabled }}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
@@ -14,65 +14,20 @@ spec:
   template:
     serviceAccountName: {{ .Values.events.github.sensorServiceAccount | default "default" }}
 
-  # Dependencies
+  # Dependencies (one per repository)
   dependencies:
-  {{ if .Values.events.github.repositories }}
-  {{ range $i, $repo := .Values.events.github.repositories }}
-    {{ $repoName := (default (printf "repo_%d" (add $i 1)) $repo.repository) }}
-    {{ $raw := (default (printf "repo-push-%s" $repoName) $repo.eventName) }}
-    {{ $step1 := replace "-" "_" $raw }}
-    {{ $safe := regexReplaceAll "[^A-Za-z0-9_]" $step1 "_" }}
-    {{ $safeNonEmpty := (default (printf "repo_push_%d" (add $i 1)) $safe) }}
-    {{ $startsWithDigit := regexMatch "^[0-9]" $safeNonEmpty }}
-    {{ $ev := ternary (printf "e_%s" $safeNonEmpty) $safeNonEmpty $startsWithDigit }}
-  - name: {{ $ev | quote }}
+  {{- range $i, $repo := .Values.events.github.repositories }}
+  - name: {{ $repo.eventName | quote }}
     eventSourceName: {{ $.Values.events.github.name | default "github" | quote }}
-    eventName: {{ $ev | quote }}
-  {{ end }}
-  {{ else }}
-    {{ $single := (default "repo-push" .Values.events.github.eventName) }}
-    {{ $ev := regexReplaceAll "[^A-Za-z0-9_]" (replace "-" "_" $single) "_" }}
-  - name: {{ $ev | quote }}
-    eventSourceName: {{ .Values.events.github.name | default "github" | quote }}
-    eventName: {{ $ev | quote }}
-  {{ end }}
+    eventName: {{ $repo.eventName | quote }}
+  {{- end }}
 
-  # Dependency groups
-  {{ if .Values.events.github.repositories }}
-  dependencyGroups:
-  {{ range $i, $repo := .Values.events.github.repositories }}
-    {{ $repoName := (default (printf "repo_%d" (add $i 1)) $repo.repository) }}
-    {{ $raw := (default (printf "repo-push-%s" $repoName) $repo.eventName) }}
-    {{ $step1 := replace "-" "_" $raw }}
-    {{ $safe := regexReplaceAll "[^A-Za-z0-9_]" $step1 "_" }}
-    {{ $safeNonEmpty := (default (printf "repo_push_%d" (add $i 1)) $safe) }}
-    {{ $startsWithDigit := regexMatch "^[0-9]" $safeNonEmpty }}
-    {{ $ev := ternary (printf "e_%s" $safeNonEmpty) $safeNonEmpty $startsWithDigit }}
-    {{ $grp := printf "grp_%s" $ev }}
-  - name: {{ $grp | quote }}
-    dependencies:
-      - {{ $ev | quote }}
-  {{ end }}
-  {{ end }}
-
-  # Triggers
+  # Triggers (one per repository) — fire on that repo’s push
   triggers:
-  {{ if .Values.events.github.repositories }}
-  {{ range $i, $repo := .Values.events.github.repositories }}
-    {{ $repoName := (default (printf "repo_%d" (add $i 1)) $repo.repository) }}
-    {{ $raw := (default (printf "repo-push-%s" $repoName) $repo.eventName) }}
-    {{ $step1 := replace "-" "_" $raw }}
-    {{ $safe := regexReplaceAll "[^A-Za-z0-9_]" $step1 "_" }}
-    {{ $safeNonEmpty := (default (printf "repo_push_%d" (add $i 1)) $safe) }}
-    {{ $startsWithDigit := regexMatch "^[0-9]" $safeNonEmpty }}
-    {{ $ev := ternary (printf "e_%s" $safeNonEmpty) $safeNonEmpty $startsWithDigit }}
-    {{ $grp := printf "grp_%s" $ev }}
-    {{ $wfns := (default ($.Values.workflows.namespace | default "wf-poc") $repo.workflowNamespace) }}
-    {{ $wft  := (default ($.Values.workflows.templateRef | default "nextflow-hello-template") $repo.workflowTemplateRef) }}
-    {{ $sa   := (default ($.Values.workflows.runnerServiceAccount | default "wf-runner") $repo.workflowServiceAccount) }}
-  - conditions: {{ $grp | quote }}
-    template:
-      name: submit-wf-{{ $repoName }}
+  {{- range $i, $repo := .Values.events.github.repositories }}
+  - template:
+      conditions: {{ $repo.eventName }}
+      name: submit-wf-{{ $repo.repository }}
       argoWorkflow:
         operation: submit
         source:
@@ -81,44 +36,19 @@ spec:
             kind: Workflow
             metadata:
               generateName: {{ printf "%s-" ($.Values.workflows.generateName | default "nextflow-hello") }}
-              namespace: {{ $wfns }}
+              namespace: {{ $.Values.workflows.namespace }}
             spec:
-              serviceAccountName: {{ $sa }}
+              serviceAccountName: {{ $.Values.workflows.runnerServiceAccount | default "wf-runner" }}
               workflowTemplateRef:
-                name: {{ $wft }}
+                name: {{ $.Values.workflows.templateRef }}
               arguments:
                 parameters:
-                - name: git_revision
-                  value: {{ printf "{{ (events.%s.body.head_commit.id) }}" $ev | quote }}
-                - name: git_repo
-                  value: {{ printf "https://github.com/%s/%s.git" ($repo.owner | default "bwalsh") $repo.repository | quote }}
-                - name: git_ref
-                  value: {{ printf "{{ (events.%s.body.ref) }}" $ev | quote }}
-  {{ end }}
-  {{ else }}
-    {{ $single := (default "repo-push" .Values.events.github.eventName) }}
-    {{ $ev := regexReplaceAll "[^A-Za-z0-9_]" (replace "-" "_" $single) "_" }}
-    {{ $grp := printf "grp_%s" $ev }}
-  - conditions: {{ $grp | quote }}
-    template:
-      name: submit-wf
-      argoWorkflow:
-        operation: submit
-        source:
-          resource:
-            apiVersion: argoproj.io/v1alpha1
-            kind: Workflow
-            metadata:
-              generateName: {{ printf "%s-" (.Values.workflows.generateName | default "nextflow-hello") }}
-              namespace: {{ .Values.workflows.namespace | default "wf-poc" }}
-            spec:
-              serviceAccountName: {{ .Values.workflows.runnerServiceAccount | default "wf-runner" }}
-              workflowTemplateRef:
-                name: {{ .Values.workflows.templateRef | default "nextflow-hello-template" }}
-              arguments:
-                parameters:
-                - name: git_revision
-                  value: {{ printf "{{ (events.%s.body.head_commit.id) }}" $ev | quote }}
-  {{ end }}
-{{ end }}
+                  - name: git_revision
+                    value: '{{`{{ (events.`}}{{ $repo.eventName }}{{`.body.head_commit.id) }}`}}'
+                  - name: git_repo
+                    value: {{ printf "https://github.com/%s/%s.git" ($repo.owner | default "bwalsh") $repo.repository | quote }}
+                  - name: git_ref
+                    value: '{{`{{ (events.`}}{{ $repo.eventName }}{{`.body.ref) }}`}}'
+  {{- end }}
+{{- end }}
 
