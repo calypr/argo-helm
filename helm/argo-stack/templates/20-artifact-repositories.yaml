@@ -24,10 +24,10 @@ data:
       insecure: {{ .Values.s3.insecure }}
       accessKeySecret:
         name: s3-credentials
-        key: {{ .Values.s3.accessKeyId | quote }}
+        key: AWS_ACCESS_KEY_ID
       secretKeySecret:
         name: s3-credentials
-        key: {{ .Values.s3.secretAccessKey | quote }}
+        key: AWS_SECRET_ACCESS_KEY
       useSDKCreds: false
       pathStyle: {{ .Values.s3.pathStyle }}
 {{- end }}
