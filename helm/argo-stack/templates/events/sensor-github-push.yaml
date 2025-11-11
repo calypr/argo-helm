@@ -8,60 +8,60 @@ metadata:
     app.kubernetes.io/name: argo-events
     app.kubernetes.io/part-of: argo-stack
   annotations:
-    "helm.sh/hook": "post-install,post-upgrade"
+    "helm.sh/hook": post-install,post-upgrade
     "helm.sh/hook-weight": "10"
 spec:
   template:
     serviceAccountName: {{ .Values.events.github.sensorServiceAccount | default "default" }}
 
-  # ----------------------------
-  # Dependencies (one per repo)
-  # ----------------------------
+  # Dependencies
   dependencies:
   {{ if .Values.events.github.repositories }}
   {{ range $i, $repo := .Values.events.github.repositories }}
     {{ $repoName := (default (printf "repo_%d" (add $i 1)) $repo.repository) }}
-    {{ $ev := (default (printf "repo_push_%s" $repoName) $repo.eventName) }}
+    {{ $raw := (default (printf "repo-push-%s" $repoName) $repo.eventName) }}
+    {{ $step1 := replace "-" "_" $raw }}
+    {{ $safe := regexReplaceAll "[^A-Za-z0-9_]" $step1 "_" }}
+    {{ $safeNonEmpty := (default (printf "repo_push_%d" (add $i 1)) $safe) }}
+    {{ $startsWithDigit := regexMatch "^[0-9]" $safeNonEmpty }}
+    {{ $ev := ternary (printf "e_%s" $safeNonEmpty) $safeNonEmpty $startsWithDigit }}
   - name: {{ $ev | quote }}
     eventSourceName: {{ $.Values.events.github.name | default "github" | quote }}
     eventName: {{ $ev | quote }}
   {{ end }}
   {{ else }}
-    {{ $single := (default "repo_push" .Values.events.github.eventName) }}
-    {{ $ev := regexReplaceAll "[^A-Za-z0-9_]" (replace $single "-" "_") "_" }}
+    {{ $single := (default "repo-push" .Values.events.github.eventName) }}
+    {{ $ev := regexReplaceAll "[^A-Za-z0-9_]" (replace "-" "_" $single) "_" }}
   - name: {{ $ev | quote }}
     eventSourceName: {{ .Values.events.github.name | default "github" | quote }}
     eventName: {{ $ev | quote }}
   {{ end }}
 
-  # ---------------------------------------------------------
-  # Dependency groups (one per dependency)
-  # ---------------------------------------------------------
+  # Dependency groups
   {{ if .Values.events.github.repositories }}
   dependencyGroups:
   {{ range $i, $repo := .Values.events.github.repositories }}
     {{ $repoName := (default (printf "repo_%d" (add $i 1)) $repo.repository) }}
-    {{ $raw := (default (printf "repo_push_%s" $repoName) $repo.eventName) }}
-    {{ $step1 := replace $raw "-" "_" }}
+    {{ $raw := (default (printf "repo-push-%s" $repoName) $repo.eventName) }}
+    {{ $step1 := replace "-" "_" $raw }}
     {{ $safe := regexReplaceAll "[^A-Za-z0-9_]" $step1 "_" }}
     {{ $safeNonEmpty := (default (printf "repo_push_%d" (add $i 1)) $safe) }}
     {{ $startsWithDigit := regexMatch "^[0-9]" $safeNonEmpty }}
     {{ $ev := ternary (printf "e_%s" $safeNonEmpty) $safeNonEmpty $startsWithDigit }}
     {{ $grp := printf "grp_%s" $ev }}
   - name: {{ $grp | quote }}
-    dependencies: [{{ $ev | quote }}]
+    dependencies:
+      - {{ $ev | quote }}
   {{ end }}
   {{ end }}
 
-  # ---------------------------------------------------------
-  # Triggers: one per repo, conditions at TRIGGER level
-  # ---------------------------------------------------------
+  # Triggers
   triggers:
   {{ if .Values.events.github.repositories }}
   {{ range $i, $repo := .Values.events.github.repositories }}
     {{ $repoName := (default (printf "repo_%d" (add $i 1)) $repo.repository) }}
-    {{ $raw := (default (printf "repo_push_%s" $repoName) $repo.eventName) }}
-    {{ $step1 := replace $raw "-" "_" }}
+    {{ $raw := (default (printf "repo-push-%s" $repoName) $repo.eventName) }}
+    {{ $step1 := replace "-" "_" $raw }}
     {{ $safe := regexReplaceAll "[^A-Za-z0-9_]" $step1 "_" }}
     {{ $safeNonEmpty := (default (printf "repo_push_%d" (add $i 1)) $safe) }}
     {{ $startsWithDigit := regexMatch "^[0-9]" $safeNonEmpty }}
@@ -89,15 +89,15 @@ spec:
               arguments:
                 parameters:
                 - name: git_revision
-                  value: '{{`{{ (events.`}}{{ $ev }}{{`.body.head_commit.id) }}`}}'
+                  value: {{ printf "{{ (events.%s.body.head_commit.id) }}" $ev | quote }}
                 - name: git_repo
                   value: {{ printf "https://github.com/%s/%s.git" ($repo.owner | default "bwalsh") $repo.repository | quote }}
                 - name: git_ref
-                  value: '{{`{{ (events.`}}{{ $ev }}{{`.body.ref) }}`}}'
+                  value: {{ printf "{{ (events.%s.body.ref) }}" $ev | quote }}
   {{ end }}
   {{ else }}
-    {{ $single := (default "repo_push" .Values.events.github.eventName) }}
-    {{ $ev := regexReplaceAll "[^A-Za-z0-9_]" (replace $single "-" "_") "_" }}
+    {{ $single := (default "repo-push" .Values.events.github.eventName) }}
+    {{ $ev := regexReplaceAll "[^A-Za-z0-9_]" (replace "-" "_" $single) "_" }}
     {{ $grp := printf "grp_%s" $ev }}
   - conditions: {{ $grp | quote }}
     template:
@@ -118,7 +118,7 @@ spec:
               arguments:
                 parameters:
                 - name: git_revision
-                  value: '{{`{{ (events.`}}{{ $ev }}{{`.body.head_commit.id) }}`}}'
+                  value: {{ printf "{{ (events.%s.body.head_commit.id) }}" $ev | quote }}
   {{ end }}
 {{ end }}
 
