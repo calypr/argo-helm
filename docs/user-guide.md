@@ -168,14 +168,81 @@ argo -n argo logs @latest
 
 Each workflow runs inside the cluster and writes outputs to object storage.
 
-Typical outputs:
-- `s3://<your-bucket>/<workflow-name>/results/`
-- or a project-specific bucket managed by your admin.
+### Per-Repository Artifact Storage
 
-You can find the bucket path in the workflow metadata:
+The Argo platform supports **per-repository S3 buckets** to ensure tenant isolation and traceability. Each GitHub repository can be configured with its own dedicated bucket or bucket prefix:
+
+#### Example Configuration
+
+When your repository is configured with per-repository artifacts, your admin will set up values like:
+
+```yaml
+applications:
+  - name: nextflow-hello-project
+    repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+    artifacts:
+      bucket: calypr-nextflow-hello
+      keyPrefix: workflows/
+      endpoint: https://s3.us-west-2.amazonaws.com
+      region: us-west-2
+      credentialsSecret: s3-cred-nextflow-hello
+```
+
+#### Locating Your Workflow Outputs
+
+With per-repository artifacts enabled, your workflow outputs are stored at:
+
+```
+s3://<your-repo-bucket>/<keyPrefix>/<workflow-name>/
+```
+
+For example:
+```
+s3://calypr-nextflow-hello/workflows/nextflow-hello-abc123/
+```
+
+You can find the exact bucket path in the workflow metadata:
 ```bash
 argo -n argo get @latest -o yaml | grep -A2 artifactRepositoryRef
 ```
+
+Or view the ConfigMap that defines your repository's artifact storage:
+```bash
+kubectl -n argo-workflows get configmap argo-artifacts-<your-app-name> -o yaml
+```
+
+#### Accessing Your Data
+
+If you have AWS CLI configured with appropriate credentials:
+
+```bash
+# List workflow outputs
+aws s3 ls s3://calypr-nextflow-hello/workflows/
+
+# Download a specific workflow's outputs
+aws s3 sync s3://calypr-nextflow-hello/workflows/nextflow-hello-abc123/ ./local-results/
+
+# View logs
+aws s3 cp s3://calypr-nextflow-hello/workflows/nextflow-hello-abc123/main.log -
+```
+
+#### Benefits of Per-Repository Artifacts
+
+- **Tenant Isolation**: Each repository's data is kept separate
+- **Traceability**: Outputs are linked to the source repository and Git commit
+- **Custom Policies**: Apply repository-specific retention, encryption, and replication rules
+- **Access Control**: Grant granular S3 bucket permissions per team or project
+
+#### Global vs Per-Repository Artifacts
+
+If your repository doesn't have a dedicated artifacts configuration, it will fall back to the **global S3 bucket** configured by your admin:
+
+```bash
+# Global artifact repository
+s3://<global-bucket>/<workflow-name>/
+```
+
+Consult with your admin to determine which configuration applies to your repository.
 
 If your workflow includes a results collection step, it will post a summary to the Workflows UI under **Artifacts**.
 

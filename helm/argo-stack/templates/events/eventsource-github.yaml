@@ -13,7 +13,7 @@ spec:
   github:
     {{- if .Values.events.github.repositories }}
     {{- range $repo := .Values.events.github.repositories }}
-    {{ $repo.eventName | default (printf "repo-push-%s" $repo.repository) }}:
+    {{ $repo.eventName | default (printf "repo_push_%s" $repo.repository) }}:
       owner: {{ $repo.owner | quote }}
       repository: {{ $repo.repository | quote }}
       events: {{ toYaml ($repo.events | default (list "push")) | nindent 8 }}
@@ -33,7 +33,7 @@ spec:
       {{- end }}
     {{- end }}
     {{- else }}
-    {{ .Values.events.github.eventName | default "repo-push" }}:
+    {{ .Values.events.github.eventName | default "repo_push" }}:
       owner: {{ .Values.events.github.owner | quote }}
       repository: {{ .Values.events.github.repository | quote }}
       events: {{ toYaml (.Values.events.github.events | default (list "push")) | nindent 8 }}
@@ -68,7 +68,7 @@ spec:
       port: {{ .Values.events.github.webhook.port | default 12000 }}
       targetPort: 12000
   type: {{ .Values.events.github.webhook.service.type | default "ClusterIP" }}
-{{- if .Values.events.github.webhook.ingress.enabled }}
+{{- if and .Values.events.github.webhook.ingress.enabled (gt (len (.Values.events.github.webhook.ingress.hosts | default list)) 0) }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress

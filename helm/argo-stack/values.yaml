@@ -1,9 +1,20 @@
+# Default values for argo-stack chart
+# Declare variables to be passed into your templates.
+
+# ============================================================================
+# Global namespace definitions
+# ============================================================================
+
 namespaces:
   argo: argo-workflows
   argocd: argocd
   tenant: wf-poc
   security: security
   argo-events: argo-events
+
+# ============================================================================
+# Argo Workflows and Argo CD settings
+# ============================================================================
 
 # Argo Workflows dependency values
 argo-workflows:
@@ -18,6 +29,10 @@ argo-workflows:
       - wf-poc
     # Ensure controller uses correct namespace
     namespaceInstallMode: true
+    # Enable log archiving for all workflows
+    workflowDefaults:
+      spec:
+        archiveLogs: true
   # Force namespace for all Argo Workflows components
   namespaceOverride: argo-workflows
 
@@ -37,7 +52,10 @@ argo-cd:
       # helm upgrade --install ... argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}"
       # server.secretkey: "<?= replace with output of: openssl rand -hex 32 ?>"
 
-# Our adapter settings
+# ============================================================================
+# Authorization Adapter Settings (Arborist Integration)
+# ============================================================================
+
 authzAdapter:
   image: ghcr.io/calypr/argo-helm:latest
   fenceBase: "https://calypr-dev.ohsu.edu/user"
@@ -45,12 +63,15 @@ authzAdapter:
   # Ensure adapter uses security namespace
   namespace: security
 
-# On-prem S3 artifacts for Argo Workflows
+# ============================================================================
+# Artifact Storage Configuration ( Results of Workflows )
+# ============================================================================
+
 s3:
   enabled: false
   hostname: ""
   bucket: ""
-  region: "us-west-2"
+  region: ""
   insecure: false
   pathStyle: true
   accessKey: ""
@@ -83,6 +104,10 @@ ingressAuth:
 # Use this array to deploy multiple Argo CD Applications.
 # Each entry creates a separate Application resource.
 #
+# Per-Repository Artifact Configuration:
+# Each application can have its own S3 bucket/prefix for workflow artifacts.
+# This enables tenant isolation, data governance, and traceability.
+#
 # Example:
 # applications:
 #   - name: nextflow-hello-project
@@ -97,6 +122,15 @@ ingressAuth:
 #       automated:
 #         prune: true
 #         selfHeal: true
+#     artifacts:
+#       bucket: calypr-nextflow-hello
+#       keyPrefix: workflows/
+#       endpoint: https://s3.us-west-2.amazonaws.com
+#       region: us-west-2
+#       insecure: false
+#       credentialsSecret: s3-cred-nextflow-hello
+#       # Optional: Use IRSA/Workload Identity instead of static credentials
+#       # useSDKCreds: true
 #
 #   - name: nextflow-hello-project-2
 #     project: default
@@ -109,7 +143,17 @@ ingressAuth:
 #       automated:
 #         prune: true
 #         selfHeal: true
+#     artifacts:
+#       bucket: calypr-nextflow-hello-2
+#       keyPrefix: workflows/
+#       endpoint: https://s3.us-west-2.amazonaws.com
+#       region: us-west-2
+#       credentialsSecret: s3-cred-nextflow-hello-2
 #
+# If no artifacts config is provided for an application, it will fall back
+# to the global s3 configuration defined above.
+#
+
 applications:
   - name: nextflow-hello
     repoURL: https://github.com/bwalsh/nextflow-hello-project.git
@@ -120,7 +164,7 @@ applications:
     syncPolicy:
       automated:
         prune: true
-        selfHeal: true    
+        selfHeal: true
   - name: nextflow-hello-2
     repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
     targetRevision: main
@@ -130,40 +174,11 @@ applications:
     syncPolicy:
       automated:
         prune: true
-        selfHeal: true 
+        selfHeal: true
 
 # ============================================================================
-# DEPRECATED: Single Application Support (Use 'applications' array instead)
+# Argo Events Configuration - GitHub EventSource and Sensor
 # ============================================================================
-# This single-application configuration is deprecated and will be removed
-# in a future release. Please migrate to the 'applications' array above.
-#
-# Migration Example:
-# OLD:
-#   argocdApplication:
-#     enabled: true
-#     name: nextflow-hello
-#     repoURL: https://github.com/bwalsh/nextflow-hello-project.git
-#     targetRevision: main
-#     path: "."
-#
-# NEW:
-#   applications:
-#     - name: nextflow-hello
-#       repoURL: https://github.com/bwalsh/nextflow-hello-project.git
-#       targetRevision: main
-#       path: "."
-#
-#argocdApplication:
-#  enabled: true
-#  name: nextflow-hello
-#  project: default
-#  repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
-#  targetRevision: "main"
-#  path: "."
-#  # IMPORTANT: do not template here. Either leave empty or set a literal default.
-##   destinationNamespace: ""   # leave empty and let the template default to .Values.namespaces.tenant
-
 
 events:
   enabled: true
@@ -177,7 +192,7 @@ events:
   github:
     enabled: true
     name: github
-    
+
     # ========================================================================
     # Multi-Repository Support (RECOMMENDED)
     # ========================================================================
@@ -186,33 +201,21 @@ events:
     #
     # Example:
     repositories:
-      - eventName: repo-push-nextflow-hello-project  # Must align with sensor event, must be unique
+      - eventName: repo_push_nextflow_hello_project  # Must align with sensor event, must be unique
         owner: bwalsh
         repository: nextflow-hello-project
         events: ["push"]
         active: true
-      - eventName: repo-push-nextflow-hello-project-2
+      - eventName: repo_push_nextflow_hello_project_2
         owner: bwalsh
         repository: nextflow-hello-project-2
         events: ["push"]
         active: true
-    
-    
-    # ========================================================================
-    # DEPRECATED: Single Repository Configuration (backward compatibility)
-    # ========================================================================
-    # If 'repositories' is empty, falls back to single repository mode.
-    # Use 'repositories' array above for multiple repositories.
-    #
-    # eventName: repo-push
-    # owner: bwalsh           # <-- change as needed
-    # repository: nextflow-hello-project   # <-- change as needed
-    # events: ["push"]
-    # active: true
 
-    # --- GitHub Secret configuration ---
-    # Secret holding either a GitHub PAT (for webhook management)
-    # or a webhook secret. If tokenValue is empty, no Secret will be created.
+    # ========================================================================
+    # Secret for GitHub API Token
+    # ========================================================================
+
     secret:
       create: true                       # chart will render a Secret manifest
       name: github-secret                # name of the Secret object
@@ -236,7 +239,7 @@ events:
       ingress:
         enabled: true
         className: nginx
-        hosts: []  # Add your public hostname, e.g., ["webhooks.example.com"]
+        hosts: []  # Add your public hostname to create Ingress, e.g., ["webhooks.example.com"]
         tls: []
 
   sensor:
@@ -257,3 +260,8 @@ workflowTemplates:
     command: ["/bin/sh", "-c"]
     args:
       - echo "Hello from Argo Events!"
+
+workflows:
+  namespace: wf-poc
+  runnerServiceAccount: wf-runner
+  templateRef: nextflow-hello-template

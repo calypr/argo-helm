@@ -10,6 +10,7 @@ metadata:
   annotations:
     "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here      
 spec:
-  nats:
-    native: {{ toYaml (.Values.events.eventBus.natsNative | default dict) | nindent 8 }}
+  jetstream:
+    version: latest
+    replicas: 3
 {{- end }}

@@ -6,8 +6,8 @@ metadata:
   namespace: {{ .Values.namespaces.tenant }}
 type: Opaque
 stringData:
-  AWS_ACCESS_KEY_ID: "{{ .Values.s3.accessKey }}"
-  AWS_SECRET_ACCESS_KEY: "{{ .Values.s3.secretKey }}"
+  AWS_ACCESS_KEY_ID: {{ .Values.s3.accessKeyId | quote  }}
+  AWS_SECRET_ACCESS_KEY: {{ .Values.s3.secretAccessKey | quote  }}
 ---
 apiVersion: v1
 kind: ConfigMap

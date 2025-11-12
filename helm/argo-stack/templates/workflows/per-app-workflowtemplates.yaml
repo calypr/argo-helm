@@ -1,0 +1,88 @@
+{{- /*
+Per-Application Workflow Templates
+Renders a WorkflowTemplate for each application that has an artifacts configuration.
+This allows workflows to automatically use the correct artifact repository.
+*/ -}}
+{{- range .Values.applications }}
+{{- if .artifacts }}
+---
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: {{ .name }}-template
+  namespace: {{ $.Values.workflowTemplates.namespace | default $.Values.namespaces.tenant | default "argo" }}
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/part-of: argo-stack
+    calypr.io/application: {{ .name }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+spec:
+  # Reference the per-app artifact repository ConfigMap
+  artifactRepositoryRef:
+    configMap: argo-artifacts-{{ .name }}
+    key: artifactRepository
+  entrypoint: main
+  serviceAccountName: wf-runner
+  arguments:
+    parameters:
+      - name: git_revision
+        value: "unknown"
+      - name: repo_url
+        value: {{ .repoURL | quote }}
+  templates:
+    - name: main
+      container:
+        {{- if .workflow }}
+        {{- if .workflow.image }}
+        image: {{ .workflow.image | quote }}
+        {{- else }}
+        image: {{ $.Values.workflowTemplates.nextflowHello.image | default "alpine:3.20" | quote }}
+        {{- end }}
+        {{- if .workflow.command }}
+        command:
+{{ toYaml .workflow.command | nindent 10 }}
+        {{- else if $.Values.workflowTemplates.nextflowHello.command }}
+        command:
+{{ toYaml $.Values.workflowTemplates.nextflowHello.command | nindent 10 }}
+        {{- else }}
+        command:
+          - /bin/sh
+          - -c
+        {{- end }}
+        {{- if .workflow.args }}
+        args:
+{{ toYaml .workflow.args | nindent 10 }}
+        {{- else if $.Values.workflowTemplates.nextflowHello.args }}
+        args:
+{{ toYaml $.Values.workflowTemplates.nextflowHello.args | nindent 10 }}
+        {{- else }}
+        args:
+          - |
+            echo "Hello from {{ .name }}!"
+            echo "Git revision: {{`{{inputs.parameters.git_revision}}`}}"
+            echo "Repository: {{`{{inputs.parameters.repo_url}}`}}"
+        {{- end }}
+        {{- else }}
+        image: {{ $.Values.workflowTemplates.nextflowHello.image | default "alpine:3.20" | quote }}
+        {{- if $.Values.workflowTemplates.nextflowHello.command }}
+        command:
+{{ toYaml $.Values.workflowTemplates.nextflowHello.command | nindent 10 }}
+        {{- else }}
+        command:
+          - /bin/sh
+          - -c
+        {{- end }}
+        {{- if $.Values.workflowTemplates.nextflowHello.args }}
+        args:
+{{ toYaml $.Values.workflowTemplates.nextflowHello.args | nindent 10 }}
+        {{- else }}
+        args:
+          - |
+            echo "Hello from {{ .name }}!"
+            echo "Git revision: {{`{{inputs.parameters.git_revision}}`}}"
+            echo "Repository: {{`{{inputs.parameters.repo_url}}`}}"
+        {{- end }}
+        {{- end }}
+{{- end }}
+{{- end }}

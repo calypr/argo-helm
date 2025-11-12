@@ -1,43 +1,54 @@
-{{- if and .Values.events.enabled .Values.events.sensor.enabled }}
+{{- if and .Values.events.enabled .Values.events.github.enabled }}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: {{ .Values.events.sensor.name | default "run-nextflow-on-push" }}
+  name: {{ .Values.events.github.sensorName | default "run-nextflow-on-push" }}
   namespace: {{ .Values.events.namespace | default "argo-events" }}
   labels:
     app.kubernetes.io/name: argo-events
     app.kubernetes.io/part-of: argo-stack
   annotations:
-    "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here     
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
 spec:
+  template:
+    serviceAccountName: {{ .Values.events.github.sensorServiceAccount | default "default" }}
+
+  # Dependencies (one per repository)
   dependencies:
-    - name: push
-      eventSourceName: {{ .Values.events.github.name | default "github" }}
-      eventName: {{ .Values.events.github.eventName | default "repo-push" }}
+  {{- range $i, $repo := .Values.events.github.repositories }}
+  - name: {{ $repo.eventName | quote }}
+    eventSourceName: {{ $.Values.events.github.name | default "github" | quote }}
+    eventName: {{ $repo.eventName | quote }}
+  {{- end }}
+
+  # Triggers (one per repository) — fire on that repo’s push
   triggers:
-    - template:
-        name: submit-wf
-        argoWorkflow:
-          operation: submit
-          source:
-            resource:
-              apiVersion: argoproj.io/v1alpha1
-              kind: Workflow
-              metadata:
-                generateName: nextflow-hello-
-                namespace: {{ .Values.events.sensor.workflowNamespace | default "argo" }}
-              spec:
-                entrypoint: main
-                arguments:
-                  parameters:
-                  # ✅ simplest: print the whole expression, then quote it
-                    - name: git_revision
-                      value: {{ printf "{{(events.push.body.head_commit.id)}}" | quote }}                    
-                workflowTemplateRef:
-                  name: {{ .Values.events.sensor.workflowTemplateRef | default "nextflow-hello-template" }}
-    - template:
-        name: log-event
-        log:
-          intervalSeconds: 1
-          compressEvents: false
+  {{- range $i, $repo := .Values.events.github.repositories }}
+  - template:
+      conditions: {{ $repo.eventName }}
+      name: submit-wf-{{ $repo.repository }}
+      argoWorkflow:
+        operation: submit
+        source:
+          resource:
+            apiVersion: argoproj.io/v1alpha1
+            kind: Workflow
+            metadata:
+              generateName: {{ printf "%s-" ($.Values.workflows.generateName | default "nextflow-hello") }}
+              namespace: {{ $.Values.workflows.namespace }}
+            spec:
+              serviceAccountName: {{ $.Values.workflows.runnerServiceAccount | default "wf-runner" }}
+              workflowTemplateRef:
+                name: {{ $.Values.workflows.templateRef }}
+              arguments:
+                parameters:
+                  - name: git_revision
+                    value: '{{`{{ (events.`}}{{ $repo.eventName }}{{`.body.head_commit.id) }}`}}'
+                  - name: git_repo
+                    value: {{ printf "https://github.com/%s/%s.git" ($repo.owner | default "bwalsh") $repo.repository | quote }}
+                  - name: git_ref
+                    value: '{{`{{ (events.`}}{{ $repo.eventName }}{{`.body.ref) }}`}}'
+  {{- end }}
 {{- end }}
+

@@ -10,6 +10,12 @@ metadata:
   annotations:
     "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here      
 spec:
+  {{- if .Values.s3.enabled }}
+  # Reference the global artifact repository for log archiving
+  artifactRepositoryRef:
+    configMap: artifact-repositories
+    key: default-v1
+  {{- end }}
   entrypoint: main
   serviceAccountName: wf-runner
   arguments:

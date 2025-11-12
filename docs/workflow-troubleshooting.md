@@ -204,20 +204,151 @@ argo -n argo logs @latest --follow
 
 ## 🪣 Step 7. Validate Artifact Storage
 
-Each application uses its own S3 bucket and key prefix (see `.Values.applications[].artifacts`).
+Each application can use its own S3 bucket and key prefix for tenant isolation and traceability.
 
-Check ConfigMap for your app:
+### Per-Repository Artifact Configuration
+
+When an application is configured with per-repository artifacts (`.Values.applications[].artifacts`), the system creates:
+1. A **ConfigMap** named `argo-artifacts-<app-name>` in the `argo-workflows` namespace
+2. A **WorkflowTemplate** named `<app-name>-template` that references this ConfigMap
+
+#### Check Your Application's Artifact Configuration
+
+List all per-app artifact ConfigMaps:
 ```bash
-kubectl -n argo get cm argo-artifacts-<app-name> -o yaml
+kubectl -n argo-workflows get cm -l app.kubernetes.io/component=artifact-repository
 ```
-Confirm that:
-- `bucket` matches your assigned project bucket.
-- `keyPrefix` follows the pattern `runs/{{workflow.name}}` or your override.
-- Credentials or IRSA roles are set correctly.
 
-You can also list the S3 location:
+View the artifact configuration for your specific app:
 ```bash
-aws s3 ls s3://<your-bucket>/<keyPrefix>/
+kubectl -n argo-workflows get cm argo-artifacts-<app-name> -o yaml
+```
+
+Verify the ConfigMap contains:
+- `bucket`: Your assigned S3 bucket (e.g., `calypr-nextflow-hello`)
+- `keyPrefix`: Workflow output path prefix (e.g., `workflows/`)
+- `endpoint`: S3 endpoint URL
+- `region`: AWS region
+- `credentialsSecret` or `useSDKCreds`: Authentication method
+
+#### Check WorkflowTemplate References
+
+Verify your workflow template references the correct artifact repository:
+```bash
+kubectl -n wf-poc get workflowtemplate <app-name>-template -o yaml | grep -A3 artifactRepositoryRef
+```
+
+Expected output:
+```yaml
+artifactRepositoryRef:
+  configMap: argo-artifacts-<app-name>
+  key: artifactRepository
+```
+
+#### Verify Credentials
+
+If using static credentials (not recommended for production):
+```bash
+kubectl -n wf-poc get secret <credentials-secret-name> -o yaml
+```
+
+The secret should contain:
+- `accessKey`: AWS access key ID
+- `secretKey`: AWS secret access key
+
+If using **IRSA (AWS)** or **Workload Identity (GCP)**:
+```bash
+# Check service account annotation
+kubectl -n wf-poc get sa wf-runner -o yaml | grep eks.amazonaws.com/role-arn
+```
+
+#### Test S3 Connectivity
+
+List artifacts in your application's S3 location:
+```bash
+# Using AWS CLI
+aws s3 ls s3://<your-app-bucket>/<keyPrefix>/
+
+# Or if using a specific endpoint (MinIO, etc.)
+aws s3 ls s3://<your-app-bucket>/<keyPrefix>/ --endpoint-url=<endpoint>
+```
+
+#### Common Artifact Issues
+
+| Symptom | Likely Issue | Fix |
+|---------|--------------|-----|
+| `S3 upload failed: 403 Forbidden` | Invalid credentials or bucket permissions | Verify credentials secret or IRSA role permissions |
+| `S3 upload failed: NoSuchBucket` | Bucket doesn't exist | Create the bucket or fix bucket name in ConfigMap |
+| `S3 upload failed: connection timeout` | Endpoint unreachable or incorrect | Verify endpoint URL and network connectivity |
+| `artifactRepositoryRef not found` | ConfigMap missing | Check if app has `artifacts` config in values.yaml |
+| Artifacts in wrong bucket | Using global config instead of per-app | Ensure WorkflowTemplate has `artifactRepositoryRef` |
+
+#### Fallback to Global Artifacts
+
+If your application doesn't have a dedicated artifacts configuration, workflows will use the **global artifact repository** defined in:
+```bash
+kubectl -n argo-workflows get cm artifact-repositories -o yaml
+```
+
+This is controlled by the global `s3.*` values in the Helm chart.
+
+#### Debugging Artifact Upload
+
+To see detailed S3 upload logs, check the workflow pod logs:
+```bash
+# Find the workflow pod
+kubectl -n wf-poc get pods -l workflows.argoproj.io/workflow=<workflow-name>
+
+# View logs
+kubectl -n wf-poc logs <pod-name> -c wait
+```
+
+Look for messages containing:
+- `Saving output artifacts`
+- `s3.PutObject`
+- `Archive Logs`
+
+### Migration from Global to Per-Repository Artifacts
+
+If you're migrating from global artifacts to per-repository:
+
+1. **Add artifacts config** to your application in values.yaml:
+```yaml
+applications:
+  - name: my-app
+    repoURL: https://github.com/org/my-repo.git
+    artifacts:
+      bucket: my-app-bucket
+      keyPrefix: workflows/
+      endpoint: https://s3.us-west-2.amazonaws.com
+      region: us-west-2
+      credentialsSecret: s3-cred-my-app
+```
+
+2. **Create the credentials secret** (if using static credentials):
+```bash
+kubectl create secret generic s3-cred-my-app \
+  -n wf-poc \
+  --from-literal=accessKey=<KEY> \
+  --from-literal=secretKey=<SECRET>
+```
+
+3. **Upgrade the Helm release**:
+```bash
+helm upgrade argo-stack ./helm/argo-stack \
+  -n argocd \
+  --values my-values.yaml
+```
+
+4. **Verify ConfigMap created**:
+```bash
+kubectl -n argo-workflows get cm argo-artifacts-my-app
+```
+
+5. **Update workflows** to use the new template:
+```yaml
+workflowTemplateRef:
+  name: my-app-template  # Instead of generic template
 ```
 
 ---

@@ -1,0 +1,214 @@
+# Example: Per-Repository Artifact Configuration
+# This example shows how to configure two applications with separate S3 buckets
+
+namespaces:
+  argo: argo-workflows
+  argocd: argocd
+  tenant: wf-poc
+  security: security
+  argo-events: argo-events
+
+# Argo Workflows configuration
+argo-workflows:
+  server:
+    enabled: true
+    secure: false
+    namespaced: true
+    extraArgs:
+      - --auth-mode=server
+  controller:
+    workflowNamespaces:
+      - wf-poc
+    namespaceInstallMode: true
+    # Enable log archiving for all workflows
+    workflowDefaults:
+      spec:
+        archiveLogs: true
+  namespaceOverride: argo-workflows
+
+# Argo CD configuration
+argo-cd:
+  applications:
+    enabled: true
+    namespace: argocd
+  namespaceOverride: argocd
+  configs:
+    secret:
+      create: true
+      extra: {}
+
+# AuthZ adapter
+authzAdapter:
+  image: ghcr.io/calypr/argo-helm:latest
+  fenceBase: "https://calypr-dev.ohsu.edu/user"
+  replicas: 2
+  namespace: security
+
+# Global S3 config (fallback for apps without specific artifacts config)
+s3:
+  enabled: true
+  hostname: "minio.storage.local"
+  bucket: "argo-artifacts-global"
+  region: "us-west-2"
+  insecure: true
+  pathStyle: true
+  accessKey: "global-access-key"
+  secretKey: "global-secret-key"
+
+# Ingress configuration
+ingress:
+  argoWorkflows:
+    enabled: true
+    host: "argo.localtest.me"
+    tls:
+      enabled: false
+  argocd:
+    enabled: true
+    host: "argocd.localtest.me"
+    tls:
+      enabled: false
+
+ingressAuth:
+  enabled: true
+  authURL: "http://authz-adapter.security.svc.cluster.local:8080/check"
+  passAuthorization: true
+
+# Multi-application configuration with per-repository artifacts
+applications:
+  # Application 1: Nextflow pipeline with dedicated S3 bucket
+  - name: nextflow-hello-project
+    project: default
+    repoURL: https://github.com/bwalsh/nextflow-hello-project.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: wf-poc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+    # Dedicated artifact storage for this repository
+    artifacts:
+      bucket: calypr-nextflow-hello
+      keyPrefix: workflows/
+      endpoint: https://s3.us-west-2.amazonaws.com
+      region: us-west-2
+      insecure: false
+      # Using IRSA for authentication (recommended for AWS EKS)
+      useSDKCreds: true
+      # Alternative: use static credentials secret
+      # credentialsSecret: s3-cred-nextflow-hello
+
+  # Application 2: Another Nextflow pipeline with separate bucket
+  - name: nextflow-hello-project-2
+    project: default
+    repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: wf-poc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+    # Different bucket for tenant isolation
+    artifacts:
+      bucket: calypr-nextflow-hello-2
+      keyPrefix: workflows/
+      endpoint: https://s3.us-west-2.amazonaws.com
+      region: us-west-2
+      insecure: false
+      # Using static credentials (not recommended for production)
+      credentialsSecret: s3-cred-nextflow-hello-2
+
+  # Application 3: No specific artifacts config - will use global S3
+  - name: generic-workflow-app
+    project: default
+    repoURL: https://github.com/bwalsh/generic-workflows.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: wf-poc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+    # No artifacts config - will use global s3 settings above
+
+# GitHub Events (optional)
+events:
+  enabled: true
+  namespace: argo-events
+  eventBus:
+    create: true
+    name: default
+    natsNative: {}
+  github:
+    enabled: true
+    name: github
+    repositories:
+      - eventName: repo-push
+        owner: bwalsh
+        repository: nextflow-hello-project
+        events: ["push"]
+        active: true
+      - eventName: repo-push
+        owner: bwalsh
+        repository: nextflow-hello-project-2
+        events: ["push"]
+        active: true
+    secret:
+      create: true
+      name: github-secret
+      tokenKey: token
+    webhook:
+      endpoint: /events
+      port: 12000
+      service:
+        type: ClusterIP
+      ingress:
+        enabled: true
+        className: nginx
+        hosts: []
+        tls: []
+  sensor:
+    enabled: true
+    name: run-nextflow-on-push
+    workflowNamespace: wf-poc
+    # Note: With per-app WorkflowTemplates, you may want to create
+    # separate sensors for each app, each referencing its own template
+    workflowTemplateRef: nextflow-hello-template
+    parameters:
+      - name: git_revision
+        valueFrom: "{{(events.push.body.head_commit.id)}}"
+
+# Workflow templates
+workflowTemplates:
+  createExample: true
+  namespace: wf-poc
+  nextflowHello:
+    name: nextflow-hello-template
+    image: alpine:3.20
+    command: ["/bin/sh", "-c"]
+    args:
+      - echo "Hello from Argo Events!"
+
+# Expected Kubernetes Resources Created:
+# 
+# ConfigMaps (in argo-workflows namespace):
+# - argo-artifacts-nextflow-hello-project       (per-app S3 config for app 1)
+# - argo-artifacts-nextflow-hello-project-2     (per-app S3 config for app 2)
+# - artifact-repositories                        (global fallback config)
+#
+# WorkflowTemplates (in wf-poc namespace):
+# - nextflow-hello-project-template              (references argo-artifacts-nextflow-hello-project)
+# - nextflow-hello-project-2-template            (references argo-artifacts-nextflow-hello-project-2)
+# - nextflow-hello-template                      (generic template, uses global or no artifacts)
+#
+# Secrets (in wf-poc namespace):
+# - s3-cred-nextflow-hello-2                     (static credentials for app 2)
+# - s3-credentials                                (global credentials)
+#
+# Service Account Annotations (for IRSA - app 1):
+# The wf-runner service account in wf-poc namespace should be annotated with:
+# eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/nextflow-hello-s3-access
