@@ -126,7 +126,8 @@ deploy: check-vars kind bump-limits deps minio
 		--set-string s3.pathStyle=true \
 		--set-string s3.insecure=true \
 		--set-string s3.region=${S3_REGION} \
-		--set-string s3.hostname=${S3_HOSTNAME}
+		--set-string s3.hostname=${S3_HOSTNAME} \
+		-f my-values.yaml
 	echo waiting for pods
 	sleep 10
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
