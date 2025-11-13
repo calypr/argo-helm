@@ -97,11 +97,13 @@ minio:
 		--set resources.limits.cpu=500m \
 		--wait
 	@echo "✅ MinIO installed successfully"
+	@echo "⏳ Waiting for MinIO service to be ready..."
+	@sleep 10
 	@echo "📦 Creating default bucket: argo-artifacts"
-	@kubectl run minio-mc --rm -i --restart=Never --image=minio/mc -- \
-		sh -c "mc alias set myminio http://minio.minio-system.svc.cluster.local:9000 minioadmin minioadmin && \
+	@kubectl run minio-mc-setup --rm -i --restart=Never --image=minio/mc --command -- \
+		sh -c "until mc alias set myminio http://minio.minio-system.svc.cluster.local:9000 minioadmin minioadmin; do echo 'Waiting for MinIO...'; sleep 2; done && \
 		mc mb myminio/argo-artifacts --ignore-existing && \
-		echo 'Bucket argo-artifacts created successfully'" || true
+		echo 'Bucket argo-artifacts created successfully'" 2>&1 || echo "⚠️  Bucket creation skipped (may already exist)"
 	@echo "   Endpoint: minio.minio-system.svc.cluster.local:9000"
 	@echo "   Access Key: minioadmin"
 	@echo "   Secret Key: minioadmin"
