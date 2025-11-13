@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts all minio
+.PHONY: deps lint template validate kind ct adapter test-artifacts all minio minio-ls
 
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
@@ -108,6 +108,12 @@ minio:
 	@echo "   Access Key: minioadmin"
 	@echo "   Secret Key: minioadmin"
 	@echo "   Bucket: argo-artifacts"
+
+minio-ls:
+	@echo "📂 Listing files in minio/argo-artifacts bucket..."
+	@kubectl run minio-mc-ls --rm -i --restart=Never --image=minio/mc --command -- \
+		sh -c "mc alias set myminio http://minio.minio-system.svc.cluster.local:9000 minioadmin minioadmin && \
+		mc ls --recursive myminio/argo-artifacts" 2>&1 || echo "⚠️  Failed to list bucket contents"
 
 ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
