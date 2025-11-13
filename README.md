@@ -10,7 +10,7 @@
 
 *A complete, production-ready Kubernetes GitOps and workflow automation stack with enterprise-grade authorization*
 
-[Quick Start](#-quick-start) • [Features](#-features) • [Architecture](#-architecture) • [Documentation](#-documentation) • [Contributing](#-contributing)
+[🚀 Quick Start](QUICKSTART.md) • [Features](#-features) • [Architecture](#-architecture) • [Documentation](#-documentation) • [Contributing](#-contributing)
 
 </div>
 
