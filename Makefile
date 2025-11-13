@@ -91,6 +91,10 @@ minio:
 		--set rootPassword=minioadmin \
 		--set persistence.enabled=false \
 		--set mode=standalone \
+		--set resources.requests.memory=512Mi \
+		--set resources.requests.cpu=250m \
+		--set resources.limits.memory=1Gi \
+		--set resources.limits.cpu=500m \
 		--wait
 	@echo "✅ MinIO installed successfully"
 	@echo "   Endpoint: minio.minio-system.svc.cluster.local:9000"

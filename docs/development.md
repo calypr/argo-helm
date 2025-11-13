@@ -54,6 +54,7 @@ This deploys MinIO using Helm with the following configuration:
 - **Secret Key**: `minioadmin`
 - **Mode**: Standalone (single instance)
 - **Persistence**: Disabled (data is ephemeral)
+- **Resources**: 512Mi memory request, 1Gi limit (optimized for Kind/Minikube)
 
 ### MinIO Configuration
 
