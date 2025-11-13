@@ -97,9 +97,15 @@ minio:
 		--set resources.limits.cpu=500m \
 		--wait
 	@echo "✅ MinIO installed successfully"
+	@echo "📦 Creating default bucket: argo-artifacts"
+	@kubectl run minio-mc --rm -i --restart=Never --image=minio/mc -- \
+		sh -c "mc alias set myminio http://minio.minio-system.svc.cluster.local:9000 minioadmin minioadmin && \
+		mc mb myminio/argo-artifacts --ignore-existing && \
+		echo 'Bucket argo-artifacts created successfully'" || true
 	@echo "   Endpoint: minio.minio-system.svc.cluster.local:9000"
 	@echo "   Access Key: minioadmin"
 	@echo "   Secret Key: minioadmin"
+	@echo "   Bucket: argo-artifacts"
 
 ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
@@ -118,6 +124,7 @@ deploy: check-vars kind bump-limits deps minio
 		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
 		--set-string s3.bucket=${S3_BUCKET} \
 		--set-string s3.pathStyle=true \
+		--set-string s3.insecure=true \
 		--set-string s3.region=${S3_REGION} \
 		--set-string s3.hostname=${S3_HOSTNAME}
 	echo waiting for pods
