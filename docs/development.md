@@ -13,7 +13,85 @@ Before using the Makefile, ensure you have:
 - **Helm** (≥ v3.10)
 - **make**
 - A running **Kubernetes cluster** (e.g. kind, minikube, or EKS)
+- **Docker** and **Docker Compose** (for local MinIO)
 - Internet connectivity for pulling Argo container images
+
+---
+
+## 🗄️ Local MinIO for Development
+
+For local development and testing, you can run a MinIO instance to provide S3-compatible object storage without requiring AWS.
+
+### Quick Start with MinIO
+
+1. **Start MinIO**:
+   ```bash
+   ./dev-minio.sh start
+   ```
+
+2. **Access MinIO Console**:
+   - URL: http://localhost:9001
+   - Username: `minioadmin`
+   - Password: `minioadmin`
+
+3. **Use MinIO in Helm deployment**:
+   ```bash
+   helm upgrade --install argo-stack ./helm/argo-stack \
+     --namespace argocd --create-namespace \
+     --values local-dev-values.yaml \
+     --wait
+   ```
+
+### MinIO Helper Commands
+
+The `dev-minio.sh` script provides several useful commands:
+
+| Command | Description |
+|---------|-------------|
+| `./dev-minio.sh start` | Start MinIO server and create default buckets |
+| `./dev-minio.sh stop` | Stop MinIO server (preserves data) |
+| `./dev-minio.sh clean` | Stop MinIO and delete all data |
+| `./dev-minio.sh status` | Check if MinIO is running |
+| `./dev-minio.sh logs` | Show MinIO logs (follow mode) |
+| `./dev-minio.sh values` | Print Helm values for MinIO config |
+
+### Default MinIO Buckets
+
+The MinIO setup automatically creates these buckets:
+- `argo-artifacts` - Global artifacts (production-like)
+- `argo-artifacts-dev` - Development artifacts
+- `calypr-nextflow-hello` - Example app bucket
+- `calypr-nextflow-hello-2` - Example app bucket
+
+### MinIO Configuration
+
+The MinIO instance runs with these defaults:
+
+| Setting | Value |
+|---------|-------|
+| **S3 API Endpoint** | `http://localhost:9000` |
+| **Console URL** | `http://localhost:9001` |
+| **Access Key** | `minioadmin` |
+| **Secret Key** | `minioadmin` |
+| **Region** | `us-east-1` |
+
+⚠️ **Warning**: These are development credentials only. Never use them in production!
+
+### Using MinIO with Helm
+
+See `local-dev-values.yaml` for a complete configuration example. Key settings:
+
+```yaml
+s3:
+  enabled: true
+  hostname: "localhost:9000"
+  bucket: "argo-artifacts-dev"
+  region: "us-east-1"
+  insecure: true      # HTTP instead of HTTPS
+  pathStyle: true     # Required for MinIO
+  accessKey: "minioadmin"
+  secretKey: "minioadmin"
+```
 
 ---
 
@@ -182,6 +260,175 @@ make uninstall
 ```
 
 This removes all Argo resources and namespaces.
+
+To also clean up MinIO:
+
+```bash
+./dev-minio.sh clean
+```
+
+---
+
+## 🧪 Testing Workflows with MinIO
+
+Once you have the stack deployed with MinIO, you can test workflow artifact storage:
+
+### 1. Submit a Test Workflow
+
+```bash
+# List available workflow templates
+kubectl -n wf-poc get workflowtemplate
+
+# Submit the example template
+argo -n wf-poc submit --from workflowtemplate/nextflow-hello-template
+
+# Watch the workflow
+argo -n wf-poc watch @latest
+```
+
+### 2. Verify Artifacts in MinIO
+
+Open the MinIO Console at http://localhost:9001 and:
+1. Login with `minioadmin` / `minioadmin`
+2. Navigate to the `argo-artifacts-dev` bucket
+3. Browse workflow artifacts and logs
+
+Or use the MinIO CLI:
+
+```bash
+# Install mc (MinIO Client) if needed
+brew install minio/stable/mc  # macOS
+# or download from https://min.io/docs/minio/linux/reference/minio-mc.html
+
+# Configure alias
+mc alias set local http://localhost:9000 minioadmin minioadmin
+
+# List artifacts
+mc ls local/argo-artifacts-dev/
+
+# Download an artifact
+mc cp local/argo-artifacts-dev/wf-poc/my-workflow/main.log ./
+```
+
+### 3. Test Per-Repository Artifacts
+
+Create a test application with dedicated bucket:
+
+```bash
+cat > my-test-app.yaml <<EOF
+applications:
+  - name: test-workflow
+    repoURL: https://github.com/YOUR_ORG/YOUR_REPO.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: wf-poc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+    artifacts:
+      bucket: calypr-nextflow-hello
+      endpoint: http://localhost:9000
+      region: us-east-1
+      insecure: true
+      pathStyle: true
+      credentialsSecret: minio-creds
+EOF
+
+# Create credentials secret
+kubectl create secret generic minio-creds -n wf-poc \
+  --from-literal=accessKey=minioadmin \
+  --from-literal=secretKey=minioadmin
+
+# Deploy with your application
+helm upgrade --install argo-stack ./helm/argo-stack \
+  --namespace argocd \
+  --values local-dev-values.yaml \
+  --values my-test-app.yaml \
+  --wait
+```
+
+---
+
+## 🔧 Troubleshooting MinIO
+
+### MinIO Won't Start
+
+```bash
+# Check if containers are running
+docker-compose ps
+
+# View logs
+docker-compose logs minio
+
+# Ensure ports are not in use
+lsof -i :9000
+lsof -i :9001
+```
+
+### Workflows Can't Connect to MinIO
+
+If running in Kind/Minikube, workflows inside the cluster can't reach `localhost:9000`. Options:
+
+**Option 1: Use host.docker.internal (Docker Desktop)**
+```yaml
+s3:
+  hostname: "host.docker.internal:9000"
+```
+
+**Option 2: Deploy MinIO inside the cluster**
+```bash
+# Deploy MinIO using Helm
+helm repo add minio https://charts.min.io/
+helm install minio minio/minio \
+  --namespace minio-system --create-namespace \
+  --set rootUser=minioadmin \
+  --set rootPassword=minioadmin \
+  --set persistence.enabled=false \
+  --set mode=standalone
+
+# Then use cluster endpoint
+s3:
+  hostname: "minio.minio-system.svc.cluster.local:9000"
+```
+
+**Option 3: Run Kind with extra port mappings**
+```bash
+# Delete existing cluster
+kind delete cluster
+
+# Create with port mapping
+cat > kind-config.yaml <<EOF
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - containerPort: 30900
+    hostPort: 9000
+    protocol: TCP
+EOF
+
+kind create cluster --config kind-config.yaml
+
+# Expose MinIO via NodePort
+kubectl create service nodeport minio-external \
+  --tcp=9000:9000 --node-port=30900
+```
+
+### Artifacts Not Appearing
+
+```bash
+# Check workflow logs
+argo -n wf-poc logs @latest
+
+# Verify ConfigMap exists
+kubectl -n argo-workflows get cm artifact-repositories -o yaml
+
+# Check service account permissions
+kubectl -n wf-poc describe sa wf-runner
+```
 
 ---
 

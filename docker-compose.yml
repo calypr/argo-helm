@@ -1,0 +1,68 @@
+# Docker Compose for Local Development - MinIO S3 Storage
+#
+# This provides a local S3-compatible object storage for testing
+# Argo Workflows artifact storage without requiring AWS.
+#
+# Usage:
+#   docker-compose up -d     # Start MinIO
+#   docker-compose down      # Stop MinIO
+#   docker-compose down -v   # Stop and remove data volumes
+#
+# Access:
+#   MinIO Console: http://localhost:9001
+#   S3 API:        http://localhost:9000
+#   Credentials:   minioadmin / minioadmin
+
+version: '3.8'
+
+services:
+  minio:
+    image: minio/minio:latest
+    container_name: argo-minio-dev
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # MinIO Console
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    volumes:
+      - minio-data:/data
+    command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+    networks:
+      - argo-dev
+
+  # Optional: MinIO Client (mc) for bucket management
+  # Uncomment to auto-create buckets on startup
+  minio-client:
+    image: minio/mc:latest
+    container_name: argo-minio-client
+    depends_on:
+      - minio
+    networks:
+      - argo-dev
+    entrypoint: >
+      /bin/sh -c "
+      sleep 5;
+      /usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin;
+      /usr/bin/mc mb myminio/argo-artifacts --ignore-existing;
+      /usr/bin/mc mb myminio/argo-artifacts-dev --ignore-existing;
+      /usr/bin/mc mb myminio/calypr-nextflow-hello --ignore-existing;
+      /usr/bin/mc mb myminio/calypr-nextflow-hello-2 --ignore-existing;
+      /usr/bin/mc anonymous set download myminio/argo-artifacts;
+      /usr/bin/mc anonymous set download myminio/argo-artifacts-dev;
+      echo 'MinIO buckets created successfully';
+      exit 0;
+      "
+
+volumes:
+  minio-data:
+    driver: local
+
+networks:
+  argo-dev:
+    driver: bridge
