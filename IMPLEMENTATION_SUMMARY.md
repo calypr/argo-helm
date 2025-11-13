@@ -4,41 +4,40 @@ This document summarizes the improvements made to the argo-helm development and 
 
 ## 🎯 Goals Achieved
 
-1. ✅ **Local MinIO Support** - Developers can now test S3 artifact storage locally without AWS
+1. ✅ **In-Cluster MinIO Support** - Developers can now test S3 artifact storage using MinIO deployed inside the Kubernetes cluster
 2. ✅ **Removed Hardcoded Repos** - Chart values are now properly configured as reusable templates
 3. ✅ **Comprehensive Documentation** - Clear guidance for both local development and production deployment
 
-## 📦 New Files
+## 📦 Changes Made
 
-### Development Tools
-- **`docker-compose.yml`** - Local MinIO deployment with auto-created buckets
-  - Runs MinIO on ports 9000 (S3 API) and 9001 (Console)
-  - Creates 4 default buckets for testing
-  - Includes mc (MinIO Client) for automatic bucket creation
+### Makefile Updates
+- **Added `minio` target** - Deploys MinIO using Helm into the cluster
+  - Namespace: `minio-system`
+  - Endpoint: `minio.minio-system.svc.cluster.local:9000`
+  - Default credentials: `minioadmin` / `minioadmin`
+  - Persistence disabled for ephemeral testing
 
-- **`dev-minio.sh`** - Helper script for managing local MinIO (264 lines)
-  - Commands: start, stop, clean, status, logs, values
-  - Automatic health checking and bucket verification
-  - Outputs ready-to-use Helm values
+- **Updated `deploy` target** - Now includes MinIO deployment as a dependency
+  - Complete workflow: Kind cluster → MinIO → Argo Stack
+  
+- **S3 Configuration Defaults** - Pre-configured for in-cluster MinIO
+  - `S3_HOSTNAME`: `minio.minio-system.svc.cluster.local:9000`
+  - `S3_ACCESS_KEY_ID`: `minioadmin`
+  - `S3_SECRET_ACCESS_KEY`: `minioadmin`
+  - `S3_BUCKET`: `argo-artifacts`
+  - All overrideable via environment variables
 
 ### Configuration Examples
-- **`local-dev-values.yaml`** - Complete local development configuration (231 lines)
-  - Pre-configured for local MinIO
-  - Minimal resource requirements
-  - Includes comprehensive usage guide
-
-- **`examples/user-repos-example.yaml`** - Template for user repository configuration (90 lines)
+- **`examples/user-repos-example.yaml`** - Template for user repository configuration
   - Shows how to configure applications
   - Examples for GitHub Events setup
   - Security best practices included
 
 ### Documentation
-- **`QUICKSTART.md`** - Fast-track onboarding guide (136 lines)
-  - 5-minute local development path
-  - 15-minute production deployment path
-  - Common questions and troubleshooting
-
-## 📝 Modified Files
+- **`QUICKSTART.md`** - Fast-track onboarding guide
+  - Simplified to use `make deploy`
+  - No external dependencies (docker-compose removed)
+  - Clear instructions for accessing MinIO console
 
 ### Chart Configuration
 - **`helm/argo-stack/values.yaml`**
@@ -53,24 +52,24 @@ This document summarizes the improvements made to the argo-helm development and 
   - Ensures clean CI environment
 
 ### Documentation Updates
-- **`README.md`** (95 lines changed)
-  - Added link to QUICKSTART guide
-  - Added local development quick start section
-  - Updated application configuration examples
-  - Added warnings about providing repository URLs
-  - Removed second application example to avoid confusion
+- **`README.md`**
+  - Updated local development section to use `make deploy`
+  - Removed references to docker-compose and local-dev-values.yaml
+  - Updated quick start to show Makefile-based approach
 
-- **`docs/development.md`** (247 lines added)
-  - New "Local MinIO for Development" section
-  - MinIO helper commands table
-  - Configuration details and warnings
-  - Comprehensive troubleshooting section
-  - Testing workflows with MinIO
-  - Per-repository artifacts testing
+- **`docs/development.md`**
+  - Rewrote "Local MinIO for Development" section for in-cluster deployment
+  - Updated Makefile targets table
+  - Replaced troubleshooting section with cluster-based approaches
+  - Removed docker-compose specific content
 
-- **`examples/README.md`** (20 lines added)
+- **`QUICKSTART.md`**
+  - Simplified local dev path to use `make deploy`
+  - Removed docker-compose references
+  - Updated MinIO console access instructions
+
+- **`examples/README.md`**
   - Important warning about providing repos
-  - Quick start with local MinIO
   - Clear guidance on configuration
 
 ## 🔄 Migration Guide
@@ -102,8 +101,11 @@ Follow the QUICKSTART guide:
 
 **Local Development:**
 ```bash
-./dev-minio.sh start
-helm upgrade --install argo-stack ./helm/argo-stack --values local-dev-values.yaml
+export GITHUB_PAT=<your-token>
+export ARGOCD_SECRET_KEY=$(openssl rand -hex 32)
+export ARGO_HOSTNAME=<your-hostname>
+
+make deploy
 ```
 
 **Production:**
@@ -112,16 +114,15 @@ Create your own values file with your repositories and S3 configuration.
 ## 🧪 Testing
 
 ### What Was Tested
+- ✅ Makefile syntax
 - ✅ YAML syntax validation (all files)
-- ✅ Shell script syntax validation
 - ✅ Helm lint passes
-- ✅ Script help/values commands work
 - ✅ Empty arrays handled correctly in templates
 
 ### What Needs Testing
-- [ ] Full MinIO deployment and workflow execution
-- [ ] CI/CD pipeline with updated values
-- [ ] Kind/Minikube specific configurations
+- [ ] Full in-cluster MinIO deployment and workflow execution
+- [ ] CI/CD pipeline with updated Makefile
+- [ ] Integration testing with Kind cluster
 
 ## 🔒 Security Considerations
 
@@ -130,6 +131,7 @@ Create your own values file with your repositories and S3 configuration.
 - Added warnings about never committing credentials
 - Provided examples using best practices (IRSA, ExternalSecrets)
 - MinIO credentials clearly marked as development-only
+- In-cluster deployment isolates credentials from host environment
 
 ### Recommendations for Users
 1. Never commit credentials to version control
@@ -139,24 +141,22 @@ Create your own values file with your repositories and S3 configuration.
 
 ## 📊 Statistics
 
-- **Files Added:** 5
-- **Files Modified:** 5
-- **Lines Added:** 1,164
-- **Lines Removed:** 62
-- **Net Change:** +1,102 lines
+- **Files Added:** 2 (examples/user-repos-example.yaml, QUICKSTART.md)
+- **Files Removed:** 3 (docker-compose.yml, dev-minio.sh, local-dev-values.yaml)
+- **Files Modified:** 6 (Makefile, README.md, QUICKSTART.md, docs/development.md, examples/README.md, IMPLEMENTATION_SUMMARY.md)
+- **Net Change:** Simplified deployment approach with in-cluster MinIO
 
 ### Breakdown by Type
-- Shell Script: 264 lines (dev-minio.sh)
-- YAML Config: 457 lines (docker-compose, local-dev-values, user-repos-example)
-- Documentation: 508 lines (QUICKSTART, README updates, development.md updates)
-- Chart Values: 73 lines changed (mostly comments and examples)
+- Makefile: Added `minio` target, updated `deploy` target, added S3 defaults
+- YAML Config: 90 lines (user-repos-example)
+- Documentation: Comprehensive updates across README, QUICKSTART, development.md
 
 ## 🎓 Key Learnings
 
 ### Design Decisions
-1. **Empty arrays by default** - Forces users to provide their own configuration
-2. **Multiple example files** - Caters to different use cases (local dev, production, advanced)
-3. **Helper script** - Makes MinIO management simple and accessible
+1. **In-cluster MinIO** - Simpler deployment, no external dependencies
+2. **Makefile integration** - Single command deployment (`make deploy`)
+3. **Empty arrays by default** - Forces users to provide their own configuration
 4. **Comprehensive docs** - Reduces friction for new users
 
 ### Trade-offs
@@ -164,19 +164,19 @@ Create your own values file with your repositories and S3 configuration.
    - **Pro:** More secure, reusable template
    - **Con:** Slightly more work for initial deployment
 
-2. **More files** - Added complexity in the repository
-   - **Pro:** Better organization, clearer examples
-   - **Con:** More files to maintain
+2. **In-cluster vs localhost** - Changed from docker-compose to Helm deployment
+   - **Pro:** No Docker Desktop required, works in CI/CD
+   - **Con:** Requires Kubernetes cluster (Kind/Minikube acceptable)
 
-3. **MinIO dependency** - Requires Docker for local development
-   - **Pro:** No AWS credentials needed for testing
-   - **Con:** Additional prerequisite software
+3. **Simplified approach** - Removed helper scripts
+   - **Pro:** Fewer moving parts, standard Helm workflow
+   - **Con:** Less flexibility for advanced users
 
 ## 🚀 Future Enhancements
 
 Potential improvements for future PRs:
 
-1. **GitHub Actions Workflow** - Automate testing of MinIO deployment
+1. **GitHub Actions Workflow** - Automate testing of in-cluster MinIO deployment
 2. **Helmfile Example** - Show multi-environment deployment
 3. **Video Tutorial** - Walkthrough of local development setup
 4. **Terraform Module** - For cloud-based MinIO deployment

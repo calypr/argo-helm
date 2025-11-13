@@ -191,40 +191,28 @@ Choose your deployment method based on your needs:
 
 | Method | Use Case | Setup Time |
 |--------|----------|------------|
-| **Local Development** | Testing with MinIO | 5 minutes |
+| **Local Development** | Testing with in-cluster MinIO | 5 minutes |
 | **Helm Deployment** | Production/Custom | 15 minutes |
-| **Script-based** | Quick demos | 10 minutes |
 
 ### 🏠 Local Development (Recommended for Testing)
 
-For local testing without AWS credentials:
+For local testing with automatic MinIO deployment:
 
 ```bash
-# 1. Start local MinIO
-./dev-minio.sh start
-
-# 2. Create a Kind cluster (optional)
-kind create cluster
-
-# 3. Deploy with local values
-helm repo add argo https://argoproj.github.io/argo-helm
-helm repo update
-helm dependency build helm/argo-stack
-
+# Set required environment variables
+export GITHUB_PAT=<your-github-token>
 export ARGOCD_SECRET_KEY=$(openssl rand -hex 32)
+export ARGO_HOSTNAME=<your-hostname>
 
-helm upgrade --install argo-stack ./helm/argo-stack \
-  --namespace argocd --create-namespace \
-  --values local-dev-values.yaml \
-  --set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
-  --wait --timeout 10m
+# Deploy everything (Kind cluster + MinIO + Argo Stack)
+make deploy
 
-# 4. Access UIs
-kubectl -n argo-workflows port-forward svc/argo-stack-argo-workflows-server 2746:2746 &
-kubectl -n argocd port-forward svc/argo-stack-argocd-server 8080:443 &
-
+# Access UIs (ports are automatically forwarded)
 # Argo Workflows: http://localhost:2746
 # Argo CD:        http://localhost:8080
+
+# Access MinIO Console (optional)
+kubectl port-forward svc/minio -n minio-system 9001:9001
 # MinIO Console:  http://localhost:9001 (minioadmin/minioadmin)
 ```
 
@@ -325,7 +313,7 @@ YAML
 
 **📚 Configuration Resources:**
 - For complete examples, see `examples/per-repo-artifacts-values.yaml`
-- For local development with MinIO, see `local-dev-values.yaml`
+- For local development with MinIO, use `make deploy` (see [docs/development.md](docs/development.md))
 - For testing without applications, use an empty array: `applications: []`
 
 **Per-Repository Artifact Storage:**

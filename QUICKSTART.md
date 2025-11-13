@@ -4,33 +4,21 @@ Choose your deployment path:
 
 ## 🏠 Local Development (5 minutes)
 
-Perfect for testing and development without AWS credentials.
+Perfect for testing and development with automatic MinIO deployment inside the cluster.
 
 ```bash
-# 1. Start local MinIO (S3-compatible storage)
-./dev-minio.sh start
-
-# 2. Install the chart with local development values
-helm repo add argo https://argoproj.github.io/argo-helm
-helm repo update
-helm dependency build helm/argo-stack
-
+# Set required environment variables
+export GITHUB_PAT=<your-github-token>
 export ARGOCD_SECRET_KEY=$(openssl rand -hex 32)
+export ARGO_HOSTNAME=<your-hostname>
 
-helm upgrade --install argo-stack ./helm/argo-stack \
-  --namespace argocd --create-namespace \
-  --values local-dev-values.yaml \
-  --set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
-  --wait --timeout 10m
+# Deploy everything (Kind cluster + MinIO + Argo Stack)
+make deploy
 
-# 3. Access the UIs
-kubectl -n argo-workflows port-forward svc/argo-stack-argo-workflows-server 2746:2746 &
-kubectl -n argocd port-forward svc/argo-stack-argocd-server 8080:443 &
-
-# Open in browser:
+# Ports are automatically forwarded:
 # - Argo Workflows: http://localhost:2746
 # - Argo CD:        http://localhost:8080
-# - MinIO Console:  http://localhost:9001 (minioadmin/minioadmin)
+# - GitHub Events:  http://localhost:12000
 ```
 
 **Get ArgoCD password:**
@@ -39,10 +27,15 @@ kubectl -n argocd get secret argocd-initial-admin-secret \
   -o jsonpath="{.data.password}" | base64 -d && echo
 ```
 
+**Access MinIO Console (optional):**
+```bash
+kubectl port-forward svc/minio -n minio-system 9001:9001
+# Open http://localhost:9001 (minioadmin/minioadmin)
+```
+
 **When done:**
 ```bash
-./dev-minio.sh stop      # Stop MinIO
-helm uninstall argo-stack -n argocd  # Remove the stack
+kind delete cluster  # Remove the entire cluster
 ```
 
 ---
@@ -122,7 +115,7 @@ A: Yes! The chart will deploy Argo Workflows and Argo CD without any application
 A: Create a values file (like `my-values.yaml`) with your repositories in the `applications` array. Never commit credentials or private repo URLs to version control.
 
 **Q: How do I use MinIO with Kubernetes in Kind/Minikube?**  
-A: See the troubleshooting section in [docs/development.md](docs/development.md#troubleshooting-minio) for cluster-specific MinIO setup.
+A: Use `make deploy` which automatically sets up MinIO inside the cluster. See [docs/development.md](docs/development.md#local-minio-for-development) for details.
 
 **Q: What about GitHub Events/webhooks?**  
 A: Configure the `events.github.repositories` section in your values file. See [examples/user-repos-example.yaml](examples/user-repos-example.yaml) for an example.
@@ -132,5 +125,5 @@ A: Configure the `events.github.repositories` section in your values file. See [
 ## 🆘 Getting Help
 
 - **Check logs:** `kubectl logs -n argo-workflows -l app.kubernetes.io/name=argo-workflows-server`
-- **MinIO status:** `./dev-minio.sh status`
+- **MinIO logs:** `kubectl logs -n minio-system -l app=minio`
 - **Issues:** [GitHub Issues](https://github.com/calypr/argo-helm/issues)

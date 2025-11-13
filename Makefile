@@ -1,10 +1,13 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts all
+.PHONY: deps lint template validate kind ct adapter test-artifacts all minio
 
+# S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
-S3_ACCESS_KEY_ID     ?=
-S3_SECRET_ACCESS_KEY ?=
-S3_BUCKET            ?=
+S3_ACCESS_KEY_ID     ?= minioadmin
+S3_SECRET_ACCESS_KEY ?= minioadmin
+S3_BUCKET            ?= argo-artifacts
+S3_REGION            ?= us-east-1
+S3_HOSTNAME          ?= minio.minio-system.svc.cluster.local:9000
 
 
 check-vars:
@@ -78,11 +81,27 @@ kind:
 	kind delete cluster || true
 	kind create cluster
 
+minio:
+	@echo "🗄️ Installing MinIO in cluster..."
+	helm repo add minio https://charts.min.io/ || true
+	helm repo update
+	helm upgrade --install minio minio/minio \
+		--namespace minio-system --create-namespace \
+		--set rootUser=minioadmin \
+		--set rootPassword=minioadmin \
+		--set persistence.enabled=false \
+		--set mode=standalone \
+		--wait
+	@echo "✅ MinIO installed successfully"
+	@echo "   Endpoint: minio.minio-system.svc.cluster.local:9000"
+	@echo "   Access Key: minioadmin"
+	@echo "   Secret Key: minioadmin"
+
 ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
-deploy: check-vars kind bump-limits deps
+deploy: check-vars kind bump-limits deps minio
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
