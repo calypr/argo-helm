@@ -1,5 +1,4 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts all vault-dev vault-seed vault-cleanup vault-status minio-dev minio-status minio-create-bucket minio-cleanup
 .PHONY: deps lint template validate kind ct adapter test-artifacts all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status
 
 # S3/MinIO configuration - defaults to in-cluster MinIO
@@ -133,7 +132,7 @@ ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
-deploy: check-vars kind bump-limits deps minio
+deploy: check-vars kind bump-limits vault-dev vault-seed deps minio
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
