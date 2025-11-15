@@ -57,6 +57,23 @@ make vault-seed
 
 The Vault dev server will be deployed to the `vault` namespace at `vault.vault.svc.cluster.local:8200` with root token `root`.
 
+#### Step 2b: Install MinIO for S3 Storage (Optional)
+
+If you want to test S3 artifact storage, install MinIO:
+
+```bash
+# Install MinIO using Helm in the cluster
+make minio-dev
+
+# Create the default bucket
+make minio-create-bucket
+
+# Verify MinIO is running
+make minio-status
+```
+
+MinIO will be deployed to the `minio` namespace at `minio.minio.svc.cluster.local:9000` with credentials `minioadmin/minioadmin`.
+
 #### Step 3: Install External Secrets Operator
 
 Install ESO separately (recommended for testing):

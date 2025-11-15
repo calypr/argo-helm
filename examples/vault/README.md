@@ -23,14 +23,20 @@ This directory contains example configuration files for integrating the Argo Sta
    make vault-seed
    ```
 
-3. Install the chart with Vault integration:
+3. (Optional) Install MinIO for S3 artifact storage:
+   ```bash
+   make minio-dev
+   make minio-create-bucket
+   ```
+
+4. Install the chart with Vault integration:
    ```bash
    helm install argo-stack ./helm/argo-stack \
      -f examples/vault/dev-values.yaml \
      --namespace argocd --create-namespace
    ```
 
-4. Verify secrets are synced:
+5. Verify secrets are synced:
    ```bash
    kubectl get externalsecrets -A
    kubectl get secrets -n argo-events github-secret

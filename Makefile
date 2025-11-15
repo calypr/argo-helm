@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts all vault-dev vault-seed vault-cleanup vault-status
+.PHONY: deps lint template validate kind ct adapter test-artifacts all vault-dev vault-seed vault-cleanup vault-status minio-dev minio-status minio-create-bucket minio-cleanup
 
 S3_ENABLED           ?= true
 S3_ACCESS_KEY_ID     ?=
@@ -222,3 +222,57 @@ vault-cleanup:
 vault-shell:
 	@echo "🐚 Opening shell in Vault pod..."
 	@kubectl exec -it -n vault vault-0 -- /bin/sh
+
+# ============================================================================
+# MinIO Development Targets (Helm-based in-cluster deployment)
+# ============================================================================
+
+minio-dev:
+	@echo "🗄️  Installing MinIO in Kubernetes cluster..."
+	@helm repo add minio https://charts.min.io/ 2>/dev/null || true
+	@helm repo update minio
+	@kubectl create namespace minio 2>/dev/null || true
+	@helm upgrade --install minio minio/minio \
+		--namespace minio \
+		--set mode=standalone \
+		--set replicas=1 \
+		--set persistence.enabled=false \
+		--set resources.requests.memory=512Mi \
+		--set rootUser=minioadmin \
+		--set rootPassword=minioadmin \
+		--set consoleService.type=ClusterIP \
+		--set service.type=ClusterIP \
+		--wait --timeout 3m
+	@echo "⏳ Waiting for MinIO to be ready..."
+	@kubectl wait --for=condition=Ready pod -l app=minio -n minio --timeout=120s
+	@echo "✅ MinIO running in cluster"
+	@echo "   Namespace: minio"
+	@echo "   Service: minio.minio.svc.cluster.local:9000"
+	@echo "   Console: minio.minio.svc.cluster.local:9001"
+	@echo "   Access Key: minioadmin"
+	@echo "   Secret Key: minioadmin"
+	@echo ""
+	@echo "💡 To access MinIO Console, run: kubectl port-forward -n minio svc/minio-console 9001:9001"
+	@echo "💡 To access MinIO API, run: kubectl port-forward -n minio svc/minio 9000:9000"
+
+minio-status:
+	@echo "🔍 Checking MinIO status..."
+	@kubectl get pods -n minio -l app=minio 2>/dev/null || echo "❌ MinIO not running. Run 'make minio-dev' first."
+
+minio-create-bucket:
+	@echo "🪣 Creating default bucket 'argo-artifacts'..."
+	@kubectl run -n minio mc-client --rm -i --restart=Never --image=minio/mc -- \
+		sh -c "mc alias set myminio http://minio.minio.svc.cluster.local:9000 minioadmin minioadmin && \
+		       mc mb myminio/argo-artifacts --ignore-existing && \
+		       mc anonymous set download myminio/argo-artifacts" || true
+	@echo "✅ Bucket created"
+
+minio-cleanup:
+	@echo "🧹 Cleaning up MinIO..."
+	@helm uninstall minio -n minio 2>/dev/null || true
+	@kubectl delete namespace minio 2>/dev/null || true
+	@echo "✅ MinIO removed"
+
+minio-shell:
+	@echo "🐚 Opening shell in MinIO pod..."
+	@kubectl exec -it -n minio $$(kubectl get pod -n minio -l app=minio -o jsonpath='{.items[0].metadata.name}') -- /bin/sh

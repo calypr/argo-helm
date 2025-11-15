@@ -558,8 +558,9 @@ externalSecrets:
 **Seed Vault with secrets:**
 
 ```bash
-# For local development
+# For local development - install Vault and MinIO
 make vault-dev vault-seed
+make minio-dev minio-create-bucket
 
 # For production
 vault kv put kv/argo/argocd/admin password="SecurePassword123!"

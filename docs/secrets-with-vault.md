@@ -103,6 +103,17 @@ kubectl port-forward -n vault svc/vault 8200:8200
 # Then open http://localhost:8200 in your browser
 ```
 
+**Optional: Install MinIO for S3 artifact storage:**
+```bash
+# Install MinIO using Helm in the cluster
+make minio-dev
+
+# Create the default bucket for artifacts
+make minio-create-bucket
+```
+
+MinIO will be available at `minio.minio.svc.cluster.local:9000` with credentials `minioadmin/minioadmin`.
+
 ### Step 2: Configure Helm Values
 
 Create a `vault-values.yaml`:
