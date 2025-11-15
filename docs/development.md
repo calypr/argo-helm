@@ -13,7 +13,79 @@ Before using the Makefile, ensure you have:
 - **Helm** (≥ v3.10)
 - **make**
 - A running **Kubernetes cluster** (e.g. kind, minikube, or EKS)
+- **Docker** and **Docker Compose** (for local MinIO)
 - Internet connectivity for pulling Argo container images
+
+---
+
+## 🗄️ Local MinIO for Development
+
+For local development and testing, the Makefile automatically deploys MinIO inside your Kubernetes cluster to provide S3-compatible object storage without requiring AWS.
+
+### Quick Start with MinIO
+
+The `make deploy` target automatically:
+1. Creates a Kind cluster
+2. Deploys MinIO inside the cluster
+3. Deploys the Argo stack configured to use MinIO
+
+```bash
+# Set required environment variables
+export GITHUB_PAT=<your-github-token>
+export ARGOCD_SECRET_KEY=$(openssl rand -hex 32)
+export ARGO_HOSTNAME=<your-hostname>
+
+# Deploy everything (includes MinIO)
+make deploy
+```
+
+### Manual MinIO Deployment
+
+To deploy only MinIO to an existing cluster:
+
+```bash
+make minio
+```
+
+This deploys MinIO using Helm with the following configuration:
+- **Namespace**: `minio-system`
+- **Endpoint**: `minio.minio-system.svc.cluster.local:9000`
+- **Access Key**: `minioadmin`
+- **Secret Key**: `minioadmin`
+- **Mode**: Standalone (single instance)
+- **Persistence**: Disabled (data is ephemeral)
+- **Resources**: 512Mi memory request, 1Gi limit (optimized for Kind/Minikube)
+- **Default Bucket**: `argo-artifacts` (automatically created)
+- **Protocol**: HTTP (insecure mode for development)
+
+### MinIO Configuration
+
+The Makefile configures the following defaults for S3/MinIO:
+
+| Variable | Default Value | Description |
+|----------|---------------|-------------|
+| `S3_ENABLED` | `true` | Enable S3 artifact storage |
+| `S3_ACCESS_KEY_ID` | `minioadmin` | MinIO access key |
+| `S3_SECRET_ACCESS_KEY` | `minioadmin` | MinIO secret key |
+| `S3_BUCKET` | `argo-artifacts` | Default bucket name |
+| `S3_REGION` | `us-east-1` | AWS region (MinIO default) |
+| `S3_HOSTNAME` | `minio.minio-system.svc.cluster.local:9000` | MinIO cluster endpoint |
+
+You can override these by setting environment variables before running `make deploy`.
+
+⚠️ **Warning**: Default credentials are for development only. Never use them in production!
+
+### Accessing MinIO Console
+
+To access the MinIO web console, port-forward the service:
+
+```bash
+kubectl port-forward svc/minio -n minio-system 9001:9001
+```
+
+Then open http://localhost:9001 in your browser and login with:
+- Username: `minioadmin`
+- Password: `minioadmin`
 
 ---
 
@@ -45,7 +117,9 @@ Common developer targets (run with `make <target>`):
 
 | Target                 | Description                                                                                                                                                                          |
 | ---------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| **make install**       | Installs or upgrades the full Argo stack Helm chart (`helm/argo-stack`) into the `argocd` and `argo-events` namespaces. Uses `GITHUB_PAT`, `ARGOCD_SECRET_KEY`, and `ARGO_HOSTNAME`. |
+| **make deploy**        | Complete deployment: creates Kind cluster, deploys MinIO, then installs Argo stack. Uses `GITHUB_PAT`, `ARGOCD_SECRET_KEY`, and `ARGO_HOSTNAME`. |
+| **make minio**         | Deploys MinIO to the cluster using Helm. Automatically called by `make deploy`. |
+| **make kind**          | Creates a new Kind cluster (deletes existing one first). |
 | **make logs**          | Streams logs from Argo CD, Argo Workflows, and Argo Events pods for debugging.                                                                                                       |
 | **make port-forward**  | Starts local port-forwards for Argo CD (8080→443) and Argo Workflows (2746).                                                                                                         |
 | **make uninstall**     | Removes all Argo stack resources and namespaces.                                                                                                                                     |
@@ -69,21 +143,18 @@ If you’re running on EC2, ensure these ports are open in your instance’s sec
 ## 🚀 Deploying the Stack
 
 ```bash
-make install
+make deploy
 ```
 
-This command wraps:
+This command:
+1. Creates a Kind cluster
+2. Deploys MinIO inside the cluster
+3. Installs the Argo stack configured to use MinIO
 
-```bash
-helm upgrade --install argo-stack ./helm/argo-stack \
-  -n argocd --create-namespace \
-  --wait --atomic \
-  --set-string events.github.secret.tokenValue="${GITHUB_PAT}" \
-  --set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
-  --set-string events.github.webhook.ingress.enabled=true \
-  --set-string events.github.webhook.ingress.className=nginx \
-  --set-string events.github.webhook.ingress.hosts[0]="${ARGO_HOSTNAME}"
-```
+The stack is deployed with:
+- MinIO at `minio.minio-system.svc.cluster.local:9000`
+- S3 credentials: `minioadmin` / `minioadmin`
+- Default bucket: `argo-artifacts`
 
 After deployment:
 
@@ -182,6 +253,163 @@ make uninstall
 ```
 
 This removes all Argo resources and namespaces.
+
+To also clean up MinIO:
+
+```bash
+./dev-minio.sh clean
+```
+
+---
+
+## 🧪 Testing Workflows with MinIO
+
+Once you have the stack deployed with MinIO, you can test workflow artifact storage:
+
+### 1. Submit a Test Workflow
+
+```bash
+# List available workflow templates
+kubectl -n wf-poc get workflowtemplate
+
+# Submit the example template
+argo -n wf-poc submit --from workflowtemplate/nextflow-hello-template
+
+# Watch the workflow
+argo -n wf-poc watch @latest
+```
+
+### 2. Verify Artifacts in MinIO
+
+Access the MinIO Console:
+
+```bash
+# Port-forward MinIO console
+kubectl port-forward svc/minio -n minio-system 9001:9001
+```
+
+Then open http://localhost:9001 in your browser and:
+1. Login with `minioadmin` / `minioadmin`
+2. Navigate to the `argo-artifacts` bucket
+3. Browse workflow artifacts and logs
+
+Or use the MinIO CLI:
+
+```bash
+# Install mc (MinIO Client) if needed
+brew install minio/stable/mc  # macOS
+# or download from https://min.io/docs/minio/linux/reference/minio-mc.html
+
+# Port-forward MinIO S3 API
+kubectl port-forward svc/minio -n minio-system 9000:9000
+
+# Configure alias
+mc alias set local http://localhost:9000 minioadmin minioadmin
+
+# List artifacts
+mc ls local/argo-artifacts/
+
+# Download an artifact
+mc cp local/argo-artifacts/wf-poc/my-workflow/main.log ./
+```
+
+### 3. Test Per-Repository Artifacts
+
+The MinIO instance deployed by `make minio` is a single-instance server. To test per-repository artifacts, you can create buckets manually:
+
+```bash
+# Port-forward MinIO
+kubectl port-forward svc/minio -n minio-system 9000:9000
+
+# Create additional buckets
+mc alias set local http://localhost:9000 minioadmin minioadmin
+mc mb local/my-app-bucket
+```
+
+Then configure your application to use the in-cluster MinIO endpoint:
+
+```yaml
+applications:
+  - name: test-workflow
+    repoURL: https://github.com/YOUR_ORG/YOUR_REPO.git
+    targetRevision: main
+    path: "."
+    destination:
+      namespace: wf-poc
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+    artifacts:
+      bucket: my-app-bucket
+      endpoint: http://minio.minio-system.svc.cluster.local:9000
+      region: us-east-1
+      insecure: true
+      pathStyle: true
+      credentialsSecret: minio-creds
+```
+
+Create the credentials secret:
+
+```bash
+kubectl create secret generic minio-creds -n wf-poc \
+  --from-literal=accessKey=minioadmin \
+  --from-literal=secretKey=minioadmin
+```
+
+---
+
+## 🔧 Troubleshooting MinIO
+
+### MinIO Pod Not Running
+
+```bash
+# Check MinIO pod status
+kubectl get pods -n minio-system
+
+# View MinIO logs
+kubectl logs -n minio-system -l app=minio
+
+# Check MinIO service
+kubectl get svc -n minio-system
+```
+
+### Workflows Can't Connect to MinIO
+
+Verify the MinIO service is accessible from the workflow namespace:
+
+```bash
+# Test connectivity from a pod
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -I http://minio.minio-system.svc.cluster.local:9000
+
+# Check if MinIO is responding
+kubectl run -it --rm debug --image=amazon/aws-cli --restart=Never -- \
+  aws s3 ls --endpoint-url http://minio.minio-system.svc.cluster.local:9000
+```
+
+### Reinstall MinIO
+
+```bash
+# Remove existing MinIO
+helm uninstall minio -n minio-system
+
+# Reinstall
+make minio
+```
+
+### Artifacts Not Appearing
+
+```bash
+# Check workflow logs
+argo -n wf-poc logs @latest
+
+# Verify ConfigMap exists
+kubectl -n argo-workflows get cm artifact-repositories -o yaml
+
+# Check service account permissions
+kubectl -n wf-poc describe sa wf-runner
+```
 
 ---
 

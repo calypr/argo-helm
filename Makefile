@@ -1,10 +1,13 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts all
+.PHONY: deps lint template validate kind ct adapter test-artifacts all minio minio-ls
 
+# S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
-S3_ACCESS_KEY_ID     ?=
-S3_SECRET_ACCESS_KEY ?=
-S3_BUCKET            ?=
+S3_ACCESS_KEY_ID     ?= minioadmin
+S3_SECRET_ACCESS_KEY ?= minioadmin
+S3_BUCKET            ?= argo-artifacts
+S3_REGION            ?= us-east-1
+S3_HOSTNAME          ?= minio.minio-system.svc.cluster.local:9000
 
 
 check-vars:
@@ -78,11 +81,45 @@ kind:
 	kind delete cluster || true
 	kind create cluster
 
+minio:
+	@echo "🗄️ Installing MinIO in cluster..."
+	helm repo add minio https://charts.min.io/ || true
+	helm repo update
+	helm upgrade --install minio minio/minio \
+		--namespace minio-system --create-namespace \
+		--set rootUser=minioadmin \
+		--set rootPassword=minioadmin \
+		--set persistence.enabled=false \
+		--set mode=standalone \
+		--set resources.requests.memory=512Mi \
+		--set resources.requests.cpu=250m \
+		--set resources.limits.memory=1Gi \
+		--set resources.limits.cpu=500m \
+		--wait
+	@echo "✅ MinIO installed successfully"
+	@echo "⏳ Waiting for MinIO service to be ready..."
+	@sleep 10
+	@echo "📦 Creating default bucket: argo-artifacts"
+	@kubectl run minio-mc-setup --rm -i --restart=Never --image=minio/mc --command -- \
+		sh -c "until mc alias set myminio http://minio.minio-system.svc.cluster.local:9000 minioadmin minioadmin; do echo 'Waiting for MinIO...'; sleep 2; done && \
+		mc mb myminio/argo-artifacts --ignore-existing && \
+		echo 'Bucket argo-artifacts created successfully'" 2>&1 || echo "⚠️  Bucket creation skipped (may already exist)"
+	@echo "   Endpoint: minio.minio-system.svc.cluster.local:9000"
+	@echo "   Access Key: minioadmin"
+	@echo "   Secret Key: minioadmin"
+	@echo "   Bucket: argo-artifacts"
+
+minio-ls:
+	@echo "📂 Listing files in minio/argo-artifacts bucket..."
+	@kubectl run minio-mc-ls --rm -i --restart=Never --image=minio/mc --command -- \
+		sh -c "mc alias set myminio http://minio.minio-system.svc.cluster.local:9000 minioadmin minioadmin && \
+		mc ls --recursive myminio/argo-artifacts" 2>&1 || echo "⚠️  Failed to list bucket contents"
+
 ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
-deploy: check-vars kind bump-limits deps
+deploy: check-vars kind bump-limits deps minio
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
@@ -95,8 +132,10 @@ deploy: check-vars kind bump-limits deps
 		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
 		--set-string s3.bucket=${S3_BUCKET} \
 		--set-string s3.pathStyle=true \
+		--set-string s3.insecure=true \
 		--set-string s3.region=${S3_REGION} \
-		--set-string s3.hostname=${S3_HOSTNAME}
+		--set-string s3.hostname=${S3_HOSTNAME} \
+		-f my-values.yaml
 	echo waiting for pods
 	sleep 10
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd

@@ -10,7 +10,7 @@
 
 *A complete, production-ready Kubernetes GitOps and workflow automation stack with enterprise-grade authorization*
 
-[Quick Start](#-quick-start) • [Features](#-features) • [Architecture](#-architecture) • [Documentation](#-documentation) • [Contributing](#-contributing)
+[🚀 Quick Start](QUICKSTART.md) • [Features](#-features) • [Architecture](#-architecture) • [Documentation](#-documentation) • [Contributing](#-contributing)
 
 </div>
 
@@ -187,6 +187,39 @@ graph TB
 
 ## 🚀 Quick Start
 
+Choose your deployment method based on your needs:
+
+| Method | Use Case | Setup Time |
+|--------|----------|------------|
+| **Local Development** | Testing with in-cluster MinIO | 5 minutes |
+| **Helm Deployment** | Production/Custom | 15 minutes |
+
+### 🏠 Local Development (Recommended for Testing)
+
+For local testing with automatic MinIO deployment:
+
+```bash
+# Set required environment variables
+export GITHUB_PAT=<your-github-token>
+export ARGOCD_SECRET_KEY=$(openssl rand -hex 32)
+export ARGO_HOSTNAME=<your-hostname>
+
+# Deploy everything (Kind cluster + MinIO + Argo Stack)
+make deploy
+
+# Access UIs (ports are automatically forwarded)
+# Argo Workflows: http://localhost:2746
+# Argo CD:        http://localhost:8080
+
+# Access MinIO Console (optional)
+kubectl port-forward svc/minio -n minio-system 9001:9001
+# MinIO Console:  http://localhost:9001 (minioadmin/minioadmin)
+```
+
+See [docs/development.md](docs/development.md) for detailed local development guide.
+
+---
+
 ### Helm Deployment
 
 #### 1️⃣ Setup Prerequisites
@@ -246,12 +279,16 @@ argoWorkflows:
 argoCD:
   enabled: true
   
-# 🎯 Argo CD Applications (Multi-Application Support)
-# Deploy one or more applications using the applications array
+# 🎯 Argo CD Applications - Configure Your Repositories
+# ⚠️  IMPORTANT: The chart does NOT include default repositories.
+#     You MUST provide your own repository URLs at deployment time.
+#
+# Deploy one or more applications using the applications array.
+# Each application can optionally have its own S3 bucket for artifacts.
 applications:
-  - name: nextflow-hello-project
+  - name: my-workflow-app
     project: default
-    repoURL: "https://github.com/bwalsh/nextflow-hello-project.git"
+    repoURL: "https://github.com/YOUR_ORG/YOUR_REPO.git"  # ⚠️  Replace with your repo
     targetRevision: "main"
     path: "."
     destination:
@@ -261,37 +298,23 @@ applications:
         prune: true
         selfHeal: true
     # 🪣 Per-repository artifact storage (optional)
-    artifacts:
-      bucket: calypr-nextflow-hello
-      keyPrefix: workflows/
-      endpoint: https://s3.us-west-2.amazonaws.com
-      region: us-west-2
-      credentialsSecret: s3-cred-nextflow-hello
-  
-  - name: nextflow-hello-project-2
-    project: default
-    repoURL: "https://github.com/bwalsh/nextflow-hello-project-2.git"
-    targetRevision: "main"
-    path: "."
-    destination:
-      namespace: wf-poc
-    syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true
-    # 🪣 Per-repository artifact storage (optional)
-    artifacts:
-      bucket: calypr-nextflow-hello-2
-      keyPrefix: workflows/
-      endpoint: https://s3.us-west-2.amazonaws.com
-      region: us-west-2
-      credentialsSecret: s3-cred-nextflow-hello-2
+    # artifacts:
+    #   bucket: my-app-artifacts
+    #   keyPrefix: workflows/
+    #   endpoint: https://s3.us-west-2.amazonaws.com
+    #   region: us-west-2
+    #   credentialsSecret: my-app-s3-creds
 
 # ⚠️ DEPRECATED: Single application configuration (use 'applications' array above)
 # argocdApplication:
 #   enabled: false
 YAML
 ```
+
+**📚 Configuration Resources:**
+- For complete examples, see `examples/per-repo-artifacts-values.yaml`
+- For local development with MinIO, use `make deploy` (see [docs/development.md](docs/development.md))
+- For testing without applications, use an empty array: `applications: []`
 
 **Per-Repository Artifact Storage:**
 Each application can have its own S3 bucket for workflow outputs, enabling tenant isolation and traceability. If not specified, applications use the global S3 configuration above. See [docs/admin-guide.md](docs/admin-guide.md) for credential management options (IRSA, Workload Identity, ExternalSecrets).
