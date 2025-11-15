@@ -12,15 +12,15 @@ This directory contains example configuration files for integrating the Argo Sta
 
 ### Local Development
 
-1. Start Vault dev server and seed with test data:
+1. Create a Kubernetes cluster (if you don't have one):
+   ```bash
+   kind create cluster
+   ```
+
+2. Install Vault dev server in the cluster and seed with test data:
    ```bash
    make vault-dev
    make vault-seed
-   ```
-
-2. Start a local Kubernetes cluster (Kind):
-   ```bash
-   kind create cluster
    ```
 
 3. Install the chart with Vault integration:

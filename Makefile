@@ -6,10 +6,8 @@ S3_ACCESS_KEY_ID     ?=
 S3_SECRET_ACCESS_KEY ?=
 S3_BUCKET            ?=
 
-# Vault configuration for local development
-VAULT_ADDR           ?= http://127.0.0.1:8200
+# Vault configuration for local development (in-cluster deployment)
 VAULT_TOKEN          ?= root
-VAULT_DEV_CONTAINER  ?= vault-dev
 
 
 check-vars:
@@ -127,63 +125,71 @@ login:
 all: lint template validate kind ct adapter test-artifacts
 
 # ============================================================================
-# Vault Development Targets
+# Vault Development Targets (Helm-based in-cluster deployment)
 # ============================================================================
 
 vault-dev:
-	@echo "🔐 Starting Vault dev server..."
-	@if docker ps -a --format '{{.Names}}' | grep -q "^$(VAULT_DEV_CONTAINER)$$"; then \
-		echo "⚠️  Vault container already exists. Removing..."; \
-		docker rm -f $(VAULT_DEV_CONTAINER) 2>/dev/null || true; \
-	fi
-	@docker run -d --name $(VAULT_DEV_CONTAINER) \
-		--cap-add=IPC_LOCK \
-		-p 8200:8200 \
-		-e VAULT_DEV_ROOT_TOKEN_ID=$(VAULT_TOKEN) \
-		-e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
-		hashicorp/vault:latest
+	@echo "🔐 Installing Vault dev server in Kubernetes cluster..."
+	@helm repo add hashicorp https://helm.releases.hashicorp.com 2>/dev/null || true
+	@helm repo update hashicorp
+	@kubectl create namespace vault 2>/dev/null || true
+	@helm upgrade --install vault hashicorp/vault \
+		--namespace vault \
+		--set server.dev.enabled=true \
+		--set server.dev.devRootToken=$(VAULT_TOKEN) \
+		--set injector.enabled=false \
+		--set ui.enabled=true \
+		--set server.dataStorage.enabled=false \
+		--wait --timeout 2m
 	@echo "⏳ Waiting for Vault to be ready..."
-	@sleep 3
-	@echo "✅ Vault dev server running at $(VAULT_ADDR)"
+	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=vault -n vault --timeout=120s
+	@echo "✅ Vault dev server running in cluster"
+	@echo "   Namespace: vault"
+	@echo "   Service: vault.vault.svc.cluster.local:8200"
 	@echo "   Root token: $(VAULT_TOKEN)"
+	@echo ""
+	@echo "💡 To access Vault UI, run: kubectl port-forward -n vault svc/vault 8200:8200"
 
 vault-status:
 	@echo "🔍 Checking Vault status..."
-	@docker exec $(VAULT_DEV_CONTAINER) vault status 2>/dev/null || echo "❌ Vault not running. Run 'make vault-dev' first."
+	@kubectl exec -n vault vault-0 -- vault status 2>/dev/null || echo "❌ Vault not running. Run 'make vault-dev' first."
 
 vault-seed:
 	@echo "🌱 Seeding Vault with test secrets..."
 	@echo "➡️  Enabling KV v2 secrets engine..."
-	@docker exec $(VAULT_DEV_CONTAINER) vault secrets enable -version=2 -path=kv kv 2>/dev/null || echo "   (KV already enabled)"
+	@kubectl exec -n vault vault-0 -- vault secrets enable -version=2 -path=kv kv 2>/dev/null || echo "   (KV already enabled)"
 	@echo "➡️  Creating secrets for Argo CD..."
-	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/argocd/admin \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/argocd/admin \
 		password="admin123456" \
 		bcryptHash='$$2a$$10$$rRyBkqjtRlpvrut4WyTp0eSx5qbHJUh.O7Ql0kp.VeGAHu8xfKKVi'
-	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/argocd/oidc \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/argocd/oidc \
 		clientSecret="test-oidc-secret-argocd"
-	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/argocd/server \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/argocd/server \
 		secretKey="$$(openssl rand -hex 32)"
 	@echo "➡️  Creating secrets for Argo Workflows..."
-	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/workflows/artifacts \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/workflows/artifacts \
 		accessKey="minioadmin" \
 		secretKey="minioadmin"
-	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/workflows/oidc \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/workflows/oidc \
 		clientSecret="test-oidc-secret-workflows"
 	@echo "➡️  Creating secrets for authz-adapter..."
-	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/authz \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/authz \
 		clientSecret="test-oidc-secret-authz"
 	@echo "➡️  Creating secrets for GitHub Events..."
-	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/events/github \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/events/github \
 		token="ghp_test_token_replace_with_real_one"
 	@echo "➡️  Creating per-app S3 credentials..."
-	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/apps/nextflow-hello/s3 \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello/s3 \
 		accessKey="app1-access-key" \
 		secretKey="app1-secret-key"
-	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/apps/nextflow-hello-2/s3 \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-2/s3 \
 		accessKey="app2-access-key" \
 		secretKey="app2-secret-key"
 	@echo "➡️  Enabling Kubernetes auth method..."
-	@docker exec $(VAULT_DEV_CONTAINER) vault auth enable kubernetes 2>/dev/null || echo "   (Kubernetes auth already enabled)"
+	@kubectl exec -n vault vault-0 -- vault auth enable kubernetes 2>/dev/null || echo "   (Kubernetes auth already enabled)"
+	@echo "➡️  Configuring Kubernetes auth..."
+	@kubectl exec -n vault vault-0 -- sh -c 'vault write auth/kubernetes/config \
+		kubernetes_host="https://$$KUBERNETES_PORT_443_TCP_ADDR:443"' 2>/dev/null || echo "   (Kubernetes auth already configured)"
 	@echo "✅ Vault seeded with test data"
 	@echo ""
 	@echo "📋 Available secrets:"
@@ -198,20 +204,21 @@ vault-seed:
 
 vault-list:
 	@echo "📋 Listing all secrets in Vault..."
-	@docker exec $(VAULT_DEV_CONTAINER) vault kv list -format=json kv/argo 2>/dev/null || echo "❌ No secrets found or Vault not running"
+	@kubectl exec -n vault vault-0 -- vault kv list -format=json kv/argo 2>/dev/null || echo "❌ No secrets found or Vault not running"
 
 vault-get:
-	@if [ -z "$(PATH)" ]; then \
-		echo "❌ Usage: make vault-get PATH=kv/argo/argocd/admin"; \
+	@if [ -z "$(VPATH)" ]; then \
+		echo "❌ Usage: make vault-get VPATH=kv/argo/argocd/admin"; \
 		exit 1; \
 	fi
-	@docker exec $(VAULT_DEV_CONTAINER) vault kv get -format=json $(PATH)
+	@kubectl exec -n vault vault-0 -- vault kv get -format=json $(VPATH)
 
 vault-cleanup:
 	@echo "🧹 Cleaning up Vault dev server..."
-	@docker rm -f $(VAULT_DEV_CONTAINER) 2>/dev/null || true
+	@helm uninstall vault -n vault 2>/dev/null || true
+	@kubectl delete namespace vault 2>/dev/null || true
 	@echo "✅ Vault dev server removed"
 
 vault-shell:
-	@echo "🐚 Opening shell in Vault container..."
-	@docker exec -it $(VAULT_DEV_CONTAINER) /bin/sh
+	@echo "🐚 Opening shell in Vault pod..."
+	@kubectl exec -it -n vault vault-0 -- /bin/sh

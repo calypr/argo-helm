@@ -43,13 +43,13 @@ This document provides a high-level overview of the Vault + External Secrets Ope
 New targets for local Vault development:
 
 ```bash
-make vault-dev        # Start Vault dev server in Docker
-make vault-seed       # Seed Vault with test secrets
-make vault-status     # Check Vault health
-make vault-list       # List all secrets
-make vault-get PATH=  # Get specific secret
-make vault-cleanup    # Stop and remove Vault container
-make vault-shell      # Open shell in Vault container
+make vault-dev         # Install Vault dev server in Kubernetes cluster
+make vault-seed        # Seed Vault with test secrets
+make vault-status      # Check Vault health
+make vault-list        # List all secrets
+make vault-get VPATH=  # Get specific secret
+make vault-cleanup     # Uninstall Vault and remove namespace
+make vault-shell       # Open shell in Vault pod
 ```
 
 ### Documentation

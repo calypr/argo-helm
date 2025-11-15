@@ -1,9 +1,9 @@
-# Example: Local Development with Vault Dev Server
-# This configuration is for local testing with Vault running in dev mode.
+# Example: Local Development with Vault Dev Server in Kubernetes
+# This configuration is for local testing with Vault deployed in the cluster in dev mode.
 # DO NOT use this in production!
 
 # Use with:
-# 1. make vault-dev vault-seed  # Start Vault and seed test data
+# 1. make vault-dev vault-seed  # Install Vault in cluster and seed test data
 # 2. helm install argo-stack ./helm/argo-stack -f examples/vault/dev-values.yaml
 
 externalSecrets:
@@ -16,9 +16,8 @@ externalSecrets:
   vault:
     enabled: true
     
-    # For Kind cluster, use host.docker.internal to reach Docker containers
-    # For other local k8s: http://localhost:8200 or http://host.k3d.internal:8200
-    address: "http://host.docker.internal:8200"
+    # Vault deployed in the vault namespace via make vault-dev
+    address: "http://vault.vault.svc.cluster.local:8200"
     
     # Dev mode: no TLS
     # caBundleSecretName: ""

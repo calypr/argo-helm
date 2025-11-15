@@ -4,7 +4,6 @@ This guide describes how to test the Vault and External Secrets Operator integra
 
 ## Prerequisites
 
-- Docker (for running Vault dev server)
 - Kubernetes cluster (Kind, k3d, or similar for local testing)
 - Helm 3.x
 - kubectl
@@ -29,14 +28,24 @@ This validates:
 - Secret path format conversions
 - Backward compatibility
 
-### 2. Local Development with Vault Dev Server
+### 2. Local Development with Vault in Kubernetes
 
-Test the full integration locally using a Vault dev server and Kind cluster.
+Test the full integration locally using Vault deployed in your Kubernetes cluster.
 
-#### Step 1: Start Vault Dev Server
+#### Step 1: Create Kind Cluster
 
 ```bash
-# Start Vault in Docker
+# Create a Kind cluster
+kind create cluster --name argo-test
+
+# Verify cluster is ready
+kubectl cluster-info --context kind-argo-test
+```
+
+#### Step 2: Install Vault Dev Server in Cluster
+
+```bash
+# Install Vault using Helm in the cluster
 make vault-dev
 
 # Verify Vault is running
@@ -46,17 +55,7 @@ make vault-status
 make vault-seed
 ```
 
-The dev server will be available at `http://127.0.0.1:8200` with root token `root`.
-
-#### Step 2: Create Kind Cluster
-
-```bash
-# Create a Kind cluster
-kind create cluster --name argo-test
-
-# Verify cluster is ready
-kubectl cluster-info --context kind-argo-test
-```
+The Vault dev server will be deployed to the `vault` namespace at `vault.vault.svc.cluster.local:8200` with root token `root`.
 
 #### Step 3: Install External Secrets Operator
 
@@ -80,20 +79,7 @@ kubectl wait --for=condition=Ready pod \
   -n external-secrets-system --timeout=120s
 ```
 
-#### Step 4: Configure Vault Access from Kind
-
-For Kind clusters, Vault needs to be accessible at `host.docker.internal`:
-
-```bash
-# On Linux, you may need to add host.docker.internal to /etc/hosts in Kind nodes
-kubectl run -it --rm debug --image=busybox --restart=Never -- \
-  nslookup host.docker.internal
-
-# If that fails, get your host IP and use it instead
-# Or use examples/vault/dev-values.yaml which is pre-configured
-```
-
-#### Step 5: Install argo-stack with Vault
+#### Step 4: Install argo-stack with Vault
 
 ```bash
 helm install argo-stack ./helm/argo-stack \
@@ -101,7 +87,7 @@ helm install argo-stack ./helm/argo-stack \
   --namespace argocd --create-namespace
 ```
 
-#### Step 6: Verify Secret Synchronization
+#### Step 5: Verify Secret Synchronization
 
 Check that ExternalSecrets are created and syncing:
 
@@ -120,13 +106,13 @@ kubectl get secret github-secret -n argo-events \
   -o jsonpath='{.data.token}' | base64 -d
 ```
 
-#### Step 7: Test Secret Rotation
+#### Step 6: Test Secret Rotation
 
 Update a secret in Vault and verify it syncs:
 
 ```bash
 # Update GitHub token in Vault
-docker exec vault-dev vault kv put kv/argo/events/github \
+kubectl exec -n vault vault-0 -- vault kv put kv/argo/events/github \
   token="ghp_new_test_token_updated"
 
 # Force immediate sync (or wait for refreshInterval)
@@ -193,26 +179,26 @@ Already tested in Step 5 above. This is the recommended method for production.
 
 ```bash
 # Enable AppRole in Vault
-docker exec vault-dev vault auth enable approle
+kubectl exec -n vault vault-0 -- vault auth enable approle
 
 # Create policy
-docker exec vault-dev sh -c 'vault policy write argo-stack-policy - <<EOF
+kubectl exec -n vault vault-0 -- sh -c 'vault policy write argo-stack-policy - <<EOF
 path "kv/data/argo/*" {
   capabilities = ["read", "list"]
 }
 EOF'
 
 # Create role
-docker exec vault-dev vault write auth/approle/role/argo-stack \
+kubectl exec -n vault vault-0 -- vault write auth/approle/role/argo-stack \
   secret_id_ttl=24h \
   token_ttl=1h \
   policies=argo-stack-policy
 
 # Get role ID
-ROLE_ID=$(docker exec vault-dev vault read -field=role_id auth/approle/role/argo-stack/role-id)
+ROLE_ID=$(kubectl exec -n vault vault-0 -- vault read -field=role_id auth/approle/role/argo-stack/role-id)
 
 # Generate secret ID
-SECRET_ID=$(docker exec vault-dev vault write -field=secret_id -f auth/approle/role/argo-stack/secret-id)
+SECRET_ID=$(kubectl exec -n vault vault-0 -- vault write -field=secret_id -f auth/approle/role/argo-stack/secret-id)
 
 # Create Kubernetes secret
 kubectl create secret generic vault-approle-secret \
@@ -308,16 +294,16 @@ ct install --config .ct.yaml --debug
 ### Issue: ExternalSecret stuck in "SecretSyncedError"
 
 **Check:**
-1. Vault connectivity: `kubectl run -it --rm debug --image=curlimages/curl -- curl -v $VAULT_ADDR/v1/sys/health`
+1. Vault connectivity: `kubectl run -it --rm debug --image=curlimages/curl -- curl -v http://vault.vault.svc.cluster.local:8200/v1/sys/health`
 2. SecretStore status: `kubectl describe secretstore -n argocd`
 3. ESO logs: `kubectl logs -l app.kubernetes.io/name=external-secrets -n external-secrets-system`
-4. Secret path exists in Vault: `docker exec vault-dev vault kv get kv/argo/path/to/secret`
+4. Secret path exists in Vault: `kubectl exec -n vault vault-0 -- vault kv get kv/argo/path/to/secret`
 
 ### Issue: Vault authentication fails
 
 **Check:**
 1. ServiceAccount exists: `kubectl get sa eso-vault-auth -n argocd`
-2. Vault role configuration: `docker exec vault-dev vault read auth/kubernetes/role/argo-stack`
+2. Vault role configuration: `kubectl exec -n vault vault-0 -- vault read auth/kubernetes/role/argo-stack`
 3. Test auth manually: Create a token and try logging in
 
 ### Issue: Dependencies missing during helm install
@@ -333,7 +319,7 @@ Test secret sync performance with many secrets:
 ```bash
 # Create 100 test secrets in Vault
 for i in {1..100}; do
-  docker exec vault-dev vault kv put kv/argo/test/secret-$i value="test-value-$i"
+  kubectl exec -n vault vault-0 -- vault kv put kv/argo/test/secret-$i value="test-value-$i"
 done
 
 # Create ExternalSecrets for all

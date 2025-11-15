@@ -72,17 +72,18 @@ graph LR
 3. **Kubernetes cluster** (v1.20+)
    - Service accounts for ESO authentication
    - Network access to Vault
+   - Helm 3.x installed
 
 ---
 
 ## 🚀 Quick Start
 
-### Step 1: Start Vault Dev Server (Local Testing)
+### Step 1: Install Vault Dev Server in Cluster (Local Testing)
 
-For local development, use the included Makefile targets:
+For local development, use the included Makefile targets to deploy Vault in your Kubernetes cluster:
 
 ```bash
-# Start Vault dev server in Docker
+# Install Vault dev server using Helm in the cluster
 make vault-dev
 
 # Seed with test data
@@ -92,9 +93,15 @@ make vault-seed
 make vault-status
 ```
 
-This creates a Vault dev server at `http://127.0.0.1:8200` with root token `root`.
+This deploys Vault in dev mode to the `vault` namespace at `vault.vault.svc.cluster.local:8200` with root token `root`.
 
-> **⚠️ Warning:** Dev mode is **NOT** for production. Data is stored in memory and lost on restart.
+> **⚠️ Warning:** Dev mode is **NOT** for production. Data is stored in memory and lost on pod restart.
+
+**Access Vault UI (optional):**
+```bash
+kubectl port-forward -n vault svc/vault 8200:8200
+# Then open http://localhost:8200 in your browser
+```
 
 ### Step 2: Configure Helm Values
 
@@ -107,7 +114,7 @@ externalSecrets:
   
   vault:
     enabled: true
-    address: "http://vault.vault.svc.cluster.local:8200"  # Or http://host.docker.internal:8200 for local Kind
+    address: "http://vault.vault.svc.cluster.local:8200"
     
     auth:
       method: "kubernetes"
@@ -186,32 +193,35 @@ kv/argo/                              # Root prefix (configurable)
 
 ### Creating Secrets in Vault
 
-Use the Vault CLI or UI to create secrets:
+Use the Vault CLI or UI to create secrets. For the in-cluster Vault dev server, use `kubectl exec`:
 
 ```bash
-export VAULT_ADDR=http://127.0.0.1:8200
-export VAULT_TOKEN=root
+# Use kubectl exec to access Vault in the cluster
+# Alternatively, set up port-forward and use local vault CLI:
+# kubectl port-forward -n vault svc/vault 8200:8200 &
+# export VAULT_ADDR=http://127.0.0.1:8200
+# export VAULT_TOKEN=root
 
 # Argo CD admin password
-vault kv put kv/argo/argocd/admin \
+kubectl exec -n vault vault-0 -- vault kv put kv/argo/argocd/admin \
   password="MySecurePassword123!" \
   bcryptHash='$2a$10$...'  # bcrypt hash of password
 
 # Argo CD server secret key (for session signing)
-vault kv put kv/argo/argocd/server \
+kubectl exec -n vault vault-0 -- vault kv put kv/argo/argocd/server \
   secretKey="$(openssl rand -hex 32)"
 
 # S3 credentials for workflow artifacts
-vault kv put kv/argo/workflows/artifacts \
+kubectl exec -n vault vault-0 -- vault kv put kv/argo/workflows/artifacts \
   accessKey="AKIAIOSFODNN7EXAMPLE" \
   secretKey="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
 
 # GitHub webhook token
-vault kv put kv/argo/events/github \
+kubectl exec -n vault vault-0 -- vault kv put kv/argo/events/github \
   token="ghp_xxxxxxxxxxxxxxxxxxxx"
 
 # Per-app S3 credentials
-vault kv put kv/argo/apps/nextflow-hello/s3 \
+kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello/s3 \
   accessKey="app1-access-key" \
   secretKey="app1-secret-key"
 ```
@@ -220,13 +230,13 @@ vault kv put kv/argo/apps/nextflow-hello/s3 \
 
 ```bash
 # List all secrets under a path
-vault kv list kv/argo
+kubectl exec -n vault vault-0 -- vault kv list kv/argo
 
 # Get a specific secret (JSON output)
-vault kv get -format=json kv/argo/argocd/admin
+kubectl exec -n vault vault-0 -- vault kv get -format=json kv/argo/argocd/admin
 
 # Get a specific field
-vault kv get -field=password kv/argo/argocd/admin
+kubectl exec -n vault vault-0 -- vault kv get -field=password kv/argo/argocd/admin
 ```
 
 ---
