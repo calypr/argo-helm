@@ -31,6 +31,7 @@ check-vars:
 
 deps:
 	helm repo add argo https://argoproj.github.io/argo-helm
+	helm repo add external-secrets https://charts.external-secrets.io
 	helm repo update
 	helm dependency build helm/argo-stack
 
@@ -120,13 +121,13 @@ minio-ls:
 
 minio-cleanup:
 	@echo "🧹 Cleaning up MinIO..."
-	@helm uninstall minio -n minio 2>/dev/null || true
-	@kubectl delete namespace minio 2>/dev/null || true
+	@helm uninstall minio -n minio-system 2>/dev/null || true
+	@kubectl delete namespace minio-system 2>/dev/null || true
 	@echo "✅ MinIO removed"
 
 minio-shell:
 	@echo "🐚 Opening shell in MinIO pod..."
-	@kubectl exec -it -n minio $$(kubectl get pod -n minio -l app=minio -o jsonpath='{.items[0].metadata.name}') -- /bin/sh
+	@kubectl exec -it -n minio-system $$(kubectl get pod -n minio-system -l app=minio -o jsonpath='{.items[0].metadata.name}') -- /bin/sh
 
 ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
