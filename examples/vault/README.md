@@ -29,14 +29,19 @@ This directory contains example configuration files for integrating the Argo Sta
    make minio-create-bucket
    ```
 
-4. Install the chart with Vault integration:
+4. Install External Secrets Operator:
+   ```bash
+   make eso-install
+   ```
+
+5. Install the chart with Vault integration:
    ```bash
    helm install argo-stack ./helm/argo-stack \
      -f examples/vault/dev-values.yaml \
      --namespace argocd --create-namespace
    ```
 
-5. Verify secrets are synced:
+6. Verify secrets are synced:
    ```bash
    kubectl get externalsecrets -A
    kubectl get secrets -n argo-events github-secret

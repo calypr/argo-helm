@@ -76,7 +76,13 @@ MinIO will be deployed to the `minio` namespace at `minio.minio.svc.cluster.loca
 
 #### Step 3: Install External Secrets Operator
 
-Install ESO separately (recommended for testing):
+Install ESO using the Makefile target (recommended):
+
+```bash
+make eso-install
+```
+
+Or install manually:
 
 ```bash
 helm repo add external-secrets https://charts.external-secrets.io

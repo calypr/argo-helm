@@ -581,9 +581,10 @@ externalSecrets:
 **Seed Vault with secrets:**
 
 ```bash
-# For local development - install Vault and MinIO
+# For local development - install Vault, MinIO, and ESO
 make vault-dev vault-seed
 make minio-dev minio-create-bucket
+make eso-install
 
 # For production
 vault kv put kv/argo/argocd/admin password="SecurePassword123!"

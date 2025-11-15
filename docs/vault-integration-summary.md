@@ -62,6 +62,13 @@ make minio-cleanup        # Uninstall MinIO and remove namespace
 make minio-shell          # Open shell in MinIO pod
 ```
 
+**External Secrets Operator:**
+```bash
+make eso-install   # Install External Secrets Operator with CRDs
+make eso-status    # Check ESO health
+make eso-cleanup   # Uninstall ESO and remove namespace
+```
+
 ### Documentation
 
 1. **docs/secrets-with-vault.md** (17KB)

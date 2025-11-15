@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status
+.PHONY: deps lint template validate kind ct adapter test-artifacts all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup
 
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
@@ -133,7 +133,7 @@ ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
-deploy: check-vars kind bump-limits vault-dev vault-seed deps minio
+deploy: check-vars kind bump-limits vault-dev vault-seed deps minio eso-install
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
@@ -272,4 +272,30 @@ vault-cleanup:
 vault-shell:
 	@echo "🐚 Opening shell in Vault pod..."
 	@kubectl exec -it -n vault vault-0 -- /bin/sh
+
+# ============================================================================
+# External Secrets Operator Installation
+# ============================================================================
+
+eso-install:
+	@echo "🔐 Installing External Secrets Operator..."
+	@helm repo add external-secrets https://charts.external-secrets.io 2>/dev/null || true
+	@helm repo update external-secrets
+	@helm upgrade --install external-secrets external-secrets/external-secrets \
+		--namespace external-secrets-system --create-namespace \
+		--set installCRDs=true \
+		--wait --timeout 3m
+	@echo "⏳ Waiting for External Secrets Operator to be ready..."
+	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=external-secrets -n external-secrets-system --timeout=120s
+	@echo "✅ External Secrets Operator installed successfully"
+
+eso-status:
+	@echo "🔍 Checking External Secrets Operator status..."
+	@kubectl get pods -n external-secrets-system -l app.kubernetes.io/name=external-secrets 2>/dev/null || echo "❌ ESO not running. Run 'make eso-install' first."
+
+eso-cleanup:
+	@echo "🧹 Cleaning up External Secrets Operator..."
+	@helm uninstall external-secrets -n external-secrets-system 2>/dev/null || true
+	@kubectl delete namespace external-secrets-system 2>/dev/null || true
+	@echo "✅ External Secrets Operator removed"
 

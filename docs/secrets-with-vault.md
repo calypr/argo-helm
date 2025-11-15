@@ -114,6 +114,13 @@ make minio-create-bucket
 
 MinIO will be available at `minio.minio.svc.cluster.local:9000` with credentials `minioadmin/minioadmin`.
 
+**Install External Secrets Operator:**
+```bash
+make eso-install
+```
+
+This installs ESO with CRDs to the `external-secrets-system` namespace.
+
 ### Step 2: Configure Helm Values
 
 Create a `vault-values.yaml`:
