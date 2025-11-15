@@ -1,6 +1,6 @@
 apiVersion: v2
 name: argo-stack
-description: Umbrella chart for Argo Workflows, Argo CD, authz-adapter, RBAC, and optional Argo CD Application
+description: Umbrella chart for Argo Workflows, Argo CD, authz-adapter, RBAC, and optional Argo CD Application with Vault/ESO integration
 type: application
 version: 0.1.0
 appVersion: "1.0.0"
@@ -17,3 +17,7 @@ dependencies:
     version: "2.x.x"
     repository: "https://argoproj.github.io/argo-helm"
     condition: events.enabled
+  - name: external-secrets
+    version: ">=0.9.0"
+    repository: https://charts.external-secrets.io
+    condition: externalSecrets.installOperator

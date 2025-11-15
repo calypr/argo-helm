@@ -1,10 +1,15 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts all
+.PHONY: deps lint template validate kind ct adapter test-artifacts all vault-dev vault-seed vault-cleanup vault-status
 
 S3_ENABLED           ?= true
 S3_ACCESS_KEY_ID     ?=
 S3_SECRET_ACCESS_KEY ?=
 S3_BUCKET            ?=
+
+# Vault configuration for local development
+VAULT_ADDR           ?= http://127.0.0.1:8200
+VAULT_TOKEN          ?= root
+VAULT_DEV_CONTAINER  ?= vault-dev
 
 
 check-vars:
@@ -120,3 +125,93 @@ login:
 	argocd login localhost:8080 --skip-test-tls --insecure --name admin --password `kubectl get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"  -n argocd | base64 -d`
 
 all: lint template validate kind ct adapter test-artifacts
+
+# ============================================================================
+# Vault Development Targets
+# ============================================================================
+
+vault-dev:
+	@echo "🔐 Starting Vault dev server..."
+	@if docker ps -a --format '{{.Names}}' | grep -q "^$(VAULT_DEV_CONTAINER)$$"; then \
+		echo "⚠️  Vault container already exists. Removing..."; \
+		docker rm -f $(VAULT_DEV_CONTAINER) 2>/dev/null || true; \
+	fi
+	@docker run -d --name $(VAULT_DEV_CONTAINER) \
+		--cap-add=IPC_LOCK \
+		-p 8200:8200 \
+		-e VAULT_DEV_ROOT_TOKEN_ID=$(VAULT_TOKEN) \
+		-e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
+		hashicorp/vault:latest
+	@echo "⏳ Waiting for Vault to be ready..."
+	@sleep 3
+	@echo "✅ Vault dev server running at $(VAULT_ADDR)"
+	@echo "   Root token: $(VAULT_TOKEN)"
+
+vault-status:
+	@echo "🔍 Checking Vault status..."
+	@docker exec $(VAULT_DEV_CONTAINER) vault status 2>/dev/null || echo "❌ Vault not running. Run 'make vault-dev' first."
+
+vault-seed:
+	@echo "🌱 Seeding Vault with test secrets..."
+	@echo "➡️  Enabling KV v2 secrets engine..."
+	@docker exec $(VAULT_DEV_CONTAINER) vault secrets enable -version=2 -path=kv kv 2>/dev/null || echo "   (KV already enabled)"
+	@echo "➡️  Creating secrets for Argo CD..."
+	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/argocd/admin \
+		password="admin123456" \
+		bcryptHash='$$2a$$10$$rRyBkqjtRlpvrut4WyTp0eSx5qbHJUh.O7Ql0kp.VeGAHu8xfKKVi'
+	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/argocd/oidc \
+		clientSecret="test-oidc-secret-argocd"
+	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/argocd/server \
+		secretKey="$$(openssl rand -hex 32)"
+	@echo "➡️  Creating secrets for Argo Workflows..."
+	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/workflows/artifacts \
+		accessKey="minioadmin" \
+		secretKey="minioadmin"
+	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/workflows/oidc \
+		clientSecret="test-oidc-secret-workflows"
+	@echo "➡️  Creating secrets for authz-adapter..."
+	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/authz \
+		clientSecret="test-oidc-secret-authz"
+	@echo "➡️  Creating secrets for GitHub Events..."
+	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/events/github \
+		token="ghp_test_token_replace_with_real_one"
+	@echo "➡️  Creating per-app S3 credentials..."
+	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/apps/nextflow-hello/s3 \
+		accessKey="app1-access-key" \
+		secretKey="app1-secret-key"
+	@docker exec $(VAULT_DEV_CONTAINER) vault kv put kv/argo/apps/nextflow-hello-2/s3 \
+		accessKey="app2-access-key" \
+		secretKey="app2-secret-key"
+	@echo "➡️  Enabling Kubernetes auth method..."
+	@docker exec $(VAULT_DEV_CONTAINER) vault auth enable kubernetes 2>/dev/null || echo "   (Kubernetes auth already enabled)"
+	@echo "✅ Vault seeded with test data"
+	@echo ""
+	@echo "📋 Available secrets:"
+	@echo "   kv/argo/argocd/admin        - Argo CD admin credentials"
+	@echo "   kv/argo/argocd/oidc         - Argo CD OIDC client secret"
+	@echo "   kv/argo/argocd/server       - Argo CD server secret key"
+	@echo "   kv/argo/workflows/artifacts - Workflow artifact storage credentials"
+	@echo "   kv/argo/workflows/oidc      - Workflow OIDC client secret"
+	@echo "   kv/argo/authz               - AuthZ adapter OIDC secret"
+	@echo "   kv/argo/events/github       - GitHub webhook token"
+	@echo "   kv/argo/apps/*/s3           - Per-app S3 credentials"
+
+vault-list:
+	@echo "📋 Listing all secrets in Vault..."
+	@docker exec $(VAULT_DEV_CONTAINER) vault kv list -format=json kv/argo 2>/dev/null || echo "❌ No secrets found or Vault not running"
+
+vault-get:
+	@if [ -z "$(PATH)" ]; then \
+		echo "❌ Usage: make vault-get PATH=kv/argo/argocd/admin"; \
+		exit 1; \
+	fi
+	@docker exec $(VAULT_DEV_CONTAINER) vault kv get -format=json $(PATH)
+
+vault-cleanup:
+	@echo "🧹 Cleaning up Vault dev server..."
+	@docker rm -f $(VAULT_DEV_CONTAINER) 2>/dev/null || true
+	@echo "✅ Vault dev server removed"
+
+vault-shell:
+	@echo "🐚 Opening shell in Vault container..."
+	@docker exec -it $(VAULT_DEV_CONTAINER) /bin/sh
