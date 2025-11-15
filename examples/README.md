@@ -2,6 +2,26 @@
 
 This directory contains example configurations for the Argo Stack Helm chart.
 
+> **⚠️ IMPORTANT**: The chart's default `values.yaml` does NOT include any repository configurations. 
+> You MUST provide your own repository URLs and settings at deployment time using these examples as templates.
+
+## Quick Start
+
+For local development and testing, use the pre-configured local development values:
+
+```bash
+# Start local MinIO (S3-compatible storage)
+./dev-minio.sh start
+
+# Deploy with local development configuration
+helm upgrade --install argo-stack ./helm/argo-stack \
+  --namespace argocd --create-namespace \
+  --values local-dev-values.yaml \
+  --wait
+```
+
+This will deploy the stack without any applications, allowing you to add your own.
+
 ## Per-Repository Artifact Configuration
 
 **File:** `per-repo-artifacts-values.yaml`

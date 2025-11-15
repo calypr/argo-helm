@@ -271,27 +271,29 @@ ingressAuth:
 # to the global s3 configuration defined above.
 #
 
-applications:
-  - name: nextflow-hello
-    repoURL: https://github.com/bwalsh/nextflow-hello-project.git
-    targetRevision: main
-    path: "."
-    destination:
-      namespace: argo
-    syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true
-  - name: nextflow-hello-2
-    repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
-    targetRevision: main
-    path: "."
-    destination:
-      namespace: argo
-    syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true
+applications: []
+  # Example application configurations (provide your own at deployment time):
+  #
+  # - name: my-workflow-app
+  #   project: default
+  #   repoURL: https://github.com/YOUR_ORG/YOUR_REPO.git
+  #   targetRevision: main
+  #   path: "."
+  #   destination:
+  #     namespace: wf-poc
+  #   syncPolicy:
+  #     automated:
+  #       prune: true
+  #       selfHeal: true
+  #   # Optional: Per-repository artifact storage
+  #   # artifacts:
+  #   #   bucket: my-app-artifacts
+  #   #   keyPrefix: workflows/
+  #   #   endpoint: https://s3.us-west-2.amazonaws.com
+  #   #   region: us-west-2
+  #   #   credentialsSecret: my-app-s3-creds
+  #
+  # See examples/per-repo-artifacts-values.yaml for complete examples
 
 # ============================================================================
 # Argo Events Configuration - GitHub EventSource and Sensor
@@ -317,17 +319,19 @@ events:
     # event name within the same EventSource.
     #
     # Example:
-    repositories:
-      - eventName: repo_push_nextflow_hello_project  # Must align with sensor event, must be unique
-        owner: bwalsh
-        repository: nextflow-hello-project
-        events: ["push"]
-        active: true
-      - eventName: repo_push_nextflow_hello_project_2
-        owner: bwalsh
-        repository: nextflow-hello-project-2
-        events: ["push"]
-        active: true
+    repositories: []
+      # - eventName: repo_push_my_project  # Must align with sensor event, must be unique
+      #   owner: YOUR_GITHUB_ORG
+      #   repository: your-repo-name
+      #   events: ["push"]
+      #   active: true
+      # - eventName: repo_push_another_project
+      #   owner: YOUR_GITHUB_ORG
+      #   repository: another-repo
+      #   events: ["push"]
+      #   active: true
+      #
+      # See examples/per-repo-artifacts-values.yaml for complete examples
 
     # ========================================================================
     # Secret for GitHub API Token

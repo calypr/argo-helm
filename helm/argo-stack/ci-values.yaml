@@ -12,6 +12,13 @@ argo-cd:
 argocdApplication:
   enabled: false
 
+# No applications for CI
+applications: []
+
+# Disable Argo Events for CI  
+events:
+  enabled: false
+
 # Disable ingresses for ct
 ingress:
   argoWorkflows:

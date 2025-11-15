@@ -1,10 +1,14 @@
 # Convenience targets for local testing
 .PHONY: deps lint template validate kind ct adapter test-artifacts all vault-dev vault-seed vault-cleanup vault-status minio-dev minio-status minio-create-bucket minio-cleanup
+.PHONY: deps lint template validate kind ct adapter test-artifacts all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status
 
+# S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
-S3_ACCESS_KEY_ID     ?=
-S3_SECRET_ACCESS_KEY ?=
-S3_BUCKET            ?=
+S3_ACCESS_KEY_ID     ?= minioadmin
+S3_SECRET_ACCESS_KEY ?= minioadmin
+S3_BUCKET            ?= argo-artifacts
+S3_REGION            ?= us-east-1
+S3_HOSTNAME          ?= minio.minio-system.svc.cluster.local:9000
 
 # Vault configuration for local development (in-cluster deployment)
 VAULT_TOKEN          ?= root
@@ -81,11 +85,55 @@ kind:
 	kind delete cluster || true
 	kind create cluster
 
+minio:
+	@echo "🗄️ Installing MinIO in cluster..."
+	helm repo add minio https://charts.min.io/ || true
+	helm repo update
+	helm upgrade --install minio minio/minio \
+		--namespace minio-system --create-namespace \
+		--set rootUser=minioadmin \
+		--set rootPassword=minioadmin \
+		--set persistence.enabled=false \
+		--set mode=standalone \
+		--set resources.requests.memory=512Mi \
+		--set resources.requests.cpu=250m \
+		--set resources.limits.memory=1Gi \
+		--set resources.limits.cpu=500m \
+		--wait
+	@echo "✅ MinIO installed successfully"
+	@echo "⏳ Waiting for MinIO service to be ready..."
+	@sleep 10
+	@echo "📦 Creating default bucket: argo-artifacts"
+	@kubectl run minio-mc-setup --rm -i --restart=Never --image=minio/mc --command -- \
+		sh -c "until mc alias set myminio http://minio.minio-system.svc.cluster.local:9000 minioadmin minioadmin; do echo 'Waiting for MinIO...'; sleep 2; done && \
+		mc mb myminio/argo-artifacts --ignore-existing && \
+		echo 'Bucket argo-artifacts created successfully'" 2>&1 || echo "⚠️  Bucket creation skipped (may already exist)"
+	@echo "   Endpoint: minio.minio-system.svc.cluster.local:9000"
+	@echo "   Access Key: minioadmin"
+	@echo "   Secret Key: minioadmin"
+	@echo "   Bucket: argo-artifacts"
+
+minio-ls:
+	@echo "📂 Listing files in minio/argo-artifacts bucket..."
+	@kubectl run minio-mc-ls --rm -i --restart=Never --image=minio/mc --command -- \
+		sh -c "mc alias set myminio http://minio.minio-system.svc.cluster.local:9000 minioadmin minioadmin && \
+		mc ls --recursive myminio/argo-artifacts" 2>&1 || echo "⚠️  Failed to list bucket contents"
+
+minio-cleanup:
+	@echo "🧹 Cleaning up MinIO..."
+	@helm uninstall minio -n minio 2>/dev/null || true
+	@kubectl delete namespace minio 2>/dev/null || true
+	@echo "✅ MinIO removed"
+
+minio-shell:
+	@echo "🐚 Opening shell in MinIO pod..."
+	@kubectl exec -it -n minio $$(kubectl get pod -n minio -l app=minio -o jsonpath='{.items[0].metadata.name}') -- /bin/sh
+
 ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
-deploy: check-vars kind bump-limits deps
+deploy: check-vars kind bump-limits deps minio
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
@@ -98,8 +146,10 @@ deploy: check-vars kind bump-limits deps
 		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
 		--set-string s3.bucket=${S3_BUCKET} \
 		--set-string s3.pathStyle=true \
+		--set-string s3.insecure=true \
 		--set-string s3.region=${S3_REGION} \
-		--set-string s3.hostname=${S3_HOSTNAME}
+		--set-string s3.hostname=${S3_HOSTNAME} \
+		-f my-values.yaml
 	echo waiting for pods
 	sleep 10
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
@@ -223,56 +273,3 @@ vault-shell:
 	@echo "🐚 Opening shell in Vault pod..."
 	@kubectl exec -it -n vault vault-0 -- /bin/sh
 
-# ============================================================================
-# MinIO Development Targets (Helm-based in-cluster deployment)
-# ============================================================================
-
-minio-dev:
-	@echo "🗄️  Installing MinIO in Kubernetes cluster..."
-	@helm repo add minio https://charts.min.io/ 2>/dev/null || true
-	@helm repo update minio
-	@kubectl create namespace minio 2>/dev/null || true
-	@helm upgrade --install minio minio/minio \
-		--namespace minio \
-		--set mode=standalone \
-		--set replicas=1 \
-		--set persistence.enabled=false \
-		--set resources.requests.memory=512Mi \
-		--set rootUser=minioadmin \
-		--set rootPassword=minioadmin \
-		--set consoleService.type=ClusterIP \
-		--set service.type=ClusterIP \
-		--wait --timeout 3m
-	@echo "⏳ Waiting for MinIO to be ready..."
-	@kubectl wait --for=condition=Ready pod -l app=minio -n minio --timeout=120s
-	@echo "✅ MinIO running in cluster"
-	@echo "   Namespace: minio"
-	@echo "   Service: minio.minio.svc.cluster.local:9000"
-	@echo "   Console: minio.minio.svc.cluster.local:9001"
-	@echo "   Access Key: minioadmin"
-	@echo "   Secret Key: minioadmin"
-	@echo ""
-	@echo "💡 To access MinIO Console, run: kubectl port-forward -n minio svc/minio-console 9001:9001"
-	@echo "💡 To access MinIO API, run: kubectl port-forward -n minio svc/minio 9000:9000"
-
-minio-status:
-	@echo "🔍 Checking MinIO status..."
-	@kubectl get pods -n minio -l app=minio 2>/dev/null || echo "❌ MinIO not running. Run 'make minio-dev' first."
-
-minio-create-bucket:
-	@echo "🪣 Creating default bucket 'argo-artifacts'..."
-	@kubectl run -n minio mc-client --rm -i --restart=Never --image=minio/mc -- \
-		sh -c "mc alias set myminio http://minio.minio.svc.cluster.local:9000 minioadmin minioadmin && \
-		       mc mb myminio/argo-artifacts --ignore-existing && \
-		       mc anonymous set download myminio/argo-artifacts" || true
-	@echo "✅ Bucket created"
-
-minio-cleanup:
-	@echo "🧹 Cleaning up MinIO..."
-	@helm uninstall minio -n minio 2>/dev/null || true
-	@kubectl delete namespace minio 2>/dev/null || true
-	@echo "✅ MinIO removed"
-
-minio-shell:
-	@echo "🐚 Opening shell in MinIO pod..."
-	@kubectl exec -it -n minio $$(kubectl get pod -n minio -l app=minio -o jsonpath='{.items[0].metadata.name}') -- /bin/sh
