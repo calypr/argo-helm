@@ -27,6 +27,11 @@ authzAdapter:
 s3:
   enabled: false
 
+# Disable External Secrets for ct
+externalSecrets:
+  enabled: false
+  installOperator: false
+
 # Ensure Argo Workflows server is up (HTTP) and controller installs
 argo-workflows:
   server:
