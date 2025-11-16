@@ -13,6 +13,123 @@ namespaces:
   argo-events: argo-events
 
 # ============================================================================
+# External Secrets Operator (ESO) and Vault Integration
+# ============================================================================
+
+externalSecrets:
+  # Enable External Secrets integration
+  enabled: false
+  
+  # Install External Secrets Operator as a dependency
+  # Set to false if ESO is already installed cluster-wide
+  installOperator: false
+  
+  # External Secrets Operator configuration (when installOperator=true)
+  # These values are passed to the external-secrets subchart
+  external-secrets:
+    installCRDs: true
+    # Namespace where ESO will be installed
+    # Note: Leave empty to use the release namespace
+    namespaceOverride: ""
+    # Additional operator configuration can be added here
+    # See: https://github.com/external-secrets/external-secrets/tree/main/deploy/charts/external-secrets
+  
+  # HashiCorp Vault provider configuration
+  vault:
+    enabled: true
+    # Vault server address (required when vault.enabled=true)
+    address: "http://vault.vault.svc.cluster.local:8200"
+    
+    # Optional: CA bundle for TLS verification
+    # Reference to a Secret containing the CA certificate
+    caBundleSecretName: ""
+    caBundleSecretKey: "ca.crt"
+    
+    # Vault authentication configuration
+    auth:
+      # Auth method: kubernetes, jwt, or approle
+      method: "kubernetes"
+      
+      # Path where the auth method is mounted in Vault
+      mount: "kubernetes"
+      
+      # Vault role name for authentication
+      role: "argo-stack"
+      
+      # ServiceAccount used by SecretStore for Kubernetes auth
+      # This SA must have permissions to authenticate with Vault
+      serviceAccountName: "eso-vault-auth"
+      
+      # AppRole configuration (when method=approle)
+      approle:
+        roleId: ""
+        # Secret reference for AppRole secret ID
+        secretRef:
+          name: "vault-approle-secret"
+          key: "secretId"
+    
+    # KV secrets engine configuration
+    kv:
+      # KV engine version (1 or 2)
+      engineVersion: 2
+      
+      # Default path prefix for all secrets
+      # Individual secret paths are relative to this prefix
+      defaultPathPrefix: "kv/argo"
+    
+    # SecretStore scope
+    # Use "namespaced" for SecretStore (namespace-scoped)
+    # Use "cluster" for ClusterSecretStore (cluster-wide)
+    scope: "namespaced"
+    
+    # Namespace for SecretStore (ignored when scope=cluster)
+    namespace: "argocd"
+  
+  # Secret path mappings
+  # Format: "path#key" where path is relative to vault.kv.defaultPathPrefix
+  secrets:
+    # Argo CD secrets
+    argocd:
+      # Admin password for initial login
+      adminPasswordPath: "argocd/admin#password"
+      # Bcrypt hash of admin password (for argocd-secret)
+      adminPasswordBcryptPath: "argocd/admin#bcryptHash"
+      # OIDC client secret
+      ssoClientSecretPath: "argocd/oidc#clientSecret"
+      # Server secret key (for session signing)
+      serverSecretKeyPath: "argocd/server#secretKey"
+    
+    # Argo Workflows secrets
+    workflows:
+      # S3/artifact repository credentials
+      artifactAccessKeyPath: "workflows/artifacts#accessKey"
+      artifactSecretKeyPath: "workflows/artifacts#secretKey"
+      # OIDC client secret
+      ssoClientSecretPath: "workflows/oidc#clientSecret"
+    
+    # Authorization adapter secrets
+    authzAdapter:
+      # OIDC client secret
+      oidcClientSecretPath: "authz#clientSecret"
+    
+    # GitHub Events secrets
+    github:
+      # GitHub personal access token or webhook secret
+      tokenPath: "events/github#token"
+    
+    # Per-application S3 credentials
+    # These are used when applications define custom artifact storage
+    # Format: appName -> { accessKeyPath, secretKeyPath }
+    perAppS3: {}
+      # Example:
+      # nextflow-hello:
+      #   accessKeyPath: "apps/nextflow-hello/s3#accessKey"
+      #   secretKeyPath: "apps/nextflow-hello/s3#secretKey"
+      # nextflow-hello-2:
+      #   accessKeyPath: "apps/nextflow-hello-2/s3#accessKey"
+      #   secretKeyPath: "apps/nextflow-hello-2/s3#secretKey"
+
+# ============================================================================
 # Argo Workflows and Argo CD settings
 # ============================================================================
 

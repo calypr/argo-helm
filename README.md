@@ -72,6 +72,7 @@ See [README-use-cases.md](./README-use-cases.md)
 - **Per-request Authorization** - Real-time access control
 - **Service Account Management** - Automated RBAC configuration
 - **Secure Artifact Storage** - S3-compatible with encryption support
+- **🆕 Vault Integration** - HashiCorp Vault + External Secrets Operator for centralized secret management
 
 ### 🌐 Infrastructure
 - **NGINX Ingress Ready** - Production-grade external access
@@ -535,6 +536,65 @@ argoWorkflows:
         - email
         - groups
 ```
+
+### 🔐 Secret Management with Vault
+
+The chart supports **HashiCorp Vault** integration via **External Secrets Operator (ESO)** for centralized secret management:
+
+**Benefits:**
+- ✅ No plaintext secrets in Git or Helm values
+- ✅ Automatic secret rotation without redeployment
+- ✅ Centralized audit logging in Vault
+- ✅ Multi-tenant secret isolation with Vault policies
+
+**Quick Setup:**
+
+```yaml
+externalSecrets:
+  enabled: true
+  installOperator: true  # Set to false if ESO already installed
+  
+  vault:
+    enabled: true
+    address: "https://vault.example.com"
+    
+    auth:
+      method: "kubernetes"  # or "approle"
+      role: "argo-stack"
+      serviceAccountName: "eso-vault-auth"
+    
+    kv:
+      engineVersion: 2
+      defaultPathPrefix: "kv/argo"
+  
+  secrets:
+    argocd:
+      adminPasswordPath: "argocd/admin#password"
+      serverSecretKeyPath: "argocd/server#secretKey"
+    workflows:
+      artifactAccessKeyPath: "workflows/artifacts#accessKey"
+      artifactSecretKeyPath: "workflows/artifacts#secretKey"
+    github:
+      tokenPath: "events/github#token"
+```
+
+**Seed Vault with secrets:**
+
+```bash
+# For local development - install Vault, MinIO, and ESO
+make vault-dev vault-seed
+make minio-dev minio-create-bucket
+make eso-install
+
+# For production
+vault kv put kv/argo/argocd/admin password="SecurePassword123!"
+vault kv put kv/argo/workflows/artifacts accessKey="..." secretKey="..."
+vault kv put kv/argo/events/github token="ghp_..."
+```
+
+📖 **Full Guide:** See [docs/secrets-with-vault.md](docs/secrets-with-vault.md) for detailed configuration, rotation workflows, and best practices.
+
+📁 **Examples:** Check [examples/vault/](examples/vault/) for sample configurations with different auth methods.
 
 ---
 
