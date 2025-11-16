@@ -133,7 +133,7 @@ ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
-deploy: check-vars kind bump-limits vault-dev vault-seed deps minio eso-install
+deploy: check-vars kind bump-limits eso-install vault-dev vault-seed deps minio
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
