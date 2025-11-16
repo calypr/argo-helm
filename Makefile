@@ -137,13 +137,9 @@ deploy: check-vars kind bump-limits eso-install vault-dev vault-seed deps minio
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
-		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
-		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
 		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000 \
 		--set-string s3.enabled=${S3_ENABLED} \
-		--set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
-		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
 		--set-string s3.bucket=${S3_BUCKET} \
 		--set-string s3.pathStyle=true \
 		--set-string s3.insecure=true \
@@ -227,7 +223,7 @@ vault-seed:
 		clientSecret="test-oidc-secret-authz"
 	@echo "➡️  Creating secrets for GitHub Events..."
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/events/github \
-		token="ghp_test_token_replace_with_real_one"
+		token="$(GITHUB_PAT)" 
 	@echo "➡️  Creating per-app S3 credentials..."
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello/s3 \
 		accessKey="app1-access-key" \
