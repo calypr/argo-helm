@@ -18,7 +18,7 @@ namespaces:
 
 externalSecrets:
   # Enable External Secrets integration
-  enabled: false
+  enabled: true
   
   # Install External Secrets Operator as a dependency
   # Set to false if ESO is already installed cluster-wide
