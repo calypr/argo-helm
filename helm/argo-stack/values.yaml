@@ -71,7 +71,7 @@ externalSecrets:
     # KV secrets engine configuration
     kv:
       # KV engine version (1 or 2)
-      engineVersion: 2
+      engineVersion: "v2"
       
       # Default path prefix for all secrets
       # Individual secret paths are relative to this prefix
@@ -80,7 +80,7 @@ externalSecrets:
     # SecretStore scope
     # Use "namespaced" for SecretStore (namespace-scoped)
     # Use "cluster" for ClusterSecretStore (cluster-wide)
-    scope: "namespaced"
+    scope: "cluster"
     
     # Namespace for SecretStore (ignored when scope=cluster)
     namespace: "argocd"
@@ -115,7 +115,7 @@ externalSecrets:
     # GitHub Events secrets
     github:
       # GitHub personal access token or webhook secret
-      tokenPath: "events/github#token"
+      tokenPath: "kv/argo/events/github"
     
     # Per-application S3 credentials
     # These are used when applications define custom artifact storage

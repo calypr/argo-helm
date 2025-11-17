@@ -69,6 +69,7 @@ kubernetes:
   role: {{ .Values.externalSecrets.vault.auth.role | quote }}
   serviceAccountRef:
     name: {{ .Values.externalSecrets.vault.auth.serviceAccountName | quote }}
+    namespace: external-secrets-system
 {{- else if eq .Values.externalSecrets.vault.auth.method "jwt" }}
 jwt:
   path: {{ .Values.externalSecrets.vault.auth.mount | quote }}
