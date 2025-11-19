@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts all minio minio-ls
+.PHONY: deps lint template validate kind ct adapter test-artifacts all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup
 
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
@@ -8,6 +8,9 @@ S3_SECRET_ACCESS_KEY ?= minioadmin
 S3_BUCKET            ?= argo-artifacts
 S3_REGION            ?= us-east-1
 S3_HOSTNAME          ?= minio.minio-system.svc.cluster.local:9000
+
+# Vault configuration for local development (in-cluster deployment)
+VAULT_TOKEN          ?= root
 
 
 check-vars:
@@ -28,6 +31,7 @@ check-vars:
 
 deps:
 	helm repo add argo https://argoproj.github.io/argo-helm
+	helm repo add external-secrets https://charts.external-secrets.io
 	helm repo update
 	helm dependency build helm/argo-stack
 
@@ -115,21 +119,27 @@ minio-ls:
 		sh -c "mc alias set myminio http://minio.minio-system.svc.cluster.local:9000 minioadmin minioadmin && \
 		mc ls --recursive myminio/argo-artifacts" 2>&1 || echo "⚠️  Failed to list bucket contents"
 
+minio-cleanup:
+	@echo "🧹 Cleaning up MinIO..."
+	@helm uninstall minio -n minio-system 2>/dev/null || true
+	@kubectl delete namespace minio-system 2>/dev/null || true
+	@echo "✅ MinIO removed"
+
+minio-shell:
+	@echo "🐚 Opening shell in MinIO pod..."
+	@kubectl exec -it -n minio-system $$(kubectl get pod -n minio-system -l app=minio -o jsonpath='{.items[0].metadata.name}') -- /bin/sh
+
 ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
-deploy: check-vars kind bump-limits deps minio
+argo-stack: check-vars kind bump-limits eso-install vault-dev vault-seed deps minio vault-auth 
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
-		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
-		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
 		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000 \
 		--set-string s3.enabled=${S3_ENABLED} \
-		--set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
-		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
 		--set-string s3.bucket=${S3_BUCKET} \
 		--set-string s3.pathStyle=true \
 		--set-string s3.insecure=true \
@@ -138,6 +148,8 @@ deploy: check-vars kind bump-limits deps minio
 		-f my-values.yaml
 	echo waiting for pods
 	sleep 10
+
+deploy: argo-stack
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
 	echo starting port forwards
 	kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 --address=0.0.0.0 -n argo-workflows &
@@ -159,3 +171,142 @@ login:
 	argocd login localhost:8080 --skip-test-tls --insecure --name admin --password `kubectl get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"  -n argocd | base64 -d`
 
 all: lint template validate kind ct adapter test-artifacts
+
+# ============================================================================
+# Vault Development Targets (Helm-based in-cluster deployment)
+# ============================================================================
+
+vault-dev:
+	@echo "🔐 Installing Vault dev server in Kubernetes cluster..."
+	@helm repo add hashicorp https://helm.releases.hashicorp.com 2>/dev/null || true
+	@helm repo update hashicorp
+	@kubectl create namespace vault 2>/dev/null || true
+	@helm upgrade --install vault hashicorp/vault \
+		--namespace vault \
+		--set server.dev.enabled=true \
+		--set server.dev.devRootToken=$(VAULT_TOKEN) \
+		--set injector.enabled=false \
+		--set ui.enabled=true \
+		--set server.dataStorage.enabled=false \
+		--wait --timeout 2m
+	@echo "⏳ Waiting for Vault to be ready..."
+	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=vault -n vault --timeout=120s
+	@echo "✅ Vault dev server running in cluster"
+	@echo "   Namespace: vault"
+	@echo "   Service: vault.vault.svc.cluster.local:8200"
+	@echo "   Root token: $(VAULT_TOKEN)"
+	@echo ""
+	@echo "💡 To access Vault UI, run: kubectl port-forward -n vault svc/vault 8200:8200"
+
+vault-status:
+	@echo "🔍 Checking Vault status..."
+	@kubectl exec -n vault vault-0 -- vault status 2>/dev/null || echo "❌ Vault not running. Run 'make vault-dev' first."
+
+vault-seed:
+	@echo "🌱 Seeding Vault with test secrets..."
+	@echo "➡️  Enabling KV v2 secrets engine..."
+	@kubectl exec -n vault vault-0 -- vault secrets enable -version=2 -path=kv kv 2>/dev/null || echo "   (KV already enabled)"
+	@echo "➡️  Creating secrets for Argo CD..."
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/argocd/admin \
+		password="admin123456" \
+		bcryptHash='$$2a$$10$$rRyBkqjtRlpvrut4WyTp0eSx5qbHJUh.O7Ql0kp.VeGAHu8xfKKVi'
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/argocd/oidc \
+		clientSecret="test-oidc-secret-argocd"
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/argocd/server \
+		secretKey="$$(openssl rand -hex 32)"
+	@echo "➡️  Creating secrets for Argo Workflows..."
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/workflows/artifacts \
+		accessKey="minioadmin" \
+		secretKey="minioadmin"
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/workflows/oidc \
+		clientSecret="test-oidc-secret-workflows"
+	@echo "➡️  Creating secrets for authz-adapter..."
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/authz \
+		clientSecret="test-oidc-secret-authz"
+	@echo "➡️  Creating secrets for GitHub Events..."
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/events/github \
+		token="$(GITHUB_PAT)" 
+	@echo "➡️  Creating per-app S3 credentials..."
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello/s3 \
+		accessKey="app1-access-key" \
+		secretKey="app1-secret-key"
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-2/s3 \
+		accessKey="app2-access-key" \
+		secretKey="app2-secret-key"
+	@echo "➡️  Enabling Kubernetes auth method..."
+	@kubectl exec -n vault vault-0 -- vault auth enable kubernetes 2>/dev/null || echo "   (Kubernetes auth already enabled)"
+	@echo "➡️  Configuring Kubernetes auth..."
+	@kubectl exec -n vault vault-0 -- sh -c 'vault write auth/kubernetes/config \
+		kubernetes_host="https://$$KUBERNETES_PORT_443_TCP_ADDR:443"' 2>/dev/null || echo "   (Kubernetes auth already configured)"
+	@echo "✅ Vault seeded with test data"
+	@echo ""
+	@echo "📋 Available secrets:"
+	@echo "   kv/argo/argocd/admin        - Argo CD admin credentials"
+	@echo "   kv/argo/argocd/oidc         - Argo CD OIDC client secret"
+	@echo "   kv/argo/argocd/server       - Argo CD server secret key"
+	@echo "   kv/argo/workflows/artifacts - Workflow artifact storage credentials"
+	@echo "   kv/argo/workflows/oidc      - Workflow OIDC client secret"
+	@echo "   kv/argo/authz               - AuthZ adapter OIDC secret"
+	@echo "   kv/argo/events/github       - GitHub webhook token"
+	@echo "   kv/argo/apps/*/s3           - Per-app S3 credentials"
+
+vault-list:
+	@echo "📋 Listing all secrets in Vault..."
+	@kubectl exec -n vault vault-0 -- vault kv list -format=json kv/argo 2>/dev/null || echo "❌ No secrets found or Vault not running"
+
+vault-get:
+	@if [ -z "$(VPATH)" ]; then \
+		echo "❌ Usage: make vault-get VPATH=kv/argo/argocd/admin"; \
+		exit 1; \
+	fi
+	@kubectl exec -n vault vault-0 -- vault kv get -format=json $(VPATH)
+
+vault-cleanup:
+	@echo "🧹 Cleaning up Vault dev server..."
+	@helm uninstall vault -n vault 2>/dev/null || true
+	@kubectl delete namespace vault 2>/dev/null || true
+	@echo "✅ Vault dev server removed"
+
+vault-auth:
+	@echo "🧹 Binding ServiceAccount to Vault dev server..."
+	@printf '%s\n' 'path "kv/data/argo/*" {' '  capabilities = ["read"]' '}' \
+	  | kubectl exec -i -n vault vault-0 -- vault policy write argo-stack -
+	@kubectl exec -n vault vault-0 -- vault write auth/kubernetes/role/argo-stack \
+                bound_service_account_names=eso-vault-auth \
+                bound_service_account_namespaces=external-secrets-system \
+                policies=argo-stack \
+                ttl=1h
+	@kubectl exec -n vault vault-0 -- vault read auth/kubernetes/role/argo-stack
+	@echo "✅ Service account to Vault dev server added"
+vault-shell:
+	@echo "🐚 Opening shell in Vault pod..."
+	@kubectl exec -it -n vault vault-0 -- /bin/sh
+
+# ============================================================================
+# External Secrets Operator Installation
+# ============================================================================
+
+eso-install:
+	@echo "🔐 Installing External Secrets Operator..."
+	@helm repo add external-secrets https://charts.external-secrets.io 2>/dev/null || true
+	@helm repo update external-secrets
+	@helm upgrade --install external-secrets external-secrets/external-secrets \
+		--namespace external-secrets-system --create-namespace \
+		--set installCRDs=true \
+		--wait --timeout 3m
+	@echo "⏳ Waiting for External Secrets Operator to be ready..."
+	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=external-secrets -n external-secrets-system --timeout=120s
+	@echo "⏳ Waiting for CRDs to be established..."
+	@kubectl wait --for condition=established --timeout=60s crd/externalsecrets.external-secrets.io crd/secretstores.external-secrets.io crd/clustersecretstores.external-secrets.io
+	@echo "✅ External Secrets Operator installed successfully"
+
+eso-status:
+	@echo "🔍 Checking External Secrets Operator status..."
+	@kubectl get pods -n external-secrets-system -l app.kubernetes.io/name=external-secrets 2>/dev/null || echo "❌ ESO not running. Run 'make eso-install' first."
+
+eso-cleanup:
+	@echo "🧹 Cleaning up External Secrets Operator..."
+	@helm uninstall external-secrets -n external-secrets-system 2>/dev/null || true
+	@kubectl delete namespace external-secrets-system 2>/dev/null || true
+	@echo "✅ External Secrets Operator removed"
+

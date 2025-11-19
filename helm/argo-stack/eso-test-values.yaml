@@ -1,0 +1,77 @@
+# Test values for External Secrets Operator integration
+# This file is used for testing ESO template rendering
+
+namespaces:
+  argo: argo-workflows
+  argocd: argocd
+  tenant: wf-poc
+  security: security
+  argo-events: argo-events
+
+# Enable External Secrets
+externalSecrets:
+  enabled: true
+  installOperator: false  # Assume ESO is already installed for tests
+  
+  vault:
+    enabled: true
+    address: "http://vault.vault.svc.cluster.local:8200"
+    
+    auth:
+      method: "kubernetes"
+      mount: "kubernetes"
+      role: "argo-stack"
+      serviceAccountName: "eso-vault-auth"
+    
+    kv:
+      engineVersion: 2
+      defaultPathPrefix: "kv/argo"
+    
+    scope: "namespaced"
+    namespace: "argocd"
+  
+  secrets:
+    argocd:
+      adminPasswordPath: "argocd/admin#password"
+      serverSecretKeyPath: "argocd/server#secretKey"
+    
+    workflows:
+      artifactAccessKeyPath: "workflows/artifacts#accessKey"
+      artifactSecretKeyPath: "workflows/artifacts#secretKey"
+    
+    github:
+      tokenPath: "events/github#token"
+
+# Enable S3 (credentials from Vault)
+s3:
+  enabled: true
+  hostname: "s3.amazonaws.com"
+  bucket: "test-bucket"
+  region: "us-west-2"
+
+# Enable GitHub Events (token from Vault)
+events:
+  enabled: true
+  github:
+    enabled: true
+    secret:
+      create: true
+      name: "github-secret"
+      tokenKey: "token"
+    repositories:
+      - eventName: repo_push_test
+        owner: testowner
+        repository: testrepo
+        events: ["push"]
+        active: true
+
+# Disable heavy dependencies for testing
+argo-cd:
+  enabled: false
+
+argo-workflows:
+  enabled: false
+
+authzAdapter:
+  enabled: true
+  replicas: 1

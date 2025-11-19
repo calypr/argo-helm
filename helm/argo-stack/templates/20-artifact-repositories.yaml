@@ -1,4 +1,5 @@
 {{- if .Values.s3.enabled }}
+{{- if not (include "argo-stack.vault.enabled" .) }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -9,6 +10,7 @@ stringData:
   AWS_ACCESS_KEY_ID: {{ .Values.s3.accessKeyId | quote  }}
   AWS_SECRET_ACCESS_KEY: {{ .Values.s3.secretAccessKey | quote  }}
 ---
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
