@@ -1,0 +1,99 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: nextflow-runner
+  namespace: wf-poc
+spec:
+  artifactRepositoryRef:
+    configMap: artifact-repositories
+    key: default-v1
+  entrypoint: run
+  arguments:
+    parameters:
+      - name: pipeline
+        value: "./"                  # or a remote repo
+      - name: params
+        value: ""                    # e.g., --reads 's3://bucket/*.fastq.gz'
+      - name: use_k8s
+        value: "true"                # set to "false" to test local executor
+  templates:
+    - name: run
+      serviceAccountName: nextflow-launcher
+      container:
+        image: eclipse-temurin:17-jre-jammy   # multi-arch
+        imagePullPolicy: IfNotPresent
+        workingDir: /workspace
+        command: ["/bin/bash","-lc"]
+        args:
+          - |
+            set -euxo pipefail
+            mkdir -p /workspace
+
+            echo "== install helpers & nextflow =="
+            apt-get update -y
+            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl git ca-certificates coreutils
+            curl -fsSL https://get.nextflow.io | bash
+            mv nextflow /usr/local/bin/
+            nextflow -version
+
+            # Mount cluster k8s profile if present; ignore if missing
+            cp /config/nextflow.config ./nextflow.config || true
+
+            # If pipeline=./, write a tiny pipeline WITHOUT heredocs
+            if [ "{{workflow.parameters.pipeline}}" = "./" ]; then
+              printf '%s\n'                 'nextflow.enable.dsl=2'                 ''                 'process HELLO {'                 "  output: path 'hello.txt'"                 '  """'                 '  echo "hello nextflow (no heredoc)" > hello.txt'                 '  """'                 '}'                 ''                 'workflow { HELLO() }'                 > main.nf
+              PIPE="./"
+            else
+              PIPE="-r {{workflow.parameters.pipeline}}"
+            fi
+
+            # Choose executor/profile
+            if [ "{{workflow.parameters.use_k8s}}" = "true" ]; then
+              PROFILE="-profile k8s"
+            else
+              PROFILE=""
+            fi
+
+            # Work directory (S3 if provided; else local)
+            if [ -n "${NF_WORKDIR:-}" ]; then
+              WARG="-w ${NF_WORKDIR}"
+            else
+              echo "NF_WORKDIR empty; using local /workspace/work"
+              mkdir -p /workspace/work
+              WARG="-w /workspace/work"
+            fi
+
+            export NXF_HOME="/workspace/.nxf"
+            export NXF_VER=${NXF_VER:-"23.10.1"}
+            export NXF_ANSI_LOG=false
+
+            echo "== running =="
+            set +x
+            echo "nextflow run $PIPE $PROFILE $WARG {{workflow.parameters.params}} -with-report report.html -with-timeline timeline.html -with-trace trace.txt"
+            set -x
+            nextflow run $PIPE $PROFILE $WARG {{workflow.parameters.params}}               -with-report report.html -with-timeline timeline.html -with-trace trace.txt
+      env:
+        - name: AWS_REGION
+          valueFrom: { secretKeyRef: { name: s3-credentials, key: AWS_REGION } }
+        - name: AWS_ACCESS_KEY_ID
+          valueFrom: { secretKeyRef: { name: s3-credentials, key: AWS_ACCESS_KEY_ID } }
+        - name: AWS_SECRET_ACCESS_KEY
+          valueFrom: { secretKeyRef: { name: s3-credentials, key: AWS_SECRET_ACCESS_KEY } }
+        - name: NF_WORKDIR
+          valueFrom: { secretKeyRef: { name: s3-credentials, key: NF_WORKDIR } }
+        # For S3-compatible endpoints, also add S3_ENDPOINT in the Secret
+      volumeMounts:
+        - name: cfg
+          mountPath: /config
+      volumes:
+        - name: cfg
+          configMap:
+            name: nextflow-config
+      outputs:
+        artifacts:
+          - name: report
+            path: /workspace/report.html
+          - name: timeline
+            path: /workspace/timeline.html
+          - name: trace
+            path: /workspace/trace.txt
