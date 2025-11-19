@@ -75,7 +75,7 @@ externalSecrets:
       
       # Default path prefix for all secrets
       # Individual secret paths are relative to this prefix
-      defaultPathPrefix: "kv/argo"
+      defaultPathPrefix: "kv"
     
     # SecretStore scope
     # Use "namespaced" for SecretStore (namespace-scoped)
@@ -115,7 +115,7 @@ externalSecrets:
     # GitHub Events secrets
     github:
       # GitHub personal access token or webhook secret
-      tokenPath: "kv/argo/events/github"
+      tokenPath: "argo/events/github"
     
     # Per-application S3 credentials
     # These are used when applications define custom artifact storage

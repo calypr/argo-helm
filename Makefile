@@ -133,7 +133,7 @@ ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
-argo-stack: check-vars kind bump-limits eso-install vault-dev vault-seed deps minio
+argo-stack: check-vars kind bump-limits eso-install vault-dev vault-seed deps minio vault-auth 
 	helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
@@ -149,7 +149,7 @@ argo-stack: check-vars kind bump-limits eso-install vault-dev vault-seed deps mi
 	echo waiting for pods
 	sleep 10
 
-deploy: argo-stack vault-auth
+deploy: argo-stack
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
 	echo starting port forwards
 	kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 --address=0.0.0.0 -n argo-workflows &
@@ -269,11 +269,14 @@ vault-cleanup:
 
 vault-auth:
 	@echo "🧹 Binding ServiceAccount to Vault dev server..."
+	@printf '%s\n' 'path "kv/data/argo/*" {' '  capabilities = ["read"]' '}' \
+	  | kubectl exec -i -n vault vault-0 -- vault policy write argo-stack -
 	@kubectl exec -n vault vault-0 -- vault write auth/kubernetes/role/argo-stack \
                 bound_service_account_names=eso-vault-auth \
-                bound_service_account_namespaces=argocd \
+                bound_service_account_namespaces=external-secrets-system \
                 policies=argo-stack \
                 ttl=1h
+	@kubectl exec -n vault vault-0 -- vault read auth/kubernetes/role/argo-stack
 	@echo "✅ Service account to Vault dev server added"
 vault-shell:
 	@echo "🐚 Opening shell in Vault pod..."
