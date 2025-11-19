@@ -102,10 +102,10 @@ externalSecrets:
     # Argo Workflows secrets
     workflows:
       # S3/artifact repository credentials
-      artifactAccessKeyPath: "workflows/artifacts#accessKey"
-      artifactSecretKeyPath: "workflows/artifacts#secretKey"
+      artifactAccessKeyPath: "argo/workflows/artifacts"
+      artifactSecretKeyPath: "argo/workflows/artifacts"
       # OIDC client secret
-      ssoClientSecretPath: "workflows/oidc#clientSecret"
+      ssoClientSecretPath: "argo/workflows/oidc/clientSecret"
     
     # Authorization adapter secrets
     authzAdapter:
