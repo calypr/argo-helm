@@ -5,6 +5,10 @@ metadata:
   namespace: {{ .Values.namespaces.argo }}
   labels:
     app.kubernetes.io/name: argo-stack
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
 spec:
   entrypoint: run-nextflow
   arguments:

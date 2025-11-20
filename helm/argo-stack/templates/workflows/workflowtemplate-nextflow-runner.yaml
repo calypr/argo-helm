@@ -2,12 +2,16 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: nextflow-runner
-  namespace: {{ .Values.namespaces.tenant }}
+  namespace: {{ .Values.namespaces.argo }}
   labels:
     app.kubernetes.io/name: nextflow-runner
     app.kubernetes.io/component: workflow
     app.kubernetes.io/part-of: argo-stack
     app.kubernetes.io/version: "1.0.0"
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
 spec:
   artifactRepositoryRef:
     configMap: artifact-repositories
