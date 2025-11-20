@@ -411,7 +411,19 @@ kubectl get namespaces | grep -E "(argo|security|wf-poc)"
 
 ## ⚙️ Configuration
 
-### 🔐 Authorization Adapter Configuration
+##### ⚠️ Deprecation Notice - Legacy Configuration Pattern
+
+**The legacy configuration pattern using `.Values.applications` has been REMOVED.**
+
+For self-service repository onboarding with automated secret management, S3 bucket configuration, and access control, use the **RepoRegistration** pattern instead.
+
+See:
+- [Deprecation Notice](docs/DEPRECATION_NOTICE.md) for migration guidance
+- [RepoRegistration User Guide](docs/REPO_REGISTRATION_USER_GUIDE.md) for the new pattern
+
+---
+
+# 🔐 Authorization Adapter Configuration
 
 The authorization adapter supports flexible configuration:
 
