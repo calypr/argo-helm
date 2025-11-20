@@ -43,6 +43,8 @@ spec:
         args:
           - |
             set -euo pipefail
+            echo "Installing git..."
+            apk add --no-cache git
             echo "Cloning repo: {{workflow.parameters.repo-url}}"
             git clone {{workflow.parameters.repo-url}} repo
             cd repo

@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: nextflow-runner
-  namespace: wf-poc
+  namespace: {{ .Values.namespaces.tenant }}
   labels:
     app.kubernetes.io/name: nextflow-runner
     app.kubernetes.io/component: workflow
@@ -45,7 +45,18 @@ spec:
 
             # If pipeline=./, write a tiny pipeline WITHOUT heredocs
             if [ "{{workflow.parameters.pipeline}}" = "./" ]; then
-              printf '%s\n'                 'nextflow.enable.dsl=2'                 ''                 'process HELLO {'                 "  output: path 'hello.txt'"                 '  """'                 '  echo "hello nextflow (no heredoc)" > hello.txt'                 '  """'                 '}'                 ''                 'workflow { HELLO() }'                 > main.nf
+              cat > main.nf <<'EOF'
+nextflow.enable.dsl=2
+
+process HELLO {
+  output: path 'hello.txt'
+  """
+  echo "hello nextflow (no heredoc)" > hello.txt
+  """
+}
+
+workflow { HELLO() }
+EOF
               PIPE="./"
             else
               PIPE="-r {{workflow.parameters.pipeline}}"
@@ -96,7 +107,7 @@ spec:
       volumes:
         - name: cfg
           configMap:
-            name: nextflow-config
+            name: {{ .Values.configMapName | default "nextflow-config" }}
         - name: s3-credentials
           secret:
             secretName: s3-credentials
