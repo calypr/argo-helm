@@ -197,7 +197,7 @@ metadata:
 
 ### Hook Delete Policy
 
-All hooks use `before-hook-creation` delete policy:
+Most hooks use `before-hook-creation` delete policy:
 
 ```yaml
 helm.sh/hook-delete-policy: before-hook-creation
@@ -208,6 +208,33 @@ helm.sh/hook-delete-policy: before-hook-creation
 - Prevents conflicts from previous installations
 - Ensures clean state for each Helm operation
 - Resources created by hooks persist after the hook completes (they're not auto-deleted)
+
+**Exception: ExternalSecret Resources**
+
+ExternalSecret resources do NOT use `hook-delete-policy`. This matches the pattern in `externalsecret-argocd.yaml` and prevents deletion errors during Helm operations.
+
+```yaml
+# ExternalSecrets only have these annotations:
+metadata:
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
+    # NO helm.sh/hook-delete-policy
+```
+
+**Why no delete policy for ExternalSecrets?**
+
+During Helm upgrades with `before-hook-creation` policy:
+1. Helm attempts to delete old ExternalSecret hook resources
+2. This deletion requires Helm to understand the ExternalSecret CRD
+3. At the deletion phase, there can be timing issues where the CRD is not properly recognized
+4. This causes errors like: `unable to build kubernetes object for deleting hook ... no matches for kind "ExternalSecret"`
+
+Without the delete policy:
+- ExternalSecrets persist across upgrades
+- ESO automatically updates the underlying Secrets when the ExternalSecret spec changes
+- No deletion/recreation is needed
+- The ExternalSecret controller handles all updates gracefully
 
 ---
 
