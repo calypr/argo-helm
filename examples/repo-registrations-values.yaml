@@ -161,11 +161,6 @@ repoRegistrations:
       - student@research.edu
     
     isPublic: false
-    
-    # EventSource configuration
-    eventName: repo_push_nextflow_hello
-    events: ["push"]
-    active: true
 
   # Example 2: Genomics pipeline with separate artifact and data buckets
   - name: genomics-variant-calling
@@ -206,9 +201,6 @@ repoRegistrations:
       - collaborator@partner.edu
     
     isPublic: false
-    eventName: repo_push_genomics
-    events: ["push"]
-    active: true
 
   # Example 3: Using MinIO (local development)
   - name: local-dev-workflows
@@ -233,9 +225,6 @@ repoRegistrations:
       - devops@company.com
     
     isPublic: false
-    eventName: repo_push_local_dev
-    events: ["push"]
-    active: true
 
 # Workflow templates
 workflowTemplates:
