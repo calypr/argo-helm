@@ -16,6 +16,9 @@ spec:
       - name: revision
         description: "Git revision (branch, tag, or SHA) to run."
         value: "main"
+      - name: pipeline-file
+        description: "Nextflow pipeline entry point file (e.g., main.nf, workflow.nf, pipeline.nf)."
+        value: "main.nf"
       - name: work-dir
         description: "Work directory inside the container."
         value: "/workspace"
@@ -58,7 +61,7 @@ spec:
             export NXF_S3_REGION="{{workflow.parameters.artifact-region}}"
 
             echo "Running Nextflow pipeline..."
-            nextflow run main.nf -with-report report.html -with-trace -with-timeline timeline.html
+            nextflow run {{workflow.parameters.pipeline-file}} -with-report report.html -with-trace -with-timeline timeline.html
 
         env:
           - name: NXF_HOME
