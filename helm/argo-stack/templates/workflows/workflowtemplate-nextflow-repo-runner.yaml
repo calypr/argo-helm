@@ -23,12 +23,6 @@ spec:
         description: "Artifact S3 endpoint hostname/URL."
       - name: artifact-region
         description: "Artifact S3 region."
-      - name: data-bucket
-        description: "Data bucket name (from RepoRegistration.spec.dataBucket.bucket)."
-      - name: data-endpoint
-        description: "Data S3 endpoint hostname/URL."
-      - name: data-region
-        description: "Data S3 region."
 
   templates:
     - name: run-nextflow
@@ -49,9 +43,8 @@ spec:
             cd repo
             git checkout {{workflow.parameters.revision}}
 
-            echo "Configuring S3 environment for artifacts and data..."
+            echo "Configuring S3 environment for artifacts..."
             echo "Artifact bucket: {{workflow.parameters.artifact-bucket}}"
-            echo "Data bucket: {{workflow.parameters.data-bucket}}"
 
             # AWS credentials from s3-credentials Secret
             export AWS_ACCESS_KEY_ID="$(cat /secrets/s3/AWS_ACCESS_KEY_ID)"
