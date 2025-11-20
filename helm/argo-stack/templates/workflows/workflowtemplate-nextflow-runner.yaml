@@ -29,7 +29,9 @@ spec:
     - name: run
       serviceAccountName: nextflow-launcher
       container:
-        image: eclipse-temurin:17-jre-jammy   # multi-arch
+        # Custom image with Nextflow and dependencies pre-installed
+        # See nextflow-runner/Dockerfile for build instructions
+        image: nextflow-runner:latest
         imagePullPolicy: IfNotPresent
         workingDir: /workspace
         command: ["/bin/bash","-lc"]
@@ -37,13 +39,6 @@ spec:
           - |
             set -euxo pipefail
             mkdir -p /workspace
-
-            echo "== install helpers & nextflow =="
-            apt-get update -y
-            DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends curl git ca-certificates coreutils
-            curl -fsSL https://get.nextflow.io | bash
-            mv nextflow /usr/local/bin/
-            nextflow -version
 
             # Mount cluster k8s profile if present; ignore if missing
             cp /config/nextflow.config ./nextflow.config || true
