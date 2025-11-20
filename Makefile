@@ -330,7 +330,9 @@ eso-install:
 	@echo "⏳ Waiting for External Secrets Operator to be ready..."
 	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=external-secrets -n external-secrets-system --timeout=120s
 	@echo "⏳ Waiting for CRDs to be established..."
-	@kubectl wait --for condition=established --timeout=60s crd/externalsecrets.external-secrets.io crd/secretstores.external-secrets.io crd/clustersecretstores.external-secrets.io
+	@kubectl wait --for condition=established --timeout=60s crd/externalsecrets.external-secrets.io
+	@kubectl wait --for condition=established --timeout=60s crd/secretstores.external-secrets.io
+	@kubectl wait --for condition=established --timeout=60s crd/clustersecretstores.external-secrets.io
 	@echo "✅ External Secrets Operator installed successfully"
 
 eso-status:
