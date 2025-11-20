@@ -9,6 +9,8 @@ spec:
   entrypoint: run-nextflow
   arguments:
     parameters:
+      - name: repo-name
+        description: "Repository name or identifier for accessing repo-specific secrets."
       - name: repo-url
         description: "Git repo containing the Nextflow pipeline."
       - name: revision
@@ -76,5 +78,5 @@ spec:
       volumes:
         - name: s3-credentials
           secret:
-            secretName: s3-credentials-{{workflow.name}}
+            secretName: s3-cred-{{workflow.parameters.repo-name}}
             optional: false
