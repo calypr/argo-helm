@@ -74,6 +74,12 @@ See [README-use-cases.md](./README-use-cases.md)
 - **Secure Artifact Storage** - S3-compatible with encryption support
 - **🆕 Vault Integration** - HashiCorp Vault + External Secrets Operator for centralized secret management
 
+### 🚀 Self-Service Features
+- **🆕 RepoRegistration CRD** - Self-service onboarding for GitHub repositories with automated webhook setup
+- **Per-Repository S3 Buckets** - Dedicated artifact and data storage with tenant isolation
+- **Automated Secret Management** - Vault-backed credentials via External Secrets Operator
+- **Fine-Grained Access Control** - Per-repository admin and read-only user management
+
 ### 🌐 Infrastructure
 - **NGINX Ingress Ready** - Production-grade external access
 - **Namespace Isolation** - Clean multi-tenant architecture
@@ -844,6 +850,52 @@ argocdApplication:
 - ✅ More explicit destination configuration
 - ✅ Better alignment with Argo CD's multi-tenancy model
 - ✅ Easier to manage complex deployments
+
+### 🎯 Self-Service Repository Registration
+
+For **automated, self-service onboarding** of GitHub repositories, use the `RepoRegistration` Custom Resource Definition (CRD). This enables developers to register their repositories without administrator intervention.
+
+**Key Features:**
+- ✅ Automated GitHub webhook setup
+- ✅ Dedicated S3 buckets for artifacts and data with tenant isolation
+- ✅ Vault-backed secret management via External Secrets Operator
+- ✅ Fine-grained user access control (admin vs. read-only)
+- ✅ Automatic reconciliation and lifecycle management
+
+**Quick Example:**
+
+```yaml
+apiVersion: platform.calypr.io/v1alpha1
+kind: RepoRegistration
+metadata:
+  name: my-nextflow-repo
+  namespace: argo
+spec:
+  # Required fields
+  repoUrl: https://github.com/myorg/my-nextflow-repo.git
+  tenant: myteam
+  workflowTemplateRef: nextflow-repo-runner
+  githubSecretName: my-repo-github-creds
+  
+  # Dedicated S3 buckets (optional)
+  artifactBucket:
+    hostname: https://s3.us-west-2.amazonaws.com
+    bucket: my-team-artifacts
+    region: us-west-2
+    externalSecretPath: kv/argo/apps/my-repo/s3/artifacts
+  
+  # User access control
+  adminUsers:
+    - admin@example.com
+  readUsers:
+    - viewer@example.com
+```
+
+📚 **Full Documentation:** See [User Guide - Self-Service Repository Registration](docs/user-guide.md#9-self-service-repository-registration) for:
+- Complete field reference
+- Multiple configuration examples (minimal, MinIO, AWS S3)
+- Troubleshooting guide
+- Security best practices
 
 ### 🔧 Custom Authorization Logic
 
