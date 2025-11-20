@@ -1,5 +1,6 @@
 {{- if .Values.repoRegistrations }}
 {{- range $reg := .Values.repoRegistrations }}
+{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
 ---
 # ArgoCD Application generated from RepoRegistration: {{ $reg.name }}
 apiVersion: argoproj.io/v1alpha1
@@ -28,7 +29,7 @@ spec:
     path: {{ $reg.path | default "." | quote }}
   destination:
     name: in-cluster
-    namespace: {{ $reg.namespace | default $.Values.namespaces.tenant | default "wf-poc" }}
+    namespace: {{ $namespace }}
   syncPolicy:
     {{- if $reg.syncPolicy }}
     {{- if $reg.syncPolicy.automated }}

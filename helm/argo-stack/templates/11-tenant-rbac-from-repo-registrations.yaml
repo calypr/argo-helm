@@ -1,0 +1,130 @@
+{{- if .Values.repoRegistrations }}
+{{- range $reg := .Values.repoRegistrations }}
+{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+---
+# ServiceAccount for workflows in tenant namespace: {{ $reg.name }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: workflow-runner
+  namespace: {{ $namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $reg.name }}
+    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/component: workflow-executor
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+  annotations:
+    repo-registration/name: {{ $reg.name | quote }}
+---
+# Role for workflow execution in tenant namespace: {{ $reg.name }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: workflow-executor
+  namespace: {{ $namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $reg.name }}
+    app.kubernetes.io/part-of: argo-stack
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+rules:
+  - apiGroups: ["", "batch"]
+    resources: ["pods","pods/log","pods/status","jobs"]
+    verbs: ["create","get","list","watch","delete","patch","update"]
+  - apiGroups: ["argoproj.io"]
+    resources:
+      - workflows
+      - workflowtemplates
+      - cronworkflows
+      - workflowtaskresults
+      - workflowtasksets
+      - workfloweventbindings
+    verbs: ["create","get","list","watch","delete","patch","update"]
+  - apiGroups: [""]
+    resources: ["secrets", "configmaps"]
+    verbs: ["get", "list"]
+---
+# RoleBinding for workflow execution in tenant namespace: {{ $reg.name }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: workflow-executor-binding
+  namespace: {{ $namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $reg.name }}
+    app.kubernetes.io/part-of: argo-stack
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: workflow-executor
+subjects:
+  - kind: ServiceAccount
+    name: workflow-runner
+    namespace: {{ $namespace }}
+---
+# Role for Argo Events Sensor to create workflows in tenant namespace: {{ $reg.name }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sensor-workflow-creator
+  namespace: {{ $namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $reg.name }}
+    app.kubernetes.io/part-of: argo-stack
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows"]
+    verbs:
+      - create
+      - get
+      - list
+      - watch
+      - patch
+      - update
+      - delete
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflowtemplates"]
+    verbs:
+      - get
+      - list
+      - watch
+---
+# RoleBinding for Argo Events Sensor to create workflows in tenant namespace: {{ $reg.name }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sensor-workflow-creator-binding
+  namespace: {{ $namespace }}
+  labels:
+    app.kubernetes.io/name: {{ $reg.name }}
+    app.kubernetes.io/part-of: argo-stack
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sensor-workflow-creator
+subjects:
+  - kind: ServiceAccount
+    name: wf-runner
+    namespace: {{ $.Values.namespaces.argoEvents | default "argo-events" }}
+  - kind: ServiceAccount
+    name: default
+    namespace: {{ $.Values.namespaces.argoEvents | default "argo-events" }}
+{{- end }}
+{{- end }}

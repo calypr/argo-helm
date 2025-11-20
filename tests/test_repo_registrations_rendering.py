@@ -50,19 +50,61 @@ class TestRepoRegistrationsRendering:
         """Run helm template and capture output."""
         print("\n🔧 Rendering Helm templates...")
         
-        cmd = [
-            'helm', 'template', 'argo-stack', str(cls.chart_dir),
-            '--values', str(cls.values_file),
-            '--set-string', f'events.github.secret.tokenValue={os.environ["GITHUB_PAT"]}',
-            '--set-string', f'argo-cd.configs.secret.extra.server\\.secretkey={os.environ["ARGOCD_SECRET_KEY"]}',
-            '--set-string', f'events.github.webhook.ingress.hosts[0]={os.environ["ARGO_HOSTNAME"]}',
-            '--set-string', f'events.github.webhook.url=http://{os.environ["ARGO_HOSTNAME"]}:12000',
-            '--set-string', f's3.enabled={os.environ["S3_ENABLED"]}',
-            '--set-string', f's3.accessKeyId={os.environ["S3_ACCESS_KEY_ID"]}',
-            '--set-string', f's3.secretAccessKey={os.environ["S3_SECRET_ACCESS_KEY"]}',
-        ]
+        # Temporarily disable problematic dependencies for testing
+        import shutil
+        chart_yaml = cls.chart_dir / "Chart.yaml"
+        chart_yaml_backup = cls.chart_dir / "Chart.yaml.backup"
+        
+        # Backup and modify Chart.yaml
+        shutil.copy(chart_yaml, chart_yaml_backup)
+        
+        with open(chart_yaml, 'r') as f:
+            content = f.read()
+        
+        # Comment out argo-events and external-secrets dependencies
+        content = content.replace(
+            '  - name: argo-events',
+            '#  - name: argo-events'
+        ).replace(
+            '    version: "2.x.x"',
+            '#    version: "2.x.x"'
+        ).replace(
+            '    repository: "https://argoproj.github.io/argo-helm"',
+            '#    repository: "https://argoproj.github.io/argo-helm"',
+            1  # Only replace first occurrence (for argo-events)
+        ).replace(
+            '    condition: events.enabled',
+            '#    condition: events.enabled'
+        ).replace(
+            '  - name: external-secrets',
+            '#  - name: external-secrets'
+        ).replace(
+            '    version: ">=0.9.0"',
+            '#    version: ">=0.9.0"'
+        ).replace(
+            '    repository: https://charts.external-secrets.io',
+            '#    repository: https://charts.external-secrets.io'
+        ).replace(
+            '    condition: externalSecrets.installOperator',
+            '#    condition: externalSecrets.installOperator'
+        )
+        
+        with open(chart_yaml, 'w') as f:
+            f.write(content)
         
         try:
+            cmd = [
+                'helm', 'template', 'argo-stack', str(cls.chart_dir),
+                '--values', str(cls.values_file),
+                '--set-string', f'events.github.secret.tokenValue={os.environ["GITHUB_PAT"]}',
+                '--set-string', f'argo-cd.configs.secret.extra.server\\.secretkey={os.environ["ARGOCD_SECRET_KEY"]}',
+                '--set-string', f'events.github.webhook.ingress.hosts[0]={os.environ["ARGO_HOSTNAME"]}',
+                '--set-string', f'events.github.webhook.url=http://{os.environ["ARGO_HOSTNAME"]}:12000',
+                '--set-string', f's3.enabled={os.environ["S3_ENABLED"]}',
+                '--set-string', f's3.accessKeyId={os.environ["S3_ACCESS_KEY_ID"]}',
+                '--set-string', f's3.secretAccessKey={os.environ["S3_SECRET_ACCESS_KEY"]}',
+            ]
+            
             result = subprocess.run(
                 cmd,
                 cwd=cls.repo_root,
@@ -75,6 +117,9 @@ class TestRepoRegistrationsRendering:
         except subprocess.CalledProcessError as e:
             print(f"❌ Failed to render templates: {e.stderr}")
             raise
+        finally:
+            # Restore original Chart.yaml
+            shutil.move(chart_yaml_backup, chart_yaml)
     
     @classmethod
     def _parse_yaml_documents(cls) -> List[Dict[str, Any]]:
@@ -313,11 +358,11 @@ class TestRepoRegistrationsRendering:
 
         # Validate that all three webhooks are present
         # Each webhook key is expected to be in the format:
-        # repo_push_<repo-name-with-dashes-replaced-by-underscores>
+        # repo_push-<org>-<repo>
         expected_events = {
-            'repo_push_nextflow-hello-project',
-            'repo_push_genomics-variant-calling',
-            'repo_push_local-dev-workflows'
+            'repo_push-bwalsh-nextflow-hello-project',
+            'repo_push-genomics-lab-variant-calling-pipeline',
+            'repo_push-internal-dev-workflows'
         }
 
         actual_events = set(github_config.keys())
@@ -327,7 +372,7 @@ class TestRepoRegistrationsRendering:
         )
         
         # Validate nextflow-hello webhook
-        nextflow_webhook = github_config['repo_push_nextflow-hello-project']
+        nextflow_webhook = github_config['repo_push-bwalsh-nextflow-hello-project']
         assert nextflow_webhook['owner'] == 'bwalsh', "Incorrect owner for nextflow-hello"
         assert nextflow_webhook['repository'] == 'nextflow-hello-project', "Incorrect repository for nextflow-hello"
         assert 'push' in nextflow_webhook['events'], "Missing push event for nextflow-hello"
@@ -336,18 +381,137 @@ class TestRepoRegistrationsRendering:
         print("✅ nextflow-hello-project webhook configured correctly")
         
         # Validate genomics webhook
-        genomics_webhook = github_config['repo_push_genomics-variant-calling']
+        genomics_webhook = github_config['repo_push-genomics-lab-variant-calling-pipeline']
         assert genomics_webhook['owner'] == 'genomics-lab', "Incorrect owner for genomics"
         assert genomics_webhook['repository'] == 'variant-calling-pipeline', "Incorrect repository for genomics"
         
         print("✅ 'genomics-variant-calling' webhook configured correctly")
         
         # Validate local-dev webhook
-        local_dev_webhook = github_config['repo_push_local-dev-workflows']
+        local_dev_webhook = github_config['repo_push-internal-dev-workflows']
         assert local_dev_webhook['owner'] == 'internal', "Incorrect owner for local-dev"
         assert local_dev_webhook['repository'] == 'dev-workflows', "Incorrect repository for local-dev"
         
         print("✅ local-dev-workflows webhook configured correctly")
+
+    def test_tenant_namespaces_created(self):
+        """Test that per-tenant namespaces are created with correct naming pattern."""
+        print("\n🧪 Testing tenant namespace creation...")
+        
+        namespaces = self._filter_by_kind('Namespace')
+        tenant_namespaces = self._filter_by_label(namespaces, 'calypr.io/workflow-tenant', 'true')
+        
+        expected_count = 3
+        actual_count = len(tenant_namespaces)
+        
+        assert actual_count == expected_count, (
+            f"Expected {expected_count} tenant namespaces, but found {actual_count}"
+        )
+        
+        # Verify namespace naming pattern: wf-<org>-<repo>
+        expected_namespaces = {
+            'wf-bwalsh-nextflow-hello-project',
+            'wf-genomics-lab-variant-calling-pipeline',
+            'wf-internal-dev-workflows'
+        }
+        
+        actual_namespaces = {ns['metadata']['name'] for ns in tenant_namespaces}
+        
+        assert actual_namespaces == expected_namespaces, (
+            f"Expected namespaces {expected_namespaces}, but found {actual_namespaces}"
+        )
+        
+        print(f"✅ Found {actual_count} tenant namespaces with correct naming pattern")
+
+    def test_legacy_wf_poc_namespace_not_used(self):
+        """Test that legacy wf-poc namespace is NOT used in tenant resources."""
+        print("\n🧪 Testing that legacy wf-poc namespace is NOT used...")
+        
+        # Check ExternalSecrets
+        external_secrets = self._filter_by_kind('ExternalSecret')
+        repo_reg_secrets = self._filter_by_label(external_secrets, 'source', 'repo-registration')
+        
+        for secret in repo_reg_secrets:
+            namespace = secret['metadata']['namespace']
+            assert namespace != 'wf-poc', (
+                f"ExternalSecret '{secret['metadata']['name']}' should not use legacy 'wf-poc' namespace, "
+                f"but found namespace: {namespace}"
+            )
+        
+        # Check that ArgoCD Applications point to tenant namespaces
+        applications = self._filter_by_kind('Application')
+        repo_reg_apps = self._filter_by_label(applications, 'source', 'repo-registration')
+        
+        for app in repo_reg_apps:
+            dest_namespace = app['spec']['destination']['namespace']
+            assert dest_namespace != 'wf-poc', (
+                f"ArgoCD Application '{app['metadata']['name']}' should not deploy to legacy 'wf-poc' namespace, "
+                f"but found namespace: {dest_namespace}"
+            )
+        
+        print("✅ No tenant resources use legacy wf-poc namespace")
+
+    def test_tenant_namespaces_have_correct_labels(self):
+        """Test that tenant namespaces have required labels."""
+        print("\n🧪 Testing tenant namespace labels...")
+        
+        namespaces = self._filter_by_kind('Namespace')
+        tenant_namespaces = self._filter_by_label(namespaces, 'calypr.io/workflow-tenant', 'true')
+        
+        for ns in tenant_namespaces:
+            labels = ns['metadata']['labels']
+            
+            # Check required labels
+            assert 'calypr.io/workflow-tenant' in labels, f"Missing 'calypr.io/workflow-tenant' label in namespace {ns['metadata']['name']}"
+            assert labels['calypr.io/workflow-tenant'] == 'true', f"Incorrect value for 'calypr.io/workflow-tenant' in {ns['metadata']['name']}"
+            
+            assert 'source' in labels, f"Missing 'source' label in namespace {ns['metadata']['name']}"
+            assert labels['source'] == 'repo-registration', f"Incorrect 'source' label in {ns['metadata']['name']}"
+            
+            assert 'app.kubernetes.io/part-of' in labels, f"Missing 'app.kubernetes.io/part-of' label in namespace {ns['metadata']['name']}"
+            assert labels['app.kubernetes.io/part-of'] == 'argo-stack', f"Incorrect 'app.kubernetes.io/part-of' in {ns['metadata']['name']}"
+        
+        print("✅ All tenant namespaces have correct labels")
+
+    def test_tenant_rbac_resources_created(self):
+        """Test that RBAC resources are created in each tenant namespace."""
+        print("\n🧪 Testing tenant RBAC resources...")
+        
+        # Get all ServiceAccounts, Roles, and RoleBindings from tenant namespaces
+        service_accounts = self._filter_by_kind('ServiceAccount')
+        roles = self._filter_by_kind('Role')
+        role_bindings = self._filter_by_kind('RoleBinding')
+        
+        # Filter for repo-registration resources
+        tenant_sas = self._filter_by_label(service_accounts, 'source', 'repo-registration')
+        tenant_roles = self._filter_by_label(roles, 'source', 'repo-registration')
+        tenant_rbs = self._filter_by_label(role_bindings, 'source', 'repo-registration')
+        
+        # Expected: 1 SA per tenant (3 tenants)
+        expected_sa_count = 3
+        assert len(tenant_sas) == expected_sa_count, (
+            f"Expected {expected_sa_count} ServiceAccounts for tenants, but found {len(tenant_sas)}"
+        )
+        
+        # Expected: 2 Roles per tenant (workflow-executor, sensor-workflow-creator) = 6 total
+        expected_role_count = 6
+        assert len(tenant_roles) == expected_role_count, (
+            f"Expected {expected_role_count} Roles for tenants, but found {len(tenant_roles)}"
+        )
+        
+        # Expected: 2 RoleBindings per tenant = 6 total
+        expected_rb_count = 6
+        assert len(tenant_rbs) == expected_rb_count, (
+            f"Expected {expected_rb_count} RoleBindings for tenants, but found {len(tenant_rbs)}"
+        )
+        
+        # Verify ServiceAccount names
+        for sa in tenant_sas:
+            assert sa['metadata']['name'] == 'workflow-runner', (
+                f"ServiceAccount should be named 'workflow-runner', but found {sa['metadata']['name']}"
+            )
+        
+        print(f"✅ Found {len(tenant_sas)} ServiceAccounts, {len(tenant_roles)} Roles, and {len(tenant_rbs)} RoleBindings for tenants")
 
 
 def main():

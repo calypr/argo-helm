@@ -25,7 +25,7 @@ spec:
     {{- if ge (len $parts) 2 }}
       {{- $owner = index $parts 0 }}
     {{- end }}
-    {{- $eventName := $reg.eventName | default (printf "repo_push_%s" $reg.name) }}
+    {{- $eventName := $reg.eventName | default (include "argo-stack.repoRegistration.eventName" $reg) }}
     {{ $eventName }}:
       owner: {{ $owner | quote }}
       repository: {{ $repoName | quote }}
