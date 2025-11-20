@@ -598,6 +598,74 @@ vault kv put kv/argo/events/github token="ghp_..."
 
 ---
 
+## 🔧 Self-Service Repository Onboarding
+
+The **RepoRegistration** custom resource provides a declarative way to onboard Git repositories with automated configuration for ArgoCD, Argo Events, S3 storage, and secrets management.
+
+### Quick Start
+
+Define your repository configuration in a single YAML file:
+
+```yaml
+apiVersion: platform.calypr.io/v1alpha1
+kind: RepoRegistration
+metadata:
+  name: my-nextflow-project
+  namespace: wf-poc
+spec:
+  repoUrl: https://github.com/myorg/my-nextflow-project.git
+  tenant: myorg
+  workflowTemplateRef: nextflow-repo-runner
+  
+  # S3 artifact storage
+  artifactBucket:
+    hostname: https://s3.us-west-2.amazonaws.com
+    bucket: my-project-artifacts
+    region: us-west-2
+    externalSecretPath: argo/apps/my-project/s3/artifacts
+  
+  # GitHub credentials
+  githubSecretName: github-secret-my-project
+  githubSecretPath: argo/apps/my-project/github
+  
+  # Access control
+  adminUsers:
+    - admin@myorg.com
+  readUsers:
+    - viewer@myorg.com
+```
+
+### What Gets Created
+
+For each `RepoRegistration`, the platform automatically creates:
+
+- ✅ **ArgoCD Application** for continuous deployment
+- ✅ **Argo Events GitHub webhook** for CI/CD triggers
+- ✅ **ExternalSecrets** for S3 and GitHub credentials from Vault
+- ✅ **Artifact Repository ConfigMap** for workflow outputs
+- ✅ **Access control** aligned with Fence/Arborist
+
+### Usage Methods
+
+**Method 1:** Using Helm values (deployment-time):
+```bash
+helm upgrade --install argo-stack ./helm/argo-stack \
+  --values examples/repo-registrations-values.yaml
+```
+
+**Method 2:** Using CRDs (runtime with controller):
+```bash
+kubectl apply -f examples/repo-registrations-example.yaml
+```
+
+📖 **Full Guide:** See [docs/repo-registration-guide.md](docs/repo-registration-guide.md) for complete documentation and examples.
+
+📁 **Examples:** 
+- [repo-registrations-example.yaml](examples/repo-registrations-example.yaml) - Sample CRs
+- [repo-registrations-values.yaml](examples/repo-registrations-values.yaml) - Helm values approach
+
+---
+
 ## 📊 Monitoring & Troubleshooting
 
 ### 🔍 Health Checks
