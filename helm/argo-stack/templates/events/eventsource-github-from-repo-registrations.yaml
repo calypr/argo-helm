@@ -1,0 +1,93 @@
+{{- if and .Values.events.enabled .Values.repoRegistrations }}
+{{- if gt (len .Values.repoRegistrations) 0 }}
+---
+# EventSource for repositories defined in RepoRegistrations
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: {{ .Values.events.github.name | default "github" }}-repo-registrations
+  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  labels:
+    app.kubernetes.io/name: argo-events
+    app.kubernetes.io/part-of: argo-stack
+    source: repo-registration
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+spec:
+  github:
+    {{- range $reg := .Values.repoRegistrations }}
+    {{- $urlParts := split "/" $reg.repoUrl }}
+    {{- $repoName := index $urlParts (sub (len $urlParts) 1) | trimSuffix ".git" }}
+    {{- $owner := index $urlParts (sub (len $urlParts) 2) }}
+    {{- $eventName := $reg.eventName | default (printf "repo_push_%s" $reg.name) }}
+    {{ $eventName }}:
+      owner: {{ $owner | quote }}
+      repository: {{ $repoName | quote }}
+      events: {{ toYaml ($reg.events | default (list "push")) | nindent 8 }}
+      active: {{ $reg.active | default true }}
+      {{- with $.Values.events.github.webhook }}
+      webhook:
+        endpoint: {{ .endpoint | default "/events" | quote }}
+        port: "{{ .port | default 12000 }}"
+        {{- if .url }}
+        url: {{ .url }}
+        {{- end }}
+      {{- end }}
+      {{- if $reg.githubSecretName }}
+      apiToken:
+        name: {{ $reg.githubSecretName }}
+        key: {{ $reg.githubSecretTokenKey | default "token" }}
+      {{- else if $.Values.events.github.secret.name }}
+      apiToken:
+        name: {{ $.Values.events.github.secret.name }}
+        key: {{ $.Values.events.github.secret.tokenKey | default "token" }}
+      {{- end }}
+    {{- end }}
+---
+# Service for repo-registrations EventSource
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.events.github.name | default "github" }}-repo-registrations-eventsource-svc
+  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  labels:
+    eventsource-name: {{ .Values.events.github.name | default "github" }}-repo-registrations
+    source: repo-registration
+spec:
+  selector:
+    eventsource-name: {{ .Values.events.github.name | default "github" }}-repo-registrations
+  ports:
+    - name: webhook
+      port: {{ .Values.events.github.webhook.port | default 12000 }}
+      targetPort: 12000
+  type: {{ .Values.events.github.webhook.service.type | default "ClusterIP" }}
+{{- if and .Values.events.github.webhook.ingress.enabled (gt (len (.Values.events.github.webhook.ingress.hosts | default list)) 0) }}
+---
+# Ingress for repo-registrations EventSource
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.events.github.name | default "github" }}-repo-registrations-eventsource
+  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  labels:
+    source: repo-registration
+  annotations:
+    kubernetes.io/ingress.class: {{ .Values.events.github.webhook.ingress.className | default "nginx" | quote }}
+spec:
+  rules:
+  {{- range $h := (.Values.events.github.webhook.ingress.hosts | default list) }}
+    - host: {{ $h }}
+      http:
+        paths:
+          - path: {{ $.Values.events.github.webhook.endpoint | default "/events" }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Values.events.github.name | default "github" }}-repo-registrations-eventsource-svc
+                port:
+                  number: {{ $.Values.events.github.webhook.port | default 12000 }}
+  {{- end }}
+  tls: {{ toYaml (.Values.events.github.webhook.ingress.tls | default list) | nindent 4 }}
+{{- end }}
+{{- end }}
+{{- end }}
