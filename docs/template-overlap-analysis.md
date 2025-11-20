@@ -2,9 +2,15 @@
 
 ## Executive Summary
 
-This analysis examines the Helm templates in `helm/argo-stack/templates/` to identify overlaps, redundancies, and opportunities for consolidation. The templates support two configuration patterns:
-1. **Legacy Pattern**: Direct configuration via `values.yaml` using `.Values.applications` and `.Values.events.github.repositories`
-2. **RepoRegistration Pattern**: Self-service onboarding via `RepoRegistration` CRD using `.Values.repoRegistrations`
+**UPDATE 2025-11-20**: Legacy templates have been removed. This document now serves as historical reference.
+
+This analysis previously examined the Helm templates in `helm/argo-stack/templates/` to identify overlaps and redundancies. The templates originally supported two configuration patterns:
+1. **Legacy Pattern** (REMOVED): Direct configuration via `values.yaml` using `.Values.applications` and `.Values.events.github.repositories`
+2. **RepoRegistration Pattern** (CURRENT): Self-service onboarding via `RepoRegistration` CRD using `.Values.repoRegistrations`
+
+**All legacy templates have been removed. Only the RepoRegistration pattern is now supported.**
+
+See [DEPRECATION_NOTICE.md](./DEPRECATION_NOTICE.md) for migration guidance.
 
 ## Template Categorization
 
@@ -47,214 +53,179 @@ volumes:
 
 ### 2. ExternalSecret Templates
 
-| Template | Purpose | Source | Target Secret Pattern | Redundancy |
-|----------|---------|--------|----------------------|------------|
-| `externalsecret-github.yaml` | GitHub token for events | Static config | `github-webhook` | **Legacy** |
-| `externalsecret-repo-registrations-github.yaml` | Per-repo GitHub tokens | RepoRegistration | `{{githubSecretName}}` | **Replacement** |
-| `externalsecret-s3.yaml` | Global S3 credentials | Static config | `s3-credentials` | **Legacy** |
-| `externalsecret-repo-registrations-s3.yaml` | Per-repo S3 credentials | RepoRegistration | `s3-credentials-{{name}}` | **Replacement** |
-| `externalsecret-per-app-s3.yaml` | Per-app S3 credentials | `.Values.externalSecrets.secrets.perAppS3` | `s3-cred-{{appName}}` | **Overlapping** |
+**Legacy templates REMOVED**:
+- ❌ `externalsecret-github.yaml` (was: GitHub token for events from static config)
+- ❌ `externalsecret-s3.yaml` (was: Global S3 credentials from static config)
+- ❌ `externalsecret-per-app-s3.yaml` (was: Per-app S3 credentials)
 
-**Overlap Analysis:**
-- **Three patterns for S3 credentials**:
-  1. Global: `s3-credentials` (from `externalsecret-s3.yaml`)
-  2. Per-app: `s3-cred-{{appName}}` (from `externalsecret-per-app-s3.yaml`)
-  3. Per-repo: `s3-credentials-{{name}}` (from `externalsecret-repo-registrations-s3.yaml`)
+**Current templates**:
+- ✅ `externalsecret-repo-registrations-github.yaml` | Per-repo GitHub tokens | RepoRegistration | `{{githubSecretName}}`
+- ✅ `externalsecret-repo-registrations-s3.yaml` | Per-repo S3 credentials | RepoRegistration | `s3-credentials-{{name}}`
 
-- **Two patterns for GitHub credentials**:
-  1. Global: `github-webhook` (from `externalsecret-github.yaml`)
-  2. Per-repo: `{{githubSecretName}}` (from `externalsecret-repo-registrations-github.yaml`)
-
-**Recommendation:**
-- **Keep all three S3 patterns** - they serve different use cases:
-  - Global: Default for all workflows
-  - Per-app: Legacy pattern for `.Values.applications`
-  - Per-repo: New pattern for `.Values.repoRegistrations`
-- **Consider deprecating** the global GitHub secret in favor of per-repo secrets
-- **Consolidate** per-app-s3 and repo-registrations-s3 if `.Values.applications` pattern is being phased out
+**Resolution:**
+- All legacy S3 and GitHub credential patterns have been removed
+- Only per-repo secrets via RepoRegistration are supported
+- This eliminates the three-pattern overlap that previously existed
 
 ### 3. Artifact Repository ConfigMaps
 
-| Template | Purpose | Source | ConfigMap Name Pattern | Redundancy |
-|----------|---------|--------|----------------------|------------|
-| `20-artifact-repositories.yaml` | Global artifact repo | `.Values.s3` | `artifact-repositories` | **Global** |
-| `21-per-app-artifact-repositories.yaml` | Per-app artifact repos | `.Values.applications[].artifacts` | `argo-artifacts-{{name}}` | **Legacy** |
-| `21-per-app-artifact-repositories-from-repo-registrations.yaml` | Per-repo artifact repos | `.Values.repoRegistrations[].artifactBucket` | `argo-artifacts-{{name}}` | **Replacement** |
+**Legacy templates REMOVED**:
+- ❌ `21-per-app-artifact-repositories.yaml` (was: Per-app artifact repos from `.Values.applications[].artifacts`)
 
-**Overlap Analysis:**
-- Two templates create ConfigMaps with **identical naming pattern** (`argo-artifacts-{{name}}`)
-- Both reference different sources but serve the same purpose
-- Only differ in feature flag checks and value paths
+**Current templates**:
+- ✅ `20-artifact-repositories.yaml` | Global artifact repo | `.Values.s3` | `artifact-repositories` | **Global fallback**
+- ✅ `21-per-app-artifact-repositories-from-repo-registrations.yaml` | Per-repo artifact repos | `.Values.repoRegistrations[].artifactBucket` | `argo-artifacts-{{name}}` | **Primary**
 
-**Critical Issue:**
-- If both `.Values.applications` and `.Values.repoRegistrations` contain entries with the same `name`, they will **conflict** and create duplicate ConfigMaps
-- The templates have the same output structure but read from different input sources
-
-**Recommendation:**
-- **High Priority**: Add validation or mutual exclusion logic
-- **Option 1**: Rename one pattern (e.g., `argo-artifacts-rr-{{name}}` for RepoRegistration)
-- **Option 2**: Merge into a single template that handles both sources
-- **Option 3**: Document that `applications[].name` and `repoRegistrations[].name` must be unique across both lists
+**Resolution:**
+- Legacy per-app template removed
+- No more naming conflicts - only RepoRegistration creates per-repo ConfigMaps
+- Global artifact repository retained as fallback for workflows not using RepoRegistration
 
 ### 4. ArgoCD Application Templates
 
-| Template | Purpose | Source | Application Name | Redundancy |
-|----------|---------|--------|-----------------|------------|
-| `argocd/applications.yaml` | ArgoCD apps from static config | `.Values.applications` | `{{.name}}` | **Legacy** |
-| `argocd/applications-from-repo-registrations.yaml` | ArgoCD apps from RepoRegistration | `.Values.repoRegistrations` | `{{.name}}` | **Replacement** |
+**Legacy templates REMOVED**:
+- ❌ `argocd/applications.yaml` (was: ArgoCD apps from `.Values.applications`)
 
-**Overlap Analysis:**
-- Both templates create ArgoCD `Application` resources
-- Both use `{{.name}}` as the Application name - **potential for conflicts**
-- Similar structure but different feature sets:
-  - `applications.yaml`: More flexible (custom destination, custom annotations)
-  - `applications-from-repo-registrations.yaml`: Opinionated defaults, tenant labels
+**Current templates**:
+- ✅ `argocd/applications-from-repo-registrations.yaml` | ArgoCD apps from RepoRegistration | `.Values.repoRegistrations` | `{{.name}}`
 
-**Recommendation:**
-- Same issue as artifact repositories - names can conflict
-- Document name uniqueness requirement OR use namespace separation
-- Consider adding `source: repo-registration` label to distinguish them
+**Resolution:**
+- Legacy template removed
+- No more naming conflicts
+- All ArgoCD Applications created from RepoRegistration with consistent tenant labels and conventions
 
 ### 5. Argo Events EventSource Templates
 
-| Template | Purpose | Source | EventSource Name | Redundancy |
-|----------|---------|--------|-----------------|------------|
-| `events/eventsource-github.yaml` | GitHub webhook events | `.Values.events.github.repositories` | `github` | **Legacy** |
-| `events/eventsource-github-from-repo-registrations.yaml` | GitHub events from RepoRegistration | `.Values.repoRegistrations` | `github-repo-registrations` | **Replacement** |
+**Legacy templates REMOVED**:
+- ❌ `events/eventsource-github.yaml` (was: GitHub webhook events from `.Values.events.github.repositories`)
 
-**Overlap Analysis:**
-- Both create GitHub EventSources for webhooks
-- Different names prevent conflicts (`github` vs `github-repo-registrations`)
-- Both create separate Services and Ingresses
-- Both use the same webhook endpoint path - **potential routing conflict**
+**Current templates**:
+- ✅ `events/eventsource-github-from-repo-registrations.yaml` | GitHub events from RepoRegistration | `.Values.repoRegistrations` | `github-repo-registrations`
 
-**Recommendation:**
-- Good: Names are different
-- Issue: Both try to expose the same webhook path (`/events`) on the same Ingress host
-- **Fix needed**: Use different paths or hostnames for each EventSource
-- Consider path prefixes: `/events/static` vs `/events/repo-registrations`
+**Resolution:**
+- Legacy template removed
+- No more webhook path conflicts
+- All EventSources created from RepoRegistration with consistent naming
 
-## Summary of Redundancies
+## Summary of Changes
 
-### High Priority Issues
+### Removed Templates (Legacy Pattern)
 
-1. **ConfigMap Naming Conflict** (`argo-artifacts-{{name}}`)
-   - **Risk**: High - Direct resource conflict
-   - **Impact**: Chart installation failure or undefined behavior
-   - **Fix**: Rename one pattern or merge templates
+All legacy templates have been removed as of 2025-11-20:
 
-2. **ArgoCD Application Naming Conflict** (both use `{{.name}}`)
-   - **Risk**: High - ArgoCD Application conflict
-   - **Impact**: One application overwrites the other
-   - **Fix**: Enforce unique names or use namespace separation
+1. ❌ **ConfigMap**: `21-per-app-artifact-repositories.yaml` - Artifact repository configurations from `.Values.applications`
+2. ❌ **ArgoCD Application**: `argocd/applications.yaml` - Application manifests from `.Values.applications`
+3. ❌ **ExternalSecret**: `eso/externalsecret-github.yaml` - Global GitHub token
+4. ❌ **ExternalSecret**: `eso/externalsecret-s3.yaml` - Global S3 credentials
+5. ❌ **ExternalSecret**: `eso/externalsecret-per-app-s3.yaml` - Per-app S3 credentials
+6. ❌ **EventSource**: `events/eventsource-github.yaml` - GitHub webhooks from `.Values.events.github.repositories`
 
-3. **Ingress Path Conflict** (both use `/events`)
-   - **Risk**: Medium - Webhook routing ambiguity
-   - **Impact**: GitHub webhooks may route incorrectly
-   - **Fix**: Use different paths or host-based routing
+### Remaining Templates (RepoRegistration Pattern)
 
-### Medium Priority Issues
+✅ **Active templates** - all driven by `.Values.repoRegistrations`:
 
-4. **Three S3 Secret Patterns** (global, per-app, per-repo)
-   - **Risk**: Low - Templates are conditional
-   - **Impact**: Confusion about which to use
-   - **Fix**: Document the pattern clearly, consider migration path from per-app to per-repo
+1. ✅ `21-per-app-artifact-repositories-from-repo-registrations.yaml` - Per-repo artifact ConfigMaps
+2. ✅ `argocd/applications-from-repo-registrations.yaml` - ArgoCD Applications
+3. ✅ `eso/externalsecret-repo-registrations-github.yaml` - Per-repo GitHub tokens
+4. ✅ `eso/externalsecret-repo-registrations-s3.yaml` - Per-repo S3 credentials
+5. ✅ `events/eventsource-github-from-repo-registrations.yaml` - GitHub webhooks
 
-5. **Two Nextflow WorkflowTemplates** (repo-runner vs runner)
-   - **Risk**: Low - Different use cases
-   - **Impact**: Confusion about which to use
-   - **Fix**: Document use cases clearly, possibly add parameter for secret name flexibility
+✅ **Retained global defaults**:
+- `20-artifact-repositories.yaml` - Global artifact repository fallback
 
-## Consolidation Opportunities
+### Issues Resolved
 
-### Option A: Merge Templates (Aggressive)
+All previously identified conflicts have been resolved:
 
-Create unified templates that handle both legacy and RepoRegistration patterns:
+1. ✅ **ConfigMap Naming Conflict** - RESOLVED: Only RepoRegistration creates per-repo ConfigMaps
+2. ✅ **ArgoCD Application Naming Conflict** - RESOLVED: Only RepoRegistration creates Applications
+3. ✅ **Ingress Path Conflict** - RESOLVED: Only RepoRegistration creates EventSources
+4. ✅ **Multiple S3 Secret Patterns** - RESOLVED: Only per-repo pattern remains
+5. ✅ **GitHub Secret Patterns** - RESOLVED: Only per-repo pattern remains
 
-```yaml
-# Example: Unified ExternalSecret for S3
-{{- if .Values.externalSecrets.enabled }}
-  {{- if .Values.s3.enabled }}
-    # Global S3 secret
-  {{- end }}
-  {{- range .Values.repoRegistrations }}
-    # Per-repo S3 secrets
-  {{- end }}
-  {{- range $appName, $paths := .Values.externalSecrets.secrets.perAppS3 }}
-    # Per-app S3 secrets
-  {{- end }}
-{{- end }}
+## Consolidation Strategy
+
+### Implemented: Complete Legacy Removal
+
+The aggressive consolidation approach has been implemented:
+
+✅ **All legacy templates removed** - Clean break from old pattern  
+✅ **No naming conflicts** - Single source of truth via RepoRegistration  
+✅ **Simplified codebase** - Fewer templates to maintain  
+✅ **Clear migration path** - See [DEPRECATION_NOTICE.md](./DEPRECATION_NOTICE.md)
+
+### Current Architecture
+
+The chart now follows a single, consistent pattern:
+
+```
+RepoRegistration CRD
+        ↓
+  Helm Templates
+        ↓
+    ┌───┴───┬────────┬──────────┬────────┐
+    ↓       ↓        ↓          ↓        ↓
+ConfigMap  ArgoCD  GitHub   S3       EventSource
+           App     Secret   Secret
 ```
 
-**Pros**: Fewer files, single source of truth
-**Cons**: More complex conditionals, harder to read
+**Benefits**:
+- ✅ Single configuration source (`.Values.repoRegistrations`)
+- ✅ No resource conflicts
+- ✅ Consistent naming conventions
+- ✅ Self-service onboarding
+- ✅ Vault-backed security
 
-### Option B: Namespace Separation (Conservative)
-
-Keep templates separate but use namespaces to avoid conflicts:
-- Legacy pattern: Deploy to `argo` namespace
-- RepoRegistration pattern: Deploy to `argo-tenant` namespace
-
-**Pros**: Clean separation, no conflicts
-**Cons**: Requires namespace management, more complex RBAC
-
-### Option C: Name Prefixing (Moderate)
-
-Add prefixes to distinguish resources:
-- Legacy: `app-{{name}}`
-- RepoRegistration: `repo-{{name}}`
-
-**Pros**: Clear distinction, no conflicts
-**Cons**: Breaking change for existing deployments
-
-### Option D: Deprecation Path (Recommended)
-
-1. Mark legacy templates as deprecated
-2. Add validation to prevent name conflicts
-3. Document migration from `.Values.applications` to `.Values.repoRegistrations`
-4. Remove legacy templates in next major version
-
-**Pros**: Clear migration path, backwards compatible
-**Cons**: Temporary duplication
+**Retained for flexibility**:
+- Global artifact repository (`20-artifact-repositories.yaml`)
+- Multiple Nextflow WorkflowTemplates for different use cases
+- Example templates (`workflowtemplate-nextflow-hello.yaml`)
 
 ## Recommendations
 
-### Immediate Actions
+### ✅ Completed Actions
 
-1. **Add validation** to prevent name conflicts:
-   ```yaml
-   {{- $allNames := list }}
-   {{- range .Values.applications }}
-     {{- $allNames = append $allNames .name }}
-   {{- end }}
-   {{- range .Values.repoRegistrations }}
-     {{- if has .name $allNames }}
-       {{- fail (printf "Duplicate name '%s' found in both applications and repoRegistrations" .name) }}
-     {{- end }}
-   {{- end }}
-   ```
+1. ✅ **Removed all legacy templates** - No more name conflicts or overlapping patterns
+2. ✅ **Created deprecation documentation** - Clear migration guide available
+3. ✅ **Simplified template structure** - Single pattern, easier to understand and maintain
 
-2. **Fix EventSource path conflict**:
-   - Use different webhook paths: `/events/legacy` and `/events/repo-registrations`
-   - OR use host-based routing with different subdomains
+### Current State
 
-3. **Document the patterns clearly**:
-   - When to use global vs per-app vs per-repo S3 credentials
-   - When to use each Nextflow WorkflowTemplate
-   - Migration path from legacy to RepoRegistration pattern
+The chart now exclusively uses the RepoRegistration pattern:
+- ✅ All resources created from `.Values.repoRegistrations`
+- ✅ No conflicts between configuration sources
+- ✅ Consistent naming and labeling
+- ✅ Vault integration for all secrets
 
-### Long-term Strategy
+### For Users
 
-1. **Deprecate legacy pattern** (`.Values.applications`) in favor of RepoRegistration
-2. **Merge per-app and per-repo templates** once migration is complete
-3. **Standardize on per-repo secrets** for all use cases
-4. **Keep example templates separate** (`nextflow-hello`) but clearly marked
+**If migrating from legacy pattern**:
+1. Read [DEPRECATION_NOTICE.md](./DEPRECATION_NOTICE.md)
+2. Convert `.Values.applications` entries to `.Values.repoRegistrations` format
+3. Ensure Vault secrets are configured at the paths specified in RepoRegistration
+4. Test with `helm template` before deploying
+5. Deploy and verify all resources are created correctly
 
-## Pattern Comparison Matrix
+**For new deployments**:
+1. Read [REPO_REGISTRATION_USER_GUIDE.md](./REPO_REGISTRATION_USER_GUIDE.md)
+2. Configure `.Values.repoRegistrations` in your `values.yaml`
+3. Deploy the chart
 
-| Feature | Legacy Pattern | RepoRegistration Pattern |
-|---------|---------------|-------------------------|
-| Configuration | Manual YAML | CRD-driven |
+### Next Steps
+
+Potential future enhancements:
+- Add validation webhook for RepoRegistration CRD
+- Add status conditions to RepoRegistration for better observability
+- Consider controller for dynamic reconciliation
+- Add more WorkflowTemplate examples
+
+## Pattern Comparison
+
+### Before (Removed) vs After (Current)
+
+| Feature | Legacy Pattern (REMOVED) | RepoRegistration Pattern (CURRENT) |
+|---------|-------------------------|-------------------------------------|
+| Configuration | Manual YAML in `values.yaml` | CRD + `.Values.repoRegistrations` |
 | S3 Credentials | Global or per-app | Per-repo from Vault |
 | GitHub Credentials | Global | Per-repo from Vault |
 | Artifact Repository | Shared or per-app | Per-repo |
@@ -262,23 +233,34 @@ Add prefixes to distinguish resources:
 | Argo Events | Manual EventSource | Auto-generated |
 | Multi-tenancy | Limited | Built-in (tenant labels) |
 | Self-service | No | Yes |
-| Migration Effort | N/A | Medium (requires Vault setup) |
+| Resource Conflicts | Possible | Eliminated |
+| Migration Required | N/A | Yes (see DEPRECATION_NOTICE.md) |
 
 ## Conclusion
 
-The current template structure supports two distinct patterns that overlap significantly:
+**Status**: Legacy templates removed as of 2025-11-20
 
-**Overlaps are intentional** - the RepoRegistration pattern is designed to replace the legacy pattern while maintaining backwards compatibility.
+The template structure has been simplified to support only the RepoRegistration pattern:
 
-**Key Issues:**
-1. Name collision potential (high priority)
-2. Webhook routing conflict (medium priority)
-3. Multiple S3 credential patterns (low priority - by design)
+✅ **All conflicts resolved** - No more naming collisions or routing ambiguity  
+✅ **Single source of truth** - `.Values.repoRegistrations` only  
+✅ **Clear architecture** - One pattern, well-documented  
+✅ **Migration path** - Documented in [DEPRECATION_NOTICE.md](./DEPRECATION_NOTICE.md)
 
-**Recommended Path Forward:**
-- Implement validation to prevent conflicts (immediate)
-- Document both patterns clearly (immediate)
-- Plan deprecation of legacy pattern (6-12 months)
-- Consolidate templates in next major version (12+ months)
+**Key Outcomes:**
+1. ✅ Naming conflicts eliminated
+2. ✅ Webhook routing conflicts eliminated
+3. ✅ S3 credential patterns unified (per-repo only)
+4. ✅ Codebase simplified and easier to maintain
 
-This analysis suggests the redundancy is **intentional for migration purposes** but needs **better conflict prevention** and **clearer documentation**.
+**For existing users:**
+- Migration to RepoRegistration is **required**
+- Follow the guide in [DEPRECATION_NOTICE.md](./DEPRECATION_NOTICE.md)
+- Vault setup required for secret management
+
+**For new users:**
+- Start with [REPO_REGISTRATION_USER_GUIDE.md](./REPO_REGISTRATION_USER_GUIDE.md)
+- Use only `.Values.repoRegistrations` configuration
+- Enjoy self-service onboarding and Vault integration
+
+This analysis now serves as historical reference for the consolidation decision and as documentation of the resolved conflicts.
