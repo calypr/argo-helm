@@ -17,6 +17,9 @@ metadata:
     {{- end }}
     source: repo-registration
   annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
     repo-registration/name: {{ $reg.name | quote }}
 ---
 # Role for workflow execution in tenant namespace: {{ $reg.name }}
@@ -32,6 +35,10 @@ metadata:
     tenant: {{ $reg.tenant }}
     {{- end }}
     source: repo-registration
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
 rules:
   - apiGroups: ["", "batch"]
     resources: ["pods","pods/log","pods/status","jobs"]
@@ -62,6 +69,10 @@ metadata:
     tenant: {{ $reg.tenant }}
     {{- end }}
     source: repo-registration
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
@@ -84,6 +95,10 @@ metadata:
     tenant: {{ $reg.tenant }}
     {{- end }}
     source: repo-registration
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
 rules:
   - apiGroups: ["argoproj.io"]
     resources: ["workflows"]
@@ -115,6 +130,10 @@ metadata:
     tenant: {{ $reg.tenant }}
     {{- end }}
     source: repo-registration
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
