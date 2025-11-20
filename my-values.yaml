@@ -32,11 +32,6 @@ repoRegistrations:
       - student@research.edu
     
     isPublic: false
-    
-    # EventSource configuration
-    eventName: repo_push_nextflow_hello
-    events: ["push"]
-    active: true
 
   # Example 2: Genomics pipeline with separate artifact and data buckets
   - name: genomics-variant-calling
@@ -45,7 +40,7 @@ repoRegistrations:
     tenant: genomics-lab
     namespace: wf-poc
     workflowTemplateRef: nextflow-repo-runner
-    
+
     # Artifacts bucket for workflow outputs
     artifactBucket:
       hostname: https://s3.us-west-2.amazonaws.com
@@ -55,7 +50,7 @@ repoRegistrations:
       pathStyle: false
       keyPrefix: workflows/
       externalSecretPath: argo/apps/genomics/s3/artifacts
-    
+
     # Data bucket for reference genomes
     dataBucket:
       hostname: https://s3.us-west-2.amazonaws.com
@@ -64,10 +59,10 @@ repoRegistrations:
       insecure: false
       pathStyle: false
       externalSecretPath: argo/apps/genomics/s3/data
-    
+
     githubSecretName: github-secret-genomics
     githubSecretPath: argo/apps/genomics/github
-    
+
     adminUsers:
       - genomics-pi@university.edu
       - bioinformatics-lead@university.edu
@@ -75,11 +70,8 @@ repoRegistrations:
       - researcher-1@university.edu
       - researcher-2@university.edu
       - collaborator@partner.edu
-    
+
     isPublic: false
-    eventName: repo_push_genomics
-    events: ["push"]
-    active: true
 
   # Example 3: Using MinIO (local development)
   - name: local-dev-workflows
@@ -88,7 +80,7 @@ repoRegistrations:
     tenant: internal-dev
     namespace: wf-poc
     workflowTemplateRef: nextflow-repo-runner
-    
+
     artifactBucket:
       hostname: https://minio.storage.local:9000
       bucket: dev-workflow-artifacts
@@ -96,14 +88,11 @@ repoRegistrations:
       insecure: true
       pathStyle: true
       externalSecretPath: argo/apps/internal-dev/minio
-    
+
     githubSecretName: github-secret-internal-dev
     githubSecretPath: argo/apps/internal-dev/github
-    
+
     adminUsers:
       - devops@company.com
-    
+
     isPublic: false
-    eventName: repo_push_local_dev
-    events: ["push"]
-    active: true

@@ -310,13 +310,16 @@ class TestRepoRegistrationsRendering:
         
         eventsource = repo_reg_eventsources[0]
         github_config = eventsource['spec']['github']
-        
+
+        # Validate that all three webhooks are present
+        # Each webhook key is expected to be in the format:
+        # repo_push_<repo-name-with-dashes-replaced-by-underscores>
         expected_events = {
-            'repo_push_nextflow_hello',
-            'repo_push_genomics',
-            'repo_push_local_dev'
+            'repo_push_nextflow-hello-project',
+            'repo_push_genomics-variant-calling',
+            'repo_push_local-dev-workflows'
         }
-        
+
         actual_events = set(github_config.keys())
         
         assert actual_events == expected_events, (
@@ -324,27 +327,27 @@ class TestRepoRegistrationsRendering:
         )
         
         # Validate nextflow-hello webhook
-        nextflow_webhook = github_config['repo_push_nextflow_hello']
+        nextflow_webhook = github_config['repo_push_nextflow-hello-project']
         assert nextflow_webhook['owner'] == 'bwalsh', "Incorrect owner for nextflow-hello"
         assert nextflow_webhook['repository'] == 'nextflow-hello-project', "Incorrect repository for nextflow-hello"
         assert 'push' in nextflow_webhook['events'], "Missing push event for nextflow-hello"
         assert nextflow_webhook['active'] == True, "Webhook should be active for nextflow-hello"
         
-        print("✅ nextflow-hello webhook configured correctly")
+        print("✅ nextflow-hello-project webhook configured correctly")
         
         # Validate genomics webhook
-        genomics_webhook = github_config['repo_push_genomics']
+        genomics_webhook = github_config['repo_push_genomics-variant-calling']
         assert genomics_webhook['owner'] == 'genomics-lab', "Incorrect owner for genomics"
         assert genomics_webhook['repository'] == 'variant-calling-pipeline', "Incorrect repository for genomics"
         
-        print("✅ genomics webhook configured correctly")
+        print("✅ 'genomics-variant-calling' webhook configured correctly")
         
         # Validate local-dev webhook
-        local_dev_webhook = github_config['repo_push_local_dev']
+        local_dev_webhook = github_config['repo_push_local-dev-workflows']
         assert local_dev_webhook['owner'] == 'internal', "Incorrect owner for local-dev"
         assert local_dev_webhook['repository'] == 'dev-workflows', "Incorrect repository for local-dev"
         
-        print("✅ local-dev webhook configured correctly")
+        print("✅ local-dev-workflows webhook configured correctly")
 
 
 def main():
