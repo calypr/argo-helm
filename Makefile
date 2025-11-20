@@ -148,10 +148,10 @@ argo-stack:
 		--set-string s3.region=${S3_REGION} \
 		--set-string s3.hostname=${S3_HOSTNAME} \
 		-f my-values.yaml
+
+deploy: init argo-stack
 	echo waiting for pods
 	sleep 10
-
-deploy: argo-stack
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
 	echo starting port forwards
 	kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 --address=0.0.0.0 -n argo-workflows &
