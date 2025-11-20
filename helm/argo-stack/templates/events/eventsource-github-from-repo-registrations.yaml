@@ -16,9 +16,15 @@ metadata:
 spec:
   github:
     {{- range $reg := .Values.repoRegistrations }}
-    {{- $urlParts := split "/" $reg.repoUrl }}
-    {{- $repoName := index $urlParts (sub (len $urlParts) 1) | trimSuffix ".git" }}
-    {{- $owner := index $urlParts (sub (len $urlParts) 2) }}
+    {{- /* Extract owner and repo from GitHub URL */ -}}
+    {{- /* Remove protocol and domain, split by /, get last two parts */ -}}
+    {{- $urlWithoutProtocol := regexReplaceAll "^https?://(www\\.)?github\\.com/" $reg.repoUrl "" }}
+    {{- $parts := splitList "/" $urlWithoutProtocol }}
+    {{- $repoName := last $parts | trimSuffix ".git" }}
+    {{- $owner := "" }}
+    {{- if ge (len $parts) 2 }}
+      {{- $owner = index $parts 0 }}
+    {{- end }}
     {{- $eventName := $reg.eventName | default (printf "repo_push_%s" $reg.name) }}
     {{ $eventName }}:
       owner: {{ $owner | quote }}
