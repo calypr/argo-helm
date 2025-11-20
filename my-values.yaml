@@ -1,0 +1,109 @@
+repoRegistrations:
+  # Example 1: Basic Nextflow pipeline
+  - name: nextflow-hello-project
+    repoUrl: https://github.com/bwalsh/nextflow-hello-project.git
+    defaultBranch: main
+    tenant: research-team-1
+    namespace: wf-poc
+    workflowTemplateRef: nextflow-repo-runner
+    
+    # Artifact bucket configuration
+    artifactBucket:
+      hostname: https://s3.us-west-2.amazonaws.com
+      bucket: research-team-1-artifacts
+      region: us-west-2
+      insecure: false
+      pathStyle: false
+      keyPrefix: workflows/
+      # Vault path for S3 credentials (relative to kv/)
+      externalSecretPath: argo/apps/nextflow-hello-project/s3/artifacts
+    
+    # GitHub credentials
+    githubSecretName: github-secret-nextflow-hello
+    # Vault path for GitHub token
+    githubSecretPath: argo/apps/nextflow-hello-project/github
+    
+    # Access control (Fence-authenticated emails)
+    adminUsers:
+      - pi@research.edu
+      - lead-scientist@research.edu
+    readUsers:
+      - postdoc@research.edu
+      - student@research.edu
+    
+    isPublic: false
+    
+    # EventSource configuration
+    eventName: repo_push_nextflow_hello
+    events: ["push"]
+    active: true
+
+  # Example 2: Genomics pipeline with separate artifact and data buckets
+  - name: genomics-variant-calling
+    repoUrl: https://github.com/genomics-lab/variant-calling-pipeline.git
+    defaultBranch: develop
+    tenant: genomics-lab
+    namespace: wf-poc
+    workflowTemplateRef: nextflow-repo-runner
+    
+    # Artifacts bucket for workflow outputs
+    artifactBucket:
+      hostname: https://s3.us-west-2.amazonaws.com
+      bucket: genomics-workflow-artifacts
+      region: us-west-2
+      insecure: false
+      pathStyle: false
+      keyPrefix: workflows/
+      externalSecretPath: argo/apps/genomics/s3/artifacts
+    
+    # Data bucket for reference genomes
+    dataBucket:
+      hostname: https://s3.us-west-2.amazonaws.com
+      bucket: genomics-reference-data
+      region: us-west-2
+      insecure: false
+      pathStyle: false
+      externalSecretPath: argo/apps/genomics/s3/data
+    
+    githubSecretName: github-secret-genomics
+    githubSecretPath: argo/apps/genomics/github
+    
+    adminUsers:
+      - genomics-pi@university.edu
+      - bioinformatics-lead@university.edu
+    readUsers:
+      - researcher-1@university.edu
+      - researcher-2@university.edu
+      - collaborator@partner.edu
+    
+    isPublic: false
+    eventName: repo_push_genomics
+    events: ["push"]
+    active: true
+
+  # Example 3: Using MinIO (local development)
+  - name: local-dev-workflows
+    repoUrl: https://github.com/internal/dev-workflows.git
+    defaultBranch: main
+    tenant: internal-dev
+    namespace: wf-poc
+    workflowTemplateRef: nextflow-repo-runner
+    
+    artifactBucket:
+      hostname: https://minio.storage.local:9000
+      bucket: dev-workflow-artifacts
+      region: us-east-1
+      insecure: true
+      pathStyle: true
+      externalSecretPath: argo/apps/internal-dev/minio
+    
+    githubSecretName: github-secret-internal-dev
+    githubSecretPath: argo/apps/internal-dev/github
+    
+    adminUsers:
+      - devops@company.com
+    
+    isPublic: false
+    eventName: repo_push_local_dev
+    events: ["push"]
+    active: true
