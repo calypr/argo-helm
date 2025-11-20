@@ -1,0 +1,267 @@
+# Example: RepoRegistration Custom Resources
+#
+# This file demonstrates how to create RepoRegistration custom resources
+# to onboard your Git repositories to the Argo platform.
+#
+# Usage:
+#   1. Ensure the RepoRegistration CRD is installed:
+#      kubectl apply -f helm/argo-stack/crds/repo-registration-crd.yaml
+#
+#   2. Store your secrets in Vault (see docs/repo-registration-guide.md)
+#
+#   3. Create your RepoRegistrations:
+#      kubectl apply -f examples/repo-registrations-example.yaml
+#
+# Note: Replace placeholder values (YOUR_ORG, YOUR_REPO, etc.) with actual values
+
+---
+# Example 1: Basic Nextflow pipeline with single S3 bucket
+apiVersion: platform.calypr.io/v1alpha1
+kind: RepoRegistration
+metadata:
+  name: nextflow-hello-project
+  namespace: wf-poc
+  labels:
+    app.kubernetes.io/name: nextflow-hello-project
+    app.kubernetes.io/part-of: argo-stack
+    tenant: myorg
+spec:
+  # Git repository URL (REQUIRED)
+  repoUrl: https://github.com/YOUR_ORG/nextflow-hello-project.git
+  
+  # Default branch to track
+  defaultBranch: main
+  
+  # Tenant identifier (REQUIRED)
+  tenant: myorg
+  
+  # WorkflowTemplate to use (REQUIRED)
+  workflowTemplateRef: nextflow-repo-runner
+  
+  # S3 bucket for workflow artifacts (OPTIONAL)
+  artifactBucket:
+    hostname: https://s3.us-west-2.amazonaws.com
+    bucket: myorg-nextflow-artifacts
+    region: us-west-2
+    insecure: false
+    pathStyle: false
+    # Vault path for S3 credentials (relative to KV mount)
+    externalSecretPath: argo/apps/nextflow-hello-project/s3/artifacts
+  
+  # GitHub secret reference (REQUIRED)
+  # This secret will be created by External Secrets Operator from Vault
+  githubSecretName: github-secret-nextflow-hello
+  
+  # Admin users (OPTIONAL) - must be Fence-authenticated emails
+  adminUsers:
+    - admin@myorg.com
+    - pi@myorg.com
+  
+  # Read-only users (OPTIONAL) - must be Fence-authenticated emails
+  readUsers:
+    - analyst@myorg.com
+    - viewer@myorg.com
+  
+  # Public visibility (OPTIONAL, default: false)
+  isPublic: false
+
+---
+# Example 2: Research project with separate artifact and data buckets
+apiVersion: platform.calypr.io/v1alpha1
+kind: RepoRegistration
+metadata:
+  name: genomics-variant-calling
+  namespace: wf-poc
+  labels:
+    app.kubernetes.io/name: genomics-variant-calling
+    app.kubernetes.io/part-of: argo-stack
+    tenant: genomics-lab
+    project: variant-calling
+spec:
+  repoUrl: https://github.com/YOUR_ORG/variant-calling-pipeline.git
+  defaultBranch: develop
+  tenant: genomics-lab
+  workflowTemplateRef: nextflow-repo-runner
+  
+  # Artifacts bucket for workflow outputs (BAM, VCF files, reports)
+  artifactBucket:
+    hostname: https://s3.us-west-2.amazonaws.com
+    bucket: genomics-workflow-artifacts
+    region: us-west-2
+    insecure: false
+    pathStyle: false
+    externalSecretPath: argo/apps/genomics/s3/artifacts
+  
+  # Data bucket for reference genomes and input samples
+  dataBucket:
+    hostname: https://s3.us-west-2.amazonaws.com
+    bucket: genomics-reference-data
+    region: us-west-2
+    insecure: false
+    pathStyle: false
+    externalSecretPath: argo/apps/genomics/s3/data
+  
+  githubSecretName: github-secret-genomics
+  
+  # Research team access control
+  adminUsers:
+    - pi@genomics.edu
+    - lead-bioinformatician@genomics.edu
+  readUsers:
+    - postdoc@genomics.edu
+    - grad-student@genomics.edu
+    - collaborator@partner.edu
+  
+  isPublic: false
+
+---
+# Example 3: Using MinIO (self-hosted S3-compatible storage)
+apiVersion: platform.calypr.io/v1alpha1
+kind: RepoRegistration
+metadata:
+  name: local-dev-workflows
+  namespace: wf-poc
+  labels:
+    app.kubernetes.io/name: local-dev-workflows
+    app.kubernetes.io/part-of: argo-stack
+    tenant: internal-dev
+    environment: development
+spec:
+  repoUrl: https://github.com/YOUR_ORG/internal-workflows.git
+  defaultBranch: main
+  tenant: internal-dev
+  workflowTemplateRef: nextflow-repo-runner
+  
+  # MinIO configuration (local development)
+  artifactBucket:
+    hostname: https://minio.storage.local:9000
+    bucket: dev-workflow-artifacts
+    region: us-east-1  # MinIO uses this for compatibility
+    insecure: true     # Using HTTP for local dev
+    pathStyle: true    # MinIO uses path-style by default
+    externalSecretPath: argo/apps/internal-dev/minio
+  
+  githubSecretName: github-secret-internal-dev
+  
+  adminUsers:
+    - devops@company.com
+    - developer@company.com
+
+---
+# Example 4: Multi-tenant project with fine-grained access
+apiVersion: platform.calypr.io/v1alpha1
+kind: RepoRegistration
+metadata:
+  name: cancer-research-tcga
+  namespace: wf-poc
+  labels:
+    app.kubernetes.io/name: cancer-research-tcga
+    app.kubernetes.io/part-of: argo-stack
+    tenant: cancer-consortium
+    project: tcga-analysis
+    data-sensitivity: high
+spec:
+  repoUrl: https://github.com/YOUR_ORG/tcga-analysis.git
+  defaultBranch: main
+  tenant: cancer-consortium
+  workflowTemplateRef: nextflow-repo-runner
+  
+  # Artifacts stored in institution-specific bucket
+  artifactBucket:
+    hostname: https://s3.us-east-1.amazonaws.com
+    bucket: cancer-consortium-tcga-artifacts
+    region: us-east-1
+    insecure: false
+    pathStyle: false
+    externalSecretPath: argo/apps/cancer-consortium/s3/artifacts
+  
+  # Controlled-access data bucket with TCGA data
+  dataBucket:
+    hostname: https://s3.us-east-1.amazonaws.com
+    bucket: cancer-consortium-tcga-data
+    region: us-east-1
+    insecure: false
+    pathStyle: false
+    externalSecretPath: argo/apps/cancer-consortium/s3/data
+  
+  githubSecretName: github-secret-cancer-research
+  
+  # Hierarchical access control
+  adminUsers:
+    - consortium-lead@institute.edu
+    - data-steward@institute.edu
+    - senior-bioinformatician@institute.edu
+  
+  readUsers:
+    - researcher-alice@institute.edu
+    - researcher-bob@partner.edu
+    - statistician@collaborator.edu
+  
+  # Restricted access - requires Fence login
+  isPublic: false
+
+---
+# Example 5: Public demo repository
+apiVersion: platform.calypr.io/v1alpha1
+kind: RepoRegistration
+metadata:
+  name: public-nextflow-demo
+  namespace: wf-poc
+  labels:
+    app.kubernetes.io/name: public-nextflow-demo
+    app.kubernetes.io/part-of: argo-stack
+    tenant: demos
+    visibility: public
+spec:
+  repoUrl: https://github.com/YOUR_ORG/public-nextflow-demo.git
+  defaultBranch: main
+  tenant: demos
+  workflowTemplateRef: nextflow-repo-runner
+  
+  # Public bucket for demo outputs
+  artifactBucket:
+    hostname: https://s3.us-west-2.amazonaws.com
+    bucket: public-demo-artifacts
+    region: us-west-2
+    insecure: false
+    pathStyle: false
+    externalSecretPath: argo/apps/demos/s3
+  
+  githubSecretName: github-secret-public-demo
+  
+  # Minimal admin access for maintainers
+  adminUsers:
+    - demo-maintainer@platform.io
+  
+  # Public visibility enabled - workflows viewable without login
+  isPublic: true
+
+---
+# Notes:
+#
+# 1. Before applying these RepoRegistrations, ensure:
+#    - The RepoRegistration CRD is installed
+#    - Secrets are stored in Vault at the specified paths
+#    - S3 buckets exist and are accessible
+#    - GitHub PAT has appropriate permissions
+#
+# 2. Vault secret paths should contain:
+#    - GitHub secrets: { token: "github_pat_..." }
+#    - S3 secrets: { AWS_ACCESS_KEY_ID: "...", AWS_SECRET_ACCESS_KEY: "..." }
+#
+# 3. For production use:
+#    - Never commit actual credentials to Git
+#    - Use proper RBAC to restrict who can create RepoRegistrations
+#    - Align adminUsers and readUsers with your Fence/Arborist policies
+#    - Set isPublic: false for sensitive data
+#
+# 4. To apply a specific example:
+#    kubectl apply -f - <<EOF
+#    <paste the YAML for that example here>
+#    EOF
+#
+# 5. To list all RepoRegistrations:
+#    kubectl get reporegistration -A
+#
+# 6. To view status:
+#    kubectl describe reporegistration <name> -n wf-poc

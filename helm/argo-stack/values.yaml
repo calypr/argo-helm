@@ -386,3 +386,68 @@ workflows:
   namespace: wf-poc
   runnerServiceAccount: wf-runner
   templateRef: nextflow-hello-template
+
+# ============================================================================
+# RepoRegistration - Self-Service Repository Onboarding (DECLARATIVE)
+# ============================================================================
+# Alternative to manually defining applications and events.github.repositories.
+# Use this array to define repositories using the RepoRegistration model.
+# The chart will automatically generate:
+# - ArgoCD Applications
+# - Argo Events GitHub EventSources
+# - ExternalSecrets for S3 and GitHub credentials
+# - Artifact Repository ConfigMaps
+#
+# Each entry follows the RepoRegistration CRD schema.
+# See docs/repo-registration-guide.md for complete documentation.
+#
+# Example:
+# repoRegistrations:
+#   - name: my-nextflow-project
+#     repoUrl: https://github.com/myorg/my-nextflow-project.git
+#     defaultBranch: main
+#     tenant: myorg
+#     namespace: wf-poc
+#     workflowTemplateRef: nextflow-repo-runner
+#     artifactBucket:
+#       hostname: https://s3.us-west-2.amazonaws.com
+#       bucket: my-project-artifacts
+#       region: us-west-2
+#       insecure: false
+#       pathStyle: false
+#       externalSecretPath: argo/apps/my-nextflow-project/s3/artifacts
+#     dataBucket:
+#       hostname: https://s3.us-west-2.amazonaws.com
+#       bucket: my-project-data
+#       region: us-west-2
+#       externalSecretPath: argo/apps/my-nextflow-project/s3/data
+#     githubSecretName: github-secret-my-project
+#     githubSecretPath: argo/apps/my-nextflow-project/github
+#     adminUsers:
+#       - admin@myorg.com
+#     readUsers:
+#       - viewer@myorg.com
+#     isPublic: false
+#
+# See examples/repo-registrations-example.yaml for more examples
+
+repoRegistrations: []
+  # Example configurations (provide your own at deployment time):
+  #
+  # - name: nextflow-hello-project
+  #   repoUrl: https://github.com/YOUR_ORG/nextflow-hello-project.git
+  #   defaultBranch: main
+  #   tenant: myorg
+  #   namespace: wf-poc
+  #   workflowTemplateRef: nextflow-repo-runner
+  #   artifactBucket:
+  #     hostname: https://s3.us-west-2.amazonaws.com
+  #     bucket: myorg-nextflow-artifacts
+  #     region: us-west-2
+  #     externalSecretPath: argo/apps/nextflow-hello-project/s3/artifacts
+  #   githubSecretName: github-secret-nextflow-hello
+  #   githubSecretPath: argo/apps/nextflow-hello-project/github
+  #   adminUsers:
+  #     - admin@myorg.com
+  #
+  # See examples/repo-registrations-example.yaml and docs/repo-registration-guide.md

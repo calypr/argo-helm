@@ -1,0 +1,323 @@
+# Example: Using RepoRegistrations for Repository Onboarding
+#
+# This values file demonstrates using the repoRegistrations array
+# instead of manually configuring applications and events.github.repositories.
+#
+# Usage:
+#   helm upgrade --install argo-stack ./helm/argo-stack \
+#     --namespace argocd --create-namespace \
+#     --values examples/repo-registrations-values.yaml \
+#     --wait
+
+namespaces:
+  argo: argo-workflows
+  argocd: argocd
+  tenant: wf-poc
+  security: security
+  argo-events: argo-events
+
+# Enable External Secrets Operator integration
+externalSecrets:
+  enabled: true
+  vault:
+    enabled: true
+    address: "http://vault.vault.svc.cluster.local:8200"
+    auth:
+      method: "kubernetes"
+      mount: "kubernetes"
+      role: "argo-stack"
+      serviceAccountName: "eso-vault-auth"
+    kv:
+      engineVersion: "v2"
+      defaultPathPrefix: "kv"
+    scope: "cluster"
+
+# Argo Workflows configuration
+argo-workflows:
+  server:
+    enabled: true
+    secure: false
+    namespaced: true
+    extraArgs:
+      - --auth-mode=server
+  controller:
+    workflowNamespaces:
+      - wf-poc
+    namespaceInstallMode: true
+    workflowDefaults:
+      spec:
+        archiveLogs: true
+  namespaceOverride: argo-workflows
+
+# Argo CD configuration
+argo-cd:
+  applications:
+    enabled: true
+    namespace: argocd
+  namespaceOverride: argocd
+  configs:
+    secret:
+      create: true
+      extra: {}
+
+# AuthZ adapter
+authzAdapter:
+  image: ghcr.io/calypr/argo-helm:latest
+  fenceBase: "https://calypr-dev.ohsu.edu/user"
+  replicas: 2
+  namespace: security
+
+# Global S3 config (fallback)
+s3:
+  enabled: false
+
+# Ingress configuration
+ingress:
+  argoWorkflows:
+    enabled: true
+    host: "argo.localtest.me"
+    tls:
+      enabled: false
+  argocd:
+    enabled: true
+    host: "argocd.localtest.me"
+    tls:
+      enabled: false
+
+ingressAuth:
+  enabled: true
+  authURL: "http://authz-adapter.security.svc.cluster.local:8080/check"
+  passAuthorization: true
+
+# Argo Events configuration
+events:
+  enabled: true
+  namespace: argo-events
+  eventBus:
+    create: true
+    name: default
+    natsNative: {}
+  github:
+    enabled: true
+    name: github
+    # No manual repositories defined - using repoRegistrations instead
+    repositories: []
+    secret:
+      create: false  # Secrets created per-repo via ExternalSecrets
+      name: github-secret
+      tokenKey: token
+    webhook:
+      endpoint: /events
+      port: 12000
+      service:
+        type: ClusterIP
+      ingress:
+        enabled: true
+        className: nginx
+        hosts: []
+        tls: []
+
+# ============================================================================
+# RepoRegistrations - Declarative Repository Onboarding
+# ============================================================================
+# Define your repositories here using the RepoRegistration model.
+# The chart will automatically create:
+# - ArgoCD Applications
+# - Argo Events GitHub EventSources
+# - ExternalSecrets for credentials
+# - Artifact Repository ConfigMaps
+
+repoRegistrations:
+  # Example 1: Basic Nextflow pipeline
+  - name: nextflow-hello-project
+    repoUrl: https://github.com/bwalsh/nextflow-hello-project.git
+    defaultBranch: main
+    tenant: research-team-1
+    namespace: wf-poc
+    workflowTemplateRef: nextflow-repo-runner
+    
+    # Artifact bucket configuration
+    artifactBucket:
+      hostname: https://s3.us-west-2.amazonaws.com
+      bucket: research-team-1-artifacts
+      region: us-west-2
+      insecure: false
+      pathStyle: false
+      keyPrefix: workflows/
+      # Vault path for S3 credentials (relative to kv/)
+      externalSecretPath: argo/apps/nextflow-hello-project/s3/artifacts
+    
+    # GitHub credentials
+    githubSecretName: github-secret-nextflow-hello
+    # Vault path for GitHub token
+    githubSecretPath: argo/apps/nextflow-hello-project/github
+    
+    # Access control (Fence-authenticated emails)
+    adminUsers:
+      - pi@research.edu
+      - lead-scientist@research.edu
+    readUsers:
+      - postdoc@research.edu
+      - student@research.edu
+    
+    isPublic: false
+    
+    # EventSource configuration
+    eventName: repo_push_nextflow_hello
+    events: ["push"]
+    active: true
+
+  # Example 2: Genomics pipeline with separate artifact and data buckets
+  - name: genomics-variant-calling
+    repoUrl: https://github.com/genomics-lab/variant-calling-pipeline.git
+    defaultBranch: develop
+    tenant: genomics-lab
+    namespace: wf-poc
+    workflowTemplateRef: nextflow-repo-runner
+    
+    # Artifacts bucket for workflow outputs
+    artifactBucket:
+      hostname: https://s3.us-west-2.amazonaws.com
+      bucket: genomics-workflow-artifacts
+      region: us-west-2
+      insecure: false
+      pathStyle: false
+      keyPrefix: workflows/
+      externalSecretPath: argo/apps/genomics/s3/artifacts
+    
+    # Data bucket for reference genomes
+    dataBucket:
+      hostname: https://s3.us-west-2.amazonaws.com
+      bucket: genomics-reference-data
+      region: us-west-2
+      insecure: false
+      pathStyle: false
+      externalSecretPath: argo/apps/genomics/s3/data
+    
+    githubSecretName: github-secret-genomics
+    githubSecretPath: argo/apps/genomics/github
+    
+    adminUsers:
+      - genomics-pi@university.edu
+      - bioinformatics-lead@university.edu
+    readUsers:
+      - researcher-1@university.edu
+      - researcher-2@university.edu
+      - collaborator@partner.edu
+    
+    isPublic: false
+    eventName: repo_push_genomics
+    events: ["push"]
+    active: true
+
+  # Example 3: Using MinIO (local development)
+  - name: local-dev-workflows
+    repoUrl: https://github.com/internal/dev-workflows.git
+    defaultBranch: main
+    tenant: internal-dev
+    namespace: wf-poc
+    workflowTemplateRef: nextflow-repo-runner
+    
+    artifactBucket:
+      hostname: https://minio.storage.local:9000
+      bucket: dev-workflow-artifacts
+      region: us-east-1
+      insecure: true
+      pathStyle: true
+      externalSecretPath: argo/apps/internal-dev/minio
+    
+    githubSecretName: github-secret-internal-dev
+    githubSecretPath: argo/apps/internal-dev/github
+    
+    adminUsers:
+      - devops@company.com
+    
+    isPublic: false
+    eventName: repo_push_local_dev
+    events: ["push"]
+    active: true
+
+# Workflow templates
+workflowTemplates:
+  createExample: true
+  namespace: wf-poc
+  nextflowHello:
+    name: nextflow-hello-template
+    image: alpine:3.20
+    command: ["/bin/sh", "-c"]
+    args:
+      - echo "Hello from Argo Events!"
+
+# ============================================================================
+# Expected Kubernetes Resources Created
+# ============================================================================
+#
+# From the repoRegistrations above, the following will be created:
+#
+# ArgoCD Applications (in argocd namespace):
+# - nextflow-hello-project
+# - genomics-variant-calling
+# - local-dev-workflows
+#
+# EventSources (in argo-events namespace):
+# - github-repo-registrations (with events for all 3 repos)
+#
+# ExternalSecrets (in wf-poc namespace):
+# - s3-credentials-nextflow-hello-project
+# - github-secret-nextflow-hello
+# - s3-credentials-genomics-variant-calling
+# - s3-data-credentials-genomics-variant-calling
+# - github-secret-genomics
+# - s3-credentials-local-dev-workflows
+# - github-secret-internal-dev
+#
+# ConfigMaps (in argo-workflows namespace):
+# - argo-artifacts-nextflow-hello-project
+# - argo-artifacts-genomics-variant-calling
+# - argo-artifacts-local-dev-workflows
+#
+# ============================================================================
+# Vault Secret Prerequisites
+# ============================================================================
+#
+# Before deploying, ensure these secrets exist in Vault:
+#
+# 1. S3 Credentials:
+#    vault kv put kv/argo/apps/nextflow-hello-project/s3/artifacts \
+#      AWS_ACCESS_KEY_ID=AKIAXXXXXXXX \
+#      AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxx
+#
+#    vault kv put kv/argo/apps/genomics/s3/artifacts \
+#      AWS_ACCESS_KEY_ID=AKIAXXXXXXXX \
+#      AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxx
+#
+#    vault kv put kv/argo/apps/genomics/s3/data \
+#      AWS_ACCESS_KEY_ID=AKIAXXXXXXXX \
+#      AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxx
+#
+# 2. GitHub Tokens:
+#    vault kv put kv/argo/apps/nextflow-hello-project/github \
+#      token=github_pat_XXXXXXXXXX
+#
+#    vault kv put kv/argo/apps/genomics/github \
+#      token=github_pat_XXXXXXXXXX
+#
+# ============================================================================
+# Deployment
+# ============================================================================
+#
+# Deploy with:
+#   helm upgrade --install argo-stack ./helm/argo-stack \
+#     --namespace argocd --create-namespace \
+#     --values examples/repo-registrations-values.yaml \
+#     --wait
+#
+# Verify:
+#   kubectl get application -n argocd
+#   kubectl get eventsource -n argo-events
+#   kubectl get externalsecret -n wf-poc
+#   kubectl get configmap -n argo-workflows | grep argo-artifacts
+#
+# Check secret sync status:
+#   kubectl get externalsecret -n wf-poc
+#   kubectl get secret -n wf-poc | grep -E "s3-credentials|github-secret"
