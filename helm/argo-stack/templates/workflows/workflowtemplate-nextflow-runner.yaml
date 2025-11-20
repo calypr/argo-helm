@@ -3,6 +3,11 @@ kind: WorkflowTemplate
 metadata:
   name: nextflow-runner
   namespace: wf-poc
+  labels:
+    app.kubernetes.io/name: nextflow-runner
+    app.kubernetes.io/component: workflow
+    app.kubernetes.io/part-of: argo-stack
+   app.kubernetes.io/version: "1.0.0"
 spec:
   artifactRepositoryRef:
     configMap: artifact-repositories
