@@ -98,8 +98,8 @@ Example: https://github.com/bwalsh/nextflow-hello-project.git -> wf-bwalsh-nextf
 {{- $cleaned = trimPrefix "https://" $cleaned -}}
 {{- $cleaned = trimPrefix "http://" $cleaned -}}
 {{- $cleaned = trimPrefix "github.com/" $cleaned -}}
-{{- $parts := split "/" $cleaned -}}
-{{- if eq (len $parts) 2 -}}
+{{- $parts := splitList "/" $cleaned -}}
+{{- if ge (len $parts) 2 -}}
 {{- printf "wf-%s-%s" (index $parts 0) (index $parts 1) -}}
 {{- else -}}
 {{- printf "wf-%s" .name -}}
