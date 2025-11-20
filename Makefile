@@ -41,7 +41,7 @@ lint:
 template: check-vars deps 
 	helm template argo-stack helm/argo-stack \
 		--debug \
-		--values helm/argo-stack/values.yaml \
+		--values my-values.yaml \
 		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
 		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
