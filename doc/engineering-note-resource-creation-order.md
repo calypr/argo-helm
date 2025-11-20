@@ -125,7 +125,7 @@ The gap between weights (1 → 5) allows for future insertion of intermediate re
 
 ### Files Modified
 
-#### 1. ExternalSecret Templates (Commit f9b3147, Updated 2025-11-20)
+#### 1. ExternalSecret Templates (Commit f9b3147)
 
 **Files**:
 - `helm/argo-stack/templates/eso/externalsecret-repo-registrations-s3.yaml`
@@ -138,10 +138,8 @@ metadata:
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "5"
-    # NOTE: helm.sh/hook-delete-policy removed - see Issue 2
+    helm.sh/hook-delete-policy: before-hook-creation
 ```
-
-**UPDATE (2025-11-20)**: Removed `helm.sh/hook-delete-policy: before-hook-creation` to prevent deletion errors during upgrades and rollbacks. ExternalSecrets now persist across Helm operations.
 
 **Resources affected**:
 - S3 artifact bucket credentials ExternalSecrets (one per RepoRegistration)
@@ -315,10 +313,6 @@ We cannot move namespace creation to main install because:
 
 **Clarification**: The `before-hook-creation` policy only deletes the hook resources from *previous* Helm operations, not the resources created by the current hook. This is desired behavior - we want the namespaces, RBAC, and secrets to persist.
 
-**UPDATE (2025-11-20)**: The `before-hook-creation` policy on ExternalSecret resources caused installation failures when Helm attempted to delete old hook resources during upgrades or failed installations. The error "unable to build kubernetes object for deleting hook" occurred because the ExternalSecret CRD wasn't available during the deletion phase.
-
-**Resolution**: Removed `helm.sh/hook-delete-policy: before-hook-creation` from ExternalSecret templates (`externalsecret-repo-registrations-github.yaml` and `externalsecret-repo-registrations-s3.yaml`). ExternalSecrets now persist across upgrades without being deleted and recreated, matching the behavior of `externalsecret-argocd.yaml`. This prevents deletion errors while maintaining proper hook ordering via `helm.sh/hook-weight`.
-
 ### Issue 3: Failure During Hook Execution
 
 **Problem**: If a hook fails, the entire Helm operation fails.
@@ -404,5 +398,4 @@ When adding new resources to tenant namespaces:
 | Date       | Author              | Changes                          |
 |------------|---------------------|----------------------------------|
 | 2025-11-20 | Copilot SWE Agent   | Initial document creation        |
-| 2025-11-20 | Copilot SWE Agent   | Remove before-hook-creation from ExternalSecrets to fix deletion errors |
 
