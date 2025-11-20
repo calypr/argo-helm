@@ -37,6 +37,7 @@ spec:
                 repoUrl:
                   type: string
                   description: "Git repository URL to onboard (https://github.com/org/repo.git)"
+                  pattern: '^https://.+\.git$'
                 defaultBranch:
                   type: string
                   description: "Default branch to track (e.g. main)"
