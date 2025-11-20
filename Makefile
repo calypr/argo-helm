@@ -233,6 +233,32 @@ vault-seed:
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-2/s3 \
 		accessKey="app2-access-key" \
 		secretKey="app2-secret-key"
+	@echo "➡️  Seeding Vault with secrets from my-values.yaml repoRegistrations..."
+	@# nextflow-hello-project GitHub credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-project/github \
+		token="$(GITHUB_PAT)"
+	@# nextflow-hello-project S3 artifact credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-project/s3/artifacts \
+		AWS_ACCESS_KEY_ID="nextflow-hello-artifacts-key" \
+		AWS_SECRET_ACCESS_KEY="nextflow-hello-artifacts-secret"
+	@# genomics-variant-calling GitHub credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/genomics/github \
+		token="$(GITHUB_PAT)"
+	@# genomics-variant-calling S3 artifact credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/genomics/s3/artifacts \
+		AWS_ACCESS_KEY_ID="genomics-artifacts-key" \
+		AWS_SECRET_ACCESS_KEY="genomics-artifacts-secret"
+	@# genomics-variant-calling S3 data bucket credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/genomics/s3/data \
+		AWS_ACCESS_KEY_ID="genomics-data-key" \
+		AWS_SECRET_ACCESS_KEY="genomics-data-secret"
+	@# local-dev-workflows GitHub credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/internal-dev/github \
+		token="$(GITHUB_PAT)"
+	@# local-dev-workflows MinIO credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/internal-dev/minio \
+		AWS_ACCESS_KEY_ID="minioadmin" \
+		AWS_SECRET_ACCESS_KEY="minioadmin"
 	@echo "➡️  Enabling Kubernetes auth method..."
 	@kubectl exec -n vault vault-0 -- vault auth enable kubernetes 2>/dev/null || echo "   (Kubernetes auth already enabled)"
 	@echo "➡️  Configuring Kubernetes auth..."
@@ -241,14 +267,21 @@ vault-seed:
 	@echo "✅ Vault seeded with test data"
 	@echo ""
 	@echo "📋 Available secrets:"
-	@echo "   kv/argo/argocd/admin        - Argo CD admin credentials"
-	@echo "   kv/argo/argocd/oidc         - Argo CD OIDC client secret"
-	@echo "   kv/argo/argocd/server       - Argo CD server secret key"
-	@echo "   kv/argo/workflows/artifacts - Workflow artifact storage credentials"
-	@echo "   kv/argo/workflows/oidc      - Workflow OIDC client secret"
-	@echo "   kv/argo/authz               - AuthZ adapter OIDC secret"
-	@echo "   kv/argo/events/github       - GitHub webhook token"
-	@echo "   kv/argo/apps/*/s3           - Per-app S3 credentials"
+	@echo "   kv/argo/argocd/admin                            - Argo CD admin credentials"
+	@echo "   kv/argo/argocd/oidc                             - Argo CD OIDC client secret"
+	@echo "   kv/argo/argocd/server                           - Argo CD server secret key"
+	@echo "   kv/argo/workflows/artifacts                     - Workflow artifact storage credentials"
+	@echo "   kv/argo/workflows/oidc                          - Workflow OIDC client secret"
+	@echo "   kv/argo/authz                                   - AuthZ adapter OIDC secret"
+	@echo "   kv/argo/events/github                           - GitHub webhook token"
+	@echo "   kv/argo/apps/*/s3                               - Per-app S3 credentials (legacy)"
+	@echo "   kv/argo/apps/nextflow-hello-project/github      - nextflow-hello-project GitHub token"
+	@echo "   kv/argo/apps/nextflow-hello-project/s3/artifacts - nextflow-hello-project S3 credentials"
+	@echo "   kv/argo/apps/genomics/github                    - genomics-variant-calling GitHub token"
+	@echo "   kv/argo/apps/genomics/s3/artifacts              - genomics-variant-calling S3 artifact credentials"
+	@echo "   kv/argo/apps/genomics/s3/data                   - genomics-variant-calling S3 data credentials"
+	@echo "   kv/argo/apps/internal-dev/github                - local-dev-workflows GitHub token"
+	@echo "   kv/argo/apps/internal-dev/minio                 - local-dev-workflows MinIO credentials"
 
 vault-list:
 	@echo "📋 Listing all secrets in Vault..."
