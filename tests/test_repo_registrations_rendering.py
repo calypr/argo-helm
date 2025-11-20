@@ -349,6 +349,125 @@ class TestRepoRegistrationsRendering:
         
         print("✅ local-dev-workflows webhook configured correctly")
 
+    def test_tenant_namespaces_created(self):
+        """Test that per-tenant namespaces are created with correct naming pattern."""
+        print("\n🧪 Testing tenant namespace creation...")
+        
+        namespaces = self._filter_by_kind('Namespace')
+        tenant_namespaces = self._filter_by_label(namespaces, 'calypr.io/workflow-tenant', 'true')
+        
+        expected_count = 3
+        actual_count = len(tenant_namespaces)
+        
+        assert actual_count == expected_count, (
+            f"Expected {expected_count} tenant namespaces, but found {actual_count}"
+        )
+        
+        # Verify namespace naming pattern: wf-<org>-<repo>
+        expected_namespaces = {
+            'wf-bwalsh-nextflow-hello-project',
+            'wf-genomics-lab-variant-calling-pipeline',
+            'wf-internal-dev-workflows'
+        }
+        
+        actual_namespaces = {ns['metadata']['name'] for ns in tenant_namespaces}
+        
+        assert actual_namespaces == expected_namespaces, (
+            f"Expected namespaces {expected_namespaces}, but found {actual_namespaces}"
+        )
+        
+        print(f"✅ Found {actual_count} tenant namespaces with correct naming pattern")
+
+    def test_legacy_wf_poc_namespace_not_used(self):
+        """Test that legacy wf-poc namespace is NOT used in tenant resources."""
+        print("\n🧪 Testing that legacy wf-poc namespace is NOT used...")
+        
+        # Check ExternalSecrets
+        external_secrets = self._filter_by_kind('ExternalSecret')
+        repo_reg_secrets = self._filter_by_label(external_secrets, 'source', 'repo-registration')
+        
+        for secret in repo_reg_secrets:
+            namespace = secret['metadata']['namespace']
+            assert namespace != 'wf-poc', (
+                f"ExternalSecret '{secret['metadata']['name']}' should not use legacy 'wf-poc' namespace, "
+                f"but found namespace: {namespace}"
+            )
+        
+        # Check that ArgoCD Applications point to tenant namespaces
+        applications = self._filter_by_kind('Application')
+        repo_reg_apps = self._filter_by_label(applications, 'source', 'repo-registration')
+        
+        for app in repo_reg_apps:
+            dest_namespace = app['spec']['destination']['namespace']
+            assert dest_namespace != 'wf-poc', (
+                f"ArgoCD Application '{app['metadata']['name']}' should not deploy to legacy 'wf-poc' namespace, "
+                f"but found namespace: {dest_namespace}"
+            )
+        
+        print("✅ No tenant resources use legacy wf-poc namespace")
+
+    def test_tenant_namespaces_have_correct_labels(self):
+        """Test that tenant namespaces have required labels."""
+        print("\n🧪 Testing tenant namespace labels...")
+        
+        namespaces = self._filter_by_kind('Namespace')
+        tenant_namespaces = self._filter_by_label(namespaces, 'calypr.io/workflow-tenant', 'true')
+        
+        for ns in tenant_namespaces:
+            labels = ns['metadata']['labels']
+            
+            # Check required labels
+            assert 'calypr.io/workflow-tenant' in labels, f"Missing 'calypr.io/workflow-tenant' label in namespace {ns['metadata']['name']}"
+            assert labels['calypr.io/workflow-tenant'] == 'true', f"Incorrect value for 'calypr.io/workflow-tenant' in {ns['metadata']['name']}"
+            
+            assert 'source' in labels, f"Missing 'source' label in namespace {ns['metadata']['name']}"
+            assert labels['source'] == 'repo-registration', f"Incorrect 'source' label in {ns['metadata']['name']}"
+            
+            assert 'app.kubernetes.io/part-of' in labels, f"Missing 'app.kubernetes.io/part-of' label in namespace {ns['metadata']['name']}"
+            assert labels['app.kubernetes.io/part-of'] == 'argo-stack', f"Incorrect 'app.kubernetes.io/part-of' in {ns['metadata']['name']}"
+        
+        print("✅ All tenant namespaces have correct labels")
+
+    def test_tenant_rbac_resources_created(self):
+        """Test that RBAC resources are created in each tenant namespace."""
+        print("\n🧪 Testing tenant RBAC resources...")
+        
+        # Get all ServiceAccounts, Roles, and RoleBindings from tenant namespaces
+        service_accounts = self._filter_by_kind('ServiceAccount')
+        roles = self._filter_by_kind('Role')
+        role_bindings = self._filter_by_kind('RoleBinding')
+        
+        # Filter for repo-registration resources
+        tenant_sas = self._filter_by_label(service_accounts, 'source', 'repo-registration')
+        tenant_roles = self._filter_by_label(roles, 'source', 'repo-registration')
+        tenant_rbs = self._filter_by_label(role_bindings, 'source', 'repo-registration')
+        
+        # Expected: 1 SA per tenant (3 tenants)
+        expected_sa_count = 3
+        assert len(tenant_sas) == expected_sa_count, (
+            f"Expected {expected_sa_count} ServiceAccounts for tenants, but found {len(tenant_sas)}"
+        )
+        
+        # Expected: 2 Roles per tenant (workflow-executor, sensor-workflow-creator) = 6 total
+        expected_role_count = 6
+        assert len(tenant_roles) == expected_role_count, (
+            f"Expected {expected_role_count} Roles for tenants, but found {len(tenant_roles)}"
+        )
+        
+        # Expected: 2 RoleBindings per tenant = 6 total
+        expected_rb_count = 6
+        assert len(tenant_rbs) == expected_rb_count, (
+            f"Expected {expected_rb_count} RoleBindings for tenants, but found {len(tenant_rbs)}"
+        )
+        
+        # Verify ServiceAccount names
+        for sa in tenant_sas:
+            assert sa['metadata']['name'] == 'workflow-runner', (
+                f"ServiceAccount should be named 'workflow-runner', but found {sa['metadata']['name']}"
+            )
+        
+        print(f"✅ Found {len(tenant_sas)} ServiceAccounts, {len(tenant_roles)} Roles, and {len(tenant_rbs)} RoleBindings for tenants")
+
 
 def main():
     """Run all tests and report results."""

@@ -1,0 +1,38 @@
+{{- if .Values.repoRegistrations }}
+{{- range $reg := .Values.repoRegistrations }}
+{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+{{- $cleaned := trimSuffix ".git" $reg.repoUrl }}
+{{- $cleaned = trimPrefix "https://" $cleaned }}
+{{- $cleaned = trimPrefix "http://" $cleaned }}
+{{- $cleaned = trimPrefix "github.com/" $cleaned }}
+---
+# Per-tenant namespace for RepoRegistration: {{ $reg.name }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ $namespace }}
+  labels:
+    calypr.io/workflow-tenant: "true"
+    calypr.io/repo: {{ $cleaned | quote }}
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/name: {{ $reg.name }}
+    app.kubernetes.io/part-of: argo-stack
+    helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+  annotations:
+    helm.sh/resource-policy: keep
+    # Ensure namespaces are created before other resources
+    helm.sh/hook: pre-install,pre-upgrade
+    helm.sh/hook-weight: "-10"
+    helm.sh/hook-delete-policy: before-hook-creation
+    repo-registration/name: {{ $reg.name | quote }}
+    repo-registration/repo-url: {{ $reg.repoUrl | quote }}
+    {{- if $reg.tenant }}
+    repo-registration/tenant: {{ $reg.tenant | quote }}
+    {{- end }}
+{{- end }}
+{{- end }}

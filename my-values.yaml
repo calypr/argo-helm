@@ -4,7 +4,6 @@ repoRegistrations:
     repoUrl: https://github.com/bwalsh/nextflow-hello-project.git
     defaultBranch: main
     tenant: research-team-1
-    namespace: wf-poc
     workflowTemplateRef: nextflow-repo-runner
     
     # Artifact bucket configuration
@@ -38,7 +37,6 @@ repoRegistrations:
     repoUrl: https://github.com/genomics-lab/variant-calling-pipeline.git
     defaultBranch: develop
     tenant: genomics-lab
-    namespace: wf-poc
     workflowTemplateRef: nextflow-repo-runner
 
     # Artifacts bucket for workflow outputs
@@ -78,7 +76,6 @@ repoRegistrations:
     repoUrl: https://github.com/internal/dev-workflows.git
     defaultBranch: main
     tenant: internal-dev
-    namespace: wf-poc
     workflowTemplateRef: nextflow-repo-runner
 
     artifactBucket:
