@@ -37,29 +37,29 @@ spec:
             Run a Nextflow pipeline from a Git repo using S3-backed
             work and artifact storage derived from RepoRegistration.
       container:
-        image: nextflow/nextflow:{{ .Values.nextflow.version }}
-        workingDir: "{{workflow.parameters.work-dir}}"
+        image: nextflow/nextflow:{{ if .Values.nextflow }}{{ .Values.nextflow.version }}{{ else }}23.10.1{{ end }}
+        workingDir: "{{ "{{workflow.parameters.work-dir}}" }}"
         command: ["/bin/sh", "-c"]
         args:
           - |
             set -euo pipefail
             echo "Installing git..."
             apk add --no-cache git
-            echo "Cloning repo: {{workflow.parameters.repo-url}}"
-            git clone {{workflow.parameters.repo-url}} repo
+            echo "Cloning repo: {{ "{{workflow.parameters.repo-url}}" }}"
+            git clone {{ "{{workflow.parameters.repo-url}}" }} repo
             cd repo
-            git checkout {{workflow.parameters.revision}}
+            git checkout {{ "{{workflow.parameters.revision}}" }}
 
             echo "Configuring S3 environment for artifacts..."
-            echo "Artifact bucket: {{workflow.parameters.artifact-bucket}}"
+            echo "Artifact bucket: {{ "{{workflow.parameters.artifact-bucket}}" }}"
 
             # Configure Nextflow to use S3 work directory
-            export NXF_WORK="s3://{{workflow.parameters.artifact-bucket}}/work"
-            export NXF_S3_ENDPOINT="{{workflow.parameters.artifact-endpoint}}"
-            export NXF_S3_REGION="{{workflow.parameters.artifact-region}}"
+            export NXF_WORK="s3://{{ "{{workflow.parameters.artifact-bucket}}" }}/work"
+            export NXF_S3_ENDPOINT="{{ "{{workflow.parameters.artifact-endpoint}}" }}"
+            export NXF_S3_REGION="{{ "{{workflow.parameters.artifact-region}}" }}"
 
             echo "Running Nextflow pipeline..."
-            nextflow run {{workflow.parameters.pipeline-file}} -with-report report.html -with-trace -with-timeline timeline.html
+            nextflow run {{ "{{workflow.parameters.pipeline-file}}" }} -with-report report.html -with-trace -with-timeline timeline.html
 
         env:
           - name: NXF_HOME
@@ -67,10 +67,10 @@ spec:
           - name: AWS_ACCESS_KEY_ID
             valueFrom:
               secretKeyRef:
-                name: s3-cred-{{workflow.parameters.repo-name}}
+                name: s3-cred-{{ "{{workflow.parameters.repo-name}}" }}
                 key: AWS_ACCESS_KEY_ID
           - name: AWS_SECRET_ACCESS_KEY
             valueFrom:
               secretKeyRef:
-                name: s3-cred-{{workflow.parameters.repo-name}}
+                name: s3-cred-{{ "{{workflow.parameters.repo-name}}" }}
                 key: AWS_SECRET_ACCESS_KEY

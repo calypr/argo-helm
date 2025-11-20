@@ -7,7 +7,7 @@ metadata:
     app.kubernetes.io/name: nextflow-runner
     app.kubernetes.io/component: workflow
     app.kubernetes.io/part-of: argo-stack
-   app.kubernetes.io/version: "1.0.0"
+    app.kubernetes.io/version: "1.0.0"
 spec:
   artifactRepositoryRef:
     configMap: artifact-repositories
@@ -44,33 +44,33 @@ spec:
             cp /config/nextflow.config ./nextflow.config || true
 
             # If pipeline=./, write a tiny pipeline WITHOUT heredocs
-            if [ "{{workflow.parameters.pipeline}}" = "./" ]; then
+            if [ "{{ "{{workflow.parameters.pipeline}}" }}" = "./" ]; then
               cat > main.nf <<'EOF'
-nextflow.enable.dsl=2
-
-process HELLO {
-  output: path 'hello.txt'
-  """
-  echo "hello nextflow (no heredoc)" > hello.txt
-  """
-}
-
-workflow { HELLO() }
-EOF
+            nextflow.enable.dsl=2
+            
+            process HELLO {
+              output: path 'hello.txt'
+              """
+              echo "hello nextflow (no heredoc)" > hello.txt
+              """
+            }
+            
+            workflow { HELLO() }
+            EOF
               PIPE="./"
             else
-              PIPE="-r {{workflow.parameters.pipeline}}"
+              PIPE="-r {{ "{{workflow.parameters.pipeline}}" }}"
             fi
 
             # Choose executor/profile
-            if [ "{{workflow.parameters.use_k8s}}" = "true" ]; then
+            if [ "{{ "{{workflow.parameters.use_k8s}}" }}" = "true" ]; then
               PROFILE="-profile k8s"
             else
               PROFILE=""
             fi
 
             # Work directory (S3 if provided; else local)
-            NF_WORKDIR_PARAM="{{workflow.parameters.nf_workdir}}"
+            NF_WORKDIR_PARAM="{{ "{{workflow.parameters.nf_workdir}}" }}"
             if [ -n "$NF_WORKDIR_PARAM" ]; then
               WARG="-w $NF_WORKDIR_PARAM"
             else
@@ -91,19 +91,19 @@ EOF
               export AWS_SECRET_ACCESS_KEY="$(cat /secrets/s3/AWS_SECRET_ACCESS_KEY)"
             fi
             # Set AWS region from parameter
-            export AWS_REGION="{{workflow.parameters.aws_region}}"
+            export AWS_REGION="{{ "{{workflow.parameters.aws_region}}" }}"
 
             echo "== running =="
             set +x
-            echo "nextflow run $PIPE $PROFILE $WARG {{workflow.parameters.params}} -with-report report.html -with-timeline timeline.html -with-trace trace.txt"
+            echo "nextflow run $PIPE $PROFILE $WARG {{ "{{workflow.parameters.params}}" }} -with-report report.html -with-timeline timeline.html -with-trace trace.txt"
             set -x
-            nextflow run $PIPE $PROFILE $WARG {{workflow.parameters.params}}               -with-report report.html -with-timeline timeline.html -with-trace trace.txt
-      volumeMounts:
-        - name: cfg
-          mountPath: /config
-        - name: s3-credentials
-          mountPath: /secrets/s3
-          readOnly: true
+            nextflow run $PIPE $PROFILE $WARG {{ "{{workflow.parameters.params}}" }}               -with-report report.html -with-timeline timeline.html -with-trace trace.txt
+        volumeMounts:
+          - name: cfg
+            mountPath: /config
+          - name: s3-credentials
+            mountPath: /secrets/s3
+            readOnly: true
       volumes:
         - name: cfg
           configMap:
