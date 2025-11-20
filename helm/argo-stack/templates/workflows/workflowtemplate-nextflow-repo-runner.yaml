@@ -2,7 +2,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: nextflow-repo-runner
-  namespace: argo-workflows
+  namespace: {{ .Values.namespaces.argo }}
   labels:
     app.kubernetes.io/name: argo-stack
 spec:
