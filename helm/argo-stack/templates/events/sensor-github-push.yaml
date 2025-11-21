@@ -56,12 +56,20 @@ spec:
                 name: {{ $reg.workflowTemplateRef | default "nextflow-repo-runner" }}
               arguments:
                 parameters:
-                  - name: git_revision
-                    value: '{{`{{ (events.`}}{{ $eventName }}{{`.body.head_commit.id) }}`}}'
-                  - name: git_repo
+                  - name: repo-name
+                    value: {{ $reg.name | quote }}
+                  - name: repo-url
                     value: {{ $reg.repoUrl | quote }}
-                  - name: git_ref
-                    value: '{{`{{ (events.`}}{{ $eventName }}{{`.body.ref) }}`}}'
+                  - name: revision
+                    value: '{{`{{ (events.`}}{{ $eventName }}{{`.body.head_commit.id) }}`}}'
+                  {{- if $reg.artifactBucket }}
+                  - name: artifact-bucket
+                    value: {{ $reg.artifactBucket.bucket | quote }}
+                  - name: artifact-endpoint
+                    value: {{ $reg.artifactBucket.hostname | quote }}
+                  - name: artifact-region
+                    value: {{ $reg.artifactBucket.region | quote }}
+                  {{- end }}
   {{- end }}
 {{- end }}
 {{- end }}
