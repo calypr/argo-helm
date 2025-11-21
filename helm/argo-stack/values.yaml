@@ -91,13 +91,13 @@ externalSecrets:
     # Argo CD secrets
     argocd:
       # Admin password for initial login
-      adminPasswordPath: "argocd/admin#password"
+      adminPasswordPath: "argo/argocd/admin#password"
       # Bcrypt hash of admin password (for argocd-secret)
-      adminPasswordBcryptPath: "argocd/admin#bcryptHash"
+      adminPasswordBcryptPath: "argo/argocd/admin#bcryptHash"
       # OIDC client secret
-      ssoClientSecretPath: "argocd/oidc#clientSecret"
+      ssoClientSecretPath: "argo/argocd/oidc#clientSecret"
       # Server secret key (for session signing)
-      serverSecretKeyPath: "argocd/server#secretKey"
+      serverSecretKeyPath: "argo/argocd/server#secretKey"
     
     # Argo Workflows secrets
     workflows:
