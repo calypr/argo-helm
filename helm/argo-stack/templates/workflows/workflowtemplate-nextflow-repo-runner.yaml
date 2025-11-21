@@ -71,10 +71,10 @@ spec:
           - name: AWS_ACCESS_KEY_ID
             valueFrom:
               secretKeyRef:
-                name: s3-cred-{{ "{{workflow.parameters.repo-name}}" }}
+                name: s3-credentials-{{ "{{workflow.parameters.repo-name}}" }}
                 key: AWS_ACCESS_KEY_ID
           - name: AWS_SECRET_ACCESS_KEY
             valueFrom:
               secretKeyRef:
-                name: s3-cred-{{ "{{workflow.parameters.repo-name}}" }}
+                name: s3-credentials-{{ "{{workflow.parameters.repo-name}}" }}
                 key: AWS_SECRET_ACCESS_KEY
