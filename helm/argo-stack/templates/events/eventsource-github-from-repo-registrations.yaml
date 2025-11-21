@@ -11,8 +11,6 @@ metadata:
     app.kubernetes.io/name: argo-events
     app.kubernetes.io/part-of: argo-stack
     source: repo-registration
-  annotations:
-    "helm.sh/hook": post-install,post-upgrade
 spec:
   github:
     {{- range $reg := .Values.repoRegistrations }}
