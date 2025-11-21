@@ -7,8 +7,6 @@ metadata:
   labels:
     app.kubernetes.io/name: argo-events
     app.kubernetes.io/part-of: argo-stack
-  annotations:
-    "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here      
 spec:
   jetstream:
     version: latest
