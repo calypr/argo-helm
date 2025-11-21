@@ -95,12 +95,12 @@ spec:
           - name: AWS_ACCESS_KEY_ID
             valueFrom:
               secretKeyRef:
-                name: s3-cred-{{ $repoName }}
+                name: s3-credentials-{{ $repoName }}
                 key: AWS_ACCESS_KEY_ID
           - name: AWS_SECRET_ACCESS_KEY
             valueFrom:
               secretKeyRef:
-                name: s3-cred-{{ $repoName }}
+                name: s3-credentials-{{ $repoName }}
                 key: AWS_SECRET_ACCESS_KEY
 {{- end }}
 {{- end }}

@@ -252,12 +252,12 @@ workflowTemplates:
 # - github-repo-registrations (with events for all 3 repos)
 #
 # ExternalSecrets (in wf-poc namespace):
-# - s3-cred-nextflow-hello-project
+# - s3-credentials-nextflow-hello-project
 # - github-secret-nextflow-hello
-# - s3-cred-genomics-variant-calling
+# - s3-credentials-genomics-variant-calling
 # - s3-data-credentials-genomics-variant-calling
 # - github-secret-genomics
-# - s3-cred-local-dev-workflows
+# - s3-credentials-local-dev-workflows
 # - github-secret-internal-dev
 #
 # ConfigMaps (in argo-workflows namespace):
