@@ -156,7 +156,7 @@ deploy: init argo-stack
 	echo starting port forwards
 	kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 --address=0.0.0.0 -n argo-workflows &
 	kubectl port-forward svc/argo-stack-argocd-server         8080:443  --address=0.0.0.0 -n argocd &
-	kubectl port-forward svc/github-eventsource-svc 12000:12000             --address=0.0.0.0 -n argo-events &
+	kubectl port-forward svc/github-repo-registrations-eventsource-svc 12000:12000 --address=0.0.0.0 -n argo-events &
 	echo UIs available on port 2746 and port 8080, event exposed on 12000
 
 adapter:
