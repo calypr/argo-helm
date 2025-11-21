@@ -149,7 +149,8 @@ argo-stack:
 		--set-string s3.hostname=${S3_HOSTNAME} \
 		-f my-values.yaml
 
-deploy: init argo-stack
+deploy: init argo-stack ports
+ports:	
 	echo waiting for pods
 	sleep 10
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
@@ -304,7 +305,7 @@ vault-cleanup:
 
 vault-auth:
 	@echo "🧹 Binding ServiceAccount to Vault dev server..."
-	@printf '%s\n' 'path "kv/data/argo/*" {' '  capabilities = ["read"]' '}' \
+	@printf '%s\n%s\n' 'path "kv/data/argo/*" {' '  capabilities = ["read"]' '}' \
 	  | kubectl exec -i -n vault vault-0 -- vault policy write argo-stack -
 	@kubectl exec -n vault vault-0 -- vault write auth/kubernetes/role/argo-stack \
                 bound_service_account_names=eso-vault-auth \
