@@ -372,6 +372,20 @@ eso-install:
 	@kubectl wait --for condition=established --timeout=60s crd/externalsecrets.external-secrets.io
 	@kubectl wait --for condition=established --timeout=60s crd/secretstores.external-secrets.io
 	@kubectl wait --for condition=established --timeout=60s crd/clustersecretstores.external-secrets.io
+	@echo "⏳ Waiting for webhook CA certificate to be generated..."
+	@MAX_WAIT=60; \
+	ELAPSED=0; \
+	while [ $$ELAPSED -lt $$MAX_WAIT ]; do \
+		if kubectl get validatingwebhookconfiguration externalsecret-validate -o jsonpath='{.webhooks[0].clientConfig.caBundle}' 2>/dev/null | grep -q "."; then \
+			echo "✅ Webhook CA certificate is ready"; \
+			break; \
+		fi; \
+		sleep 2; \
+		ELAPSED=$$((ELAPSED + 2)); \
+	done; \
+	if [ $$ELAPSED -ge $$MAX_WAIT ]; then \
+		echo "⚠️  Webhook CA certificate not ready after $${MAX_WAIT}s, but continuing..."; \
+	fi
 	@echo "✅ External Secrets Operator installed successfully"
 
 eso-status:
