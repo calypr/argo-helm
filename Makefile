@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup
+.PHONY: deps lint template validate kind ct adapter test-artifacts test-secrets all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup
 
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
@@ -165,6 +165,42 @@ adapter:
 
 test-artifacts:
 	./test-per-app-artifacts.sh
+
+test-secrets:
+	@echo "🔐 Validating ExternalSecrets exist and are valid..."
+	@echo ""
+	@echo "📋 Checking ArgoCD ExternalSecrets in namespace: argocd"
+	@kubectl get externalsecret argocd-secret -n argocd -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ argocd-secret not found"
+	@kubectl get externalsecret argocd-initial-admin-secret -n argocd -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ argocd-initial-admin-secret not found"
+	@echo ""
+	@echo "📋 Checking GitHub ExternalSecrets in namespace: argo-events"
+	@kubectl get externalsecret github-secret-nextflow-hello -n argo-events -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ github-secret-nextflow-hello not found"
+	@kubectl get externalsecret github-secret-genomics -n argo-events -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ github-secret-genomics not found"
+	@kubectl get externalsecret github-secret-internal-dev -n argo-events -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ github-secret-internal-dev not found"
+	@echo ""
+	@echo "📋 Checking S3 ExternalSecrets in tenant namespaces"
+	@kubectl get externalsecret s3-credentials-nextflow-hello-project -n wf-bwalsh-nextflow-hello-project -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ s3-credentials-nextflow-hello-project not found in wf-bwalsh-nextflow-hello-project"
+	@kubectl get externalsecret s3-credentials-genomics-variant-calling -n wf-genomics-lab-variant-calling-pipeline -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ s3-credentials-genomics-variant-calling not found in wf-genomics-lab-variant-calling-pipeline"
+	@kubectl get externalsecret s3-data-credentials-genomics-variant-calling -n wf-genomics-lab-variant-calling-pipeline -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ s3-data-credentials-genomics-variant-calling not found in wf-genomics-lab-variant-calling-pipeline"
+	@kubectl get externalsecret s3-credentials-local-dev-workflows -n wf-internal-dev-workflows -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ s3-credentials-local-dev-workflows not found in wf-internal-dev-workflows"
+	@echo ""
+	@echo "📊 Summary of all ExternalSecrets:"
+	@echo "Namespace: argocd"
+	@kubectl get externalsecret -n argocd -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SYNCED:.status.conditions[?(@.type=="Ready")].lastTransitionTime' 2>/dev/null || echo "  No ExternalSecrets found"
+	@echo ""
+	@echo "Namespace: argo-events"
+	@kubectl get externalsecret -n argo-events -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SYNCED:.status.conditions[?(@.type=="Ready")].lastTransitionTime' 2>/dev/null || echo "  No ExternalSecrets found"
+	@echo ""
+	@echo "Namespace: wf-bwalsh-nextflow-hello-project"
+	@kubectl get externalsecret -n wf-bwalsh-nextflow-hello-project -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SYNCED:.status.conditions[?(@.type=="Ready")].lastTransitionTime' 2>/dev/null || echo "  No ExternalSecrets found"
+	@echo ""
+	@echo "Namespace: wf-genomics-lab-variant-calling-pipeline"
+	@kubectl get externalsecret -n wf-genomics-lab-variant-calling-pipeline -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SYNCED:.status.conditions[?(@.type=="Ready")].lastTransitionTime' 2>/dev/null || echo "  No ExternalSecrets found"
+	@echo ""
+	@echo "Namespace: wf-internal-dev-workflows"
+	@kubectl get externalsecret -n wf-internal-dev-workflows -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SYNCED:.status.conditions[?(@.type=="Ready")].lastTransitionTime' 2>/dev/null || echo "  No ExternalSecrets found"
+	@echo ""
+	@echo "✅ ExternalSecret validation complete"
 
 password:
 	kubectl get secret argocd-initial-admin-secret \
