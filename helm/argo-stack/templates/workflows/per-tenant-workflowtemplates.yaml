@@ -41,24 +41,21 @@ spec:
       - name: work-dir
         description: "Work directory inside the container."
         value: "/workspace"
-      {{- if $reg.artifactBucket }}
       - name: artifact-bucket
         description: "Artifact bucket name (from RepoRegistration.spec.artifactBucket.bucket)."
+        {{- if $reg.artifactBucket }}
         value: {{ $reg.artifactBucket.bucket | quote }}
+        {{- end }}
       - name: artifact-endpoint
         description: "Artifact S3 endpoint hostname/URL."
+        {{- if $reg.artifactBucket }}
         value: {{ $reg.artifactBucket.hostname | quote }}
+        {{- end }}
       - name: artifact-region
         description: "Artifact S3 region."
+        {{- if $reg.artifactBucket }}
         value: {{ $reg.artifactBucket.region | quote }}
-      {{- else }}
-      - name: artifact-bucket
-        description: "Artifact bucket name (from RepoRegistration.spec.artifactBucket.bucket)."
-      - name: artifact-endpoint
-        description: "Artifact S3 endpoint hostname/URL."
-      - name: artifact-region
-        description: "Artifact S3 region."
-      {{- end }}
+        {{- end }}
 
   templates:
     - name: run-nextflow
