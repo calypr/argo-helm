@@ -45,10 +45,10 @@ data:
       useSDKCreds: {{ .artifactBucket.useSDKCreds }}
       {{- else }}
       accessKeySecret:
-        name: s3-credentials-{{ .name }}
+        name: s3-cred-{{ .name }}
         key: AWS_ACCESS_KEY_ID
       secretKeySecret:
-        name: s3-credentials-{{ .name }}
+        name: s3-cred-{{ .name }}
         key: AWS_SECRET_ACCESS_KEY
       useSDKCreds: false
       {{- end }}
