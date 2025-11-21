@@ -6,7 +6,9 @@ metadata:
   namespace: {{ .Values.events.namespace | default "argo-events" }}
   labels:
     app.kubernetes.io/name: argo-events
-    app.kubernetes.io/part-of: argo-stack      
+    app.kubernetes.io/part-of: argo-stack
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here      
 spec:
   jetstream:
     version: latest
