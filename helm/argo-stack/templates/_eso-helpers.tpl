@@ -125,3 +125,32 @@ Example: https://github.com/bwalsh/nextflow-hello-project.git -> repo_push-bwals
 {{- printf "repo_push-%s" .name -}}
 {{- end -}}
 {{- end -}}
+
+{{/*
+Extract vault key from path#property format
+Example: "argo/argocd/admin#password" -> "argo/argocd/admin"
+*/}}
+{{- define "argo-stack.vault.extractKey" -}}
+{{- $path := . -}}
+{{- if contains "#" $path -}}
+{{- $parts := splitList "#" $path -}}
+{{- index $parts 0 -}}
+{{- else -}}
+{{- $path -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Extract property from path#property format
+Example: "argo/argocd/admin#password" -> "password"
+Returns empty string if no property specified
+*/}}
+{{- define "argo-stack.vault.extractProperty" -}}
+{{- $path := . -}}
+{{- if contains "#" $path -}}
+{{- $parts := splitList "#" $path -}}
+{{- if gt (len $parts) 1 -}}
+{{- index $parts 1 -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
