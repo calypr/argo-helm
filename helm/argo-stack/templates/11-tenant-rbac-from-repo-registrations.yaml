@@ -6,7 +6,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: workflow-runner
+  name: wf-runner
   namespace: {{ $namespace }}
   labels:
     app.kubernetes.io/name: {{ $reg.name }}
@@ -79,7 +79,7 @@ roleRef:
   name: workflow-executor
 subjects:
   - kind: ServiceAccount
-    name: workflow-runner
+    name: wf-runner
     namespace: {{ $namespace }}
 ---
 # Role for Argo Events Sensor to create workflows in tenant namespace: {{ $reg.name }}
