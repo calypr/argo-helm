@@ -252,7 +252,7 @@ events:
   eventBus:
     create: true
     name: default
-    natsNative: {}  # use NATS native by default
+    # natsNative: {}  # use NATS native by default
 
   github:
     enabled: true

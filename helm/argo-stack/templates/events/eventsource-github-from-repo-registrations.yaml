@@ -12,7 +12,8 @@ metadata:
     app.kubernetes.io/part-of: argo-stack
     source: repo-registration
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "5"
 spec:
   github:
     {{- range $reg := .Values.repoRegistrations }}
