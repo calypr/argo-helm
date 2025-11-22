@@ -1,3 +1,8 @@
 .idea/
 .venv/
+venv/
+.env
 __pycache__/
+rendered.yaml
+helm/argo-stack/charts/argo-events-*.tgz
+helm/argo-stack/charts/external-secrets-*.tgz

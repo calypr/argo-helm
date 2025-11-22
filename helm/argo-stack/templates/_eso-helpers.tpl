@@ -86,3 +86,71 @@ appRole:
     key: {{ .Values.externalSecrets.vault.auth.approle.secretRef.key | quote }}
 {{- end }}
 {{- end -}}
+
+{{/*
+Generate namespace name from repoRegistration using wf-<org>-<repo> pattern
+Expects a repoRegistration object with a repoUrl field
+Example: https://github.com/bwalsh/nextflow-hello-project.git -> wf-bwalsh-nextflow-hello-project
+Note: Uses dashes as separators since Kubernetes namespace names must be valid DNS-1123 labels
+*/}}
+{{- define "argo-stack.repoRegistration.namespace" -}}
+{{- $repoUrl := .repoUrl -}}
+{{- $cleaned := trimSuffix ".git" $repoUrl -}}
+{{- $cleaned = trimPrefix "https://" $cleaned -}}
+{{- $cleaned = trimPrefix "http://" $cleaned -}}
+{{- $cleaned = trimPrefix "github.com/" $cleaned -}}
+{{- $parts := splitList "/" $cleaned -}}
+{{- if ge (len $parts) 2 -}}
+{{- printf "wf-%s-%s" (index $parts 0) (index $parts 1) -}}
+{{- else -}}
+{{- printf "wf-%s" .name -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Generate event name from repoRegistration using repo_push-<org>-<repo> pattern
+Expects a repoRegistration object with a repoUrl field
+Example: https://github.com/bwalsh/nextflow-hello-project.git -> repo_push-bwalsh-nextflow-hello-project
+*/}}
+{{- define "argo-stack.repoRegistration.eventName" -}}
+{{- $repoUrl := .repoUrl -}}
+{{- $cleaned := trimSuffix ".git" $repoUrl -}}
+{{- $cleaned = trimPrefix "https://" $cleaned -}}
+{{- $cleaned = trimPrefix "http://" $cleaned -}}
+{{- $cleaned = trimPrefix "github.com/" $cleaned -}}
+{{- $parts := splitList "/" $cleaned -}}
+{{- if ge (len $parts) 2 -}}
+{{- printf "repo_push-%s-%s" (index $parts 0) (index $parts 1) -}}
+{{- else -}}
+{{- printf "repo_push-%s" .name -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Extract vault key from path#property format
+Example: "argo/argocd/admin#password" -> "argo/argocd/admin"
+*/}}
+{{- define "argo-stack.vault.extractKey" -}}
+{{- $path := . -}}
+{{- if contains "#" $path -}}
+{{- $parts := splitList "#" $path -}}
+{{- index $parts 0 -}}
+{{- else -}}
+{{- $path -}}
+{{- end -}}
+{{- end -}}
+
+{{/*
+Extract property from path#property format
+Example: "argo/argocd/admin#password" -> "password"
+Returns empty string if no property specified
+*/}}
+{{- define "argo-stack.vault.extractProperty" -}}
+{{- $path := . -}}
+{{- if contains "#" $path -}}
+{{- $parts := splitList "#" $path -}}
+{{- if gt (len $parts) 1 -}}
+{{- index $parts 1 -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}

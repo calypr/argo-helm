@@ -91,13 +91,13 @@ externalSecrets:
     # Argo CD secrets
     argocd:
       # Admin password for initial login
-      adminPasswordPath: "argocd/admin#password"
+      adminPasswordPath: "argo/argocd/admin#password"
       # Bcrypt hash of admin password (for argocd-secret)
-      adminPasswordBcryptPath: "argocd/admin#bcryptHash"
+      adminPasswordBcryptPath: "argo/argocd/admin#bcryptHash"
       # OIDC client secret
-      ssoClientSecretPath: "argocd/oidc#clientSecret"
+      ssoClientSecretPath: "argo/argocd/oidc#clientSecret"
       # Server secret key (for session signing)
-      serverSecretKeyPath: "argocd/server#secretKey"
+      serverSecretKeyPath: "argo/argocd/server#secretKey"
     
     # Argo Workflows secrets
     workflows:
@@ -216,84 +216,28 @@ ingressAuth:
   passAuthorization: true
 
 # ============================================================================
-# Argo CD Applications - Multi-Application Support (RECOMMENDED)
+# Argo CD Applications - Multi-Application Support (REMOVED)
 # ============================================================================
-# Use this array to deploy multiple Argo CD Applications.
-# Each entry creates a separate Application resource.
+# ⚠️ DEPRECATED: Legacy Application Configuration Pattern
+# ============================================================================
+# The 'applications' array pattern has been REMOVED.
+# Please use the RepoRegistration pattern instead.
 #
-# Per-Repository Artifact Configuration:
-# Each application can have its own S3 bucket/prefix for workflow artifacts.
-# This enables tenant isolation, data governance, and traceability.
+# See:
+# - docs/DEPRECATION_NOTICE.md for migration guidance
+# - docs/repo-registration-guide.md for the new pattern
+# - examples/repo-registrations-values.yaml for examples
 #
-# Example:
-# applications:
-#   - name: nextflow-hello-project
-#     project: default
-#     repoURL: https://github.com/bwalsh/nextflow-hello-project.git
-#     targetRevision: main
-#     path: "."
-#     destination:
-#       server: https://kubernetes.default.svc
-#       namespace: argo
-#     syncPolicy:
-#       automated:
-#         prune: true
-#         selfHeal: true
-#     artifacts:
-#       bucket: calypr-nextflow-hello
-#       keyPrefix: workflows/
-#       endpoint: https://s3.us-west-2.amazonaws.com
-#       region: us-west-2
-#       insecure: false
-#       credentialsSecret: s3-cred-nextflow-hello
-#       # Optional: Use IRSA/Workload Identity instead of static credentials
-#       # useSDKCreds: true
+# The templates that used this configuration have been removed:
+# - argocd/applications.yaml (removed)
+# - workflows/per-app-workflowtemplates.yaml (removed)
+# - 21-per-app-artifact-repositories.yaml (removed)
+# - eso/externalsecret-per-app-s3.yaml (removed)
+# - events/eventsource-github.yaml (removed)
 #
-#   - name: nextflow-hello-project-2
-#     project: default
-#     repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
-#     targetRevision: main
-#     path: "."
-#     destination:
-#       namespace: argo
-#     syncPolicy:
-#       automated:
-#         prune: true
-#         selfHeal: true
-#     artifacts:
-#       bucket: calypr-nextflow-hello-2
-#       keyPrefix: workflows/
-#       endpoint: https://s3.us-west-2.amazonaws.com
-#       region: us-west-2
-#       credentialsSecret: s3-cred-nextflow-hello-2
-#
-# If no artifacts config is provided for an application, it will fall back
-# to the global s3 configuration defined above.
-#
-
-applications: []
-  # Example application configurations (provide your own at deployment time):
-  #
-  # - name: my-workflow-app
-  #   project: default
-  #   repoURL: https://github.com/YOUR_ORG/YOUR_REPO.git
-  #   targetRevision: main
-  #   path: "."
-  #   destination:
-  #     namespace: wf-poc
-  #   syncPolicy:
-  #     automated:
-  #       prune: true
-  #       selfHeal: true
-  #   # Optional: Per-repository artifact storage
-  #   # artifacts:
-  #   #   bucket: my-app-artifacts
-  #   #   keyPrefix: workflows/
-  #   #   endpoint: https://s3.us-west-2.amazonaws.com
-  #   #   region: us-west-2
-  #   #   credentialsSecret: my-app-s3-creds
-  #
-  # See examples/per-repo-artifacts-values.yaml for complete examples
+# Migration path:
+# Convert each application entry to a repoRegistrations entry below.
+# ============================================================================
 
 # ============================================================================
 # Argo Events Configuration - GitHub EventSource and Sensor
@@ -306,32 +250,23 @@ events:
   eventBus:
     create: true
     name: default
-    natsNative: {}  # use NATS native by default
+    # natsNative: {}  # use NATS native by default
 
   github:
     enabled: true
     name: github
 
     # ========================================================================
-    # Multi-Repository Support (RECOMMENDED)
+    # ⚠️ DEPRECATED: Legacy Repository Configuration Pattern (REMOVED)
     # ========================================================================
-    # Define multiple repositories in an array. Each repository gets its own
-    # event name within the same EventSource.
+    # The 'repositories' array pattern has been REMOVED.
+    # Please use the RepoRegistration pattern instead.
     #
-    # Example:
-    repositories: []
-      # - eventName: repo_push_my_project  # Must align with sensor event, must be unique
-      #   owner: YOUR_GITHUB_ORG
-      #   repository: your-repo-name
-      #   events: ["push"]
-      #   active: true
-      # - eventName: repo_push_another_project
-      #   owner: YOUR_GITHUB_ORG
-      #   repository: another-repo
-      #   events: ["push"]
-      #   active: true
-      #
-      # See examples/per-repo-artifacts-values.yaml for complete examples
+    # See:
+    # - docs/DEPRECATION_NOTICE.md for migration guidance
+    # - docs/repo-registration-guide.md for the new pattern
+    # - examples/repo-registrations-values.yaml for examples
+    # ========================================================================
 
     # ========================================================================
     # Secret for GitHub API Token
@@ -363,26 +298,90 @@ events:
         hosts: []  # Add your public hostname to create Ingress, e.g., ["webhooks.example.com"]
         tls: []
 
-  sensor:
-    enabled: true
-    name: run-nextflow-on-push
-    workflowNamespace: wf-poc
-    workflowTemplateRef: nextflow-hello-template
-    parameters:
-      - name: git_revision
-        valueFrom: "{{(events.push.body.head_commit.id)}}"  # from GitHub payload
+  # ========================================================================
+  # Legacy sensor configuration has been removed.
+  # Sensors are now automatically generated from repoRegistrations.
+  # See templates/events/sensor-github-push.yaml
+  # ========================================================================
 
-workflowTemplates:
-  createExample: true
-  namespace: wf-poc
-  nextflowHello:
-    name: nextflow-hello-template
-    image: alpine:3.20
-    command: ["/bin/sh", "-c"]
-    args:
-      - echo "Hello from Argo Events!"
+# ============================================================================
+# Workflow Execution Configuration
+# ============================================================================
+# The RepoRegistration pattern automatically creates per-tenant:
+# - Namespaces (wf-<tenant>-<repo>)
+# - ServiceAccounts (wf-runner)
+# - RBAC roles and bindings
+# - WorkflowTemplates (nextflow-repo-runner)
+#
+# Legacy static namespace configuration has been removed.
+# See templates/11-tenant-rbac-from-repo-registrations.yaml for details.
 
 workflows:
-  namespace: wf-poc
+  # ServiceAccount name used by workflow pods in tenant namespaces
+  # This is created automatically per tenant by repoRegistrations
   runnerServiceAccount: wf-runner
-  templateRef: nextflow-hello-template
+
+# ============================================================================
+# RepoRegistration - Self-Service Repository Onboarding (DECLARATIVE)
+# ============================================================================
+# Alternative to manually defining applications and events.github.repositories.
+# Use this array to define repositories using the RepoRegistration model.
+# The chart will automatically generate:
+# - ArgoCD Applications
+# - Argo Events GitHub EventSources
+# - ExternalSecrets for S3 and GitHub credentials
+# - Artifact Repository ConfigMaps
+#
+# Each entry follows the RepoRegistration CRD schema.
+# See docs/repo-registration-guide.md for complete documentation.
+#
+# Example:
+# repoRegistrations:
+#   - name: my-nextflow-project
+#     repoUrl: https://github.com/myorg/my-nextflow-project.git
+#     defaultBranch: main
+#     tenant: myorg
+#     # namespace is auto-generated as wf-<tenant>-<repo-name>
+#     workflowTemplateRef: nextflow-repo-runner
+#     artifactBucket:
+#       hostname: https://s3.us-west-2.amazonaws.com
+#       bucket: my-project-artifacts
+#       region: us-west-2
+#       insecure: false
+#       pathStyle: false
+#       externalSecretPath: argo/apps/my-nextflow-project/s3/artifacts
+#     dataBucket:
+#       hostname: https://s3.us-west-2.amazonaws.com
+#       bucket: my-project-data
+#       region: us-west-2
+#       externalSecretPath: argo/apps/my-nextflow-project/s3/data
+#     githubSecretName: github-secret-my-project
+#     githubSecretPath: argo/apps/my-nextflow-project/github
+#     adminUsers:
+#       - admin@myorg.com
+#     readUsers:
+#       - viewer@myorg.com
+#     isPublic: false
+#
+# See examples/repo-registrations-example.yaml for more examples
+
+repoRegistrations: []
+  # Example configurations (provide your own at deployment time):
+  #
+  # - name: nextflow-hello-project
+  #   repoUrl: https://github.com/YOUR_ORG/nextflow-hello-project.git
+  #   defaultBranch: main
+  #   tenant: myorg
+  #   # namespace is auto-generated as wf-<tenant>-<repo-name>
+  #   workflowTemplateRef: nextflow-repo-runner
+  #   artifactBucket:
+  #     hostname: https://s3.us-west-2.amazonaws.com
+  #     bucket: myorg-nextflow-artifacts
+  #     region: us-west-2
+  #     externalSecretPath: argo/apps/nextflow-hello-project/s3/artifacts
+  #   githubSecretName: github-secret-nextflow-hello
+  #   githubSecretPath: argo/apps/nextflow-hello-project/github
+  #   adminUsers:
+  #     - admin@myorg.com
+  #
+  # See examples/repo-registrations-example.yaml and docs/repo-registration-guide.md

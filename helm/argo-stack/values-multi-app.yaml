@@ -1,5 +1,5 @@
-# Test values for multi-application support
-# This file demonstrates deploying multiple Argo CD Applications
+# Test values for multi-application support using RepoRegistration pattern
+# This file demonstrates deploying multiple repositories using repoRegistrations
 
 # Keep namespaces as-is; they're used in templates
 namespaces:
@@ -13,52 +13,63 @@ namespaces:
 argocdApplication:
   enabled: false
 
-# Use new multi-application array
-applications:
+# Use new repoRegistrations pattern
+repoRegistrations:
   - name: nextflow-hello-project
-    project: default
-    repoURL: https://github.com/bwalsh/nextflow-hello-project.git
-    targetRevision: main
-    path: "."
-    destination:
-      namespace: wf-poc
-    syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true
-    # Per-repository artifact configuration
-    artifacts:
+    repoUrl: https://github.com/bwalsh/nextflow-hello-project.git
+    defaultBranch: main
+    tenant: research-team-1
+    workflowTemplateRef: nextflow-repo-runner
+    
+    # Artifact bucket configuration
+    artifactBucket:
+      hostname: https://s3.us-west-2.amazonaws.com
       bucket: calypr-nextflow-hello
-      keyPrefix: workflows/
-      endpoint: https://s3.us-west-2.amazonaws.com
       region: us-west-2
       insecure: false
-      credentialsSecret: s3-cred-nextflow-hello
+      pathStyle: false
+      keyPrefix: workflows/
+      externalSecretPath: argo/apps/nextflow-hello-project/s3/artifacts
+    
+    # GitHub credentials
+    githubSecretName: github-secret-nextflow-hello
+    githubSecretPath: argo/apps/nextflow-hello-project/github
+    
+    # Access control (Fence-authenticated emails)
+    adminUsers:
+      - admin@research.edu
+    readUsers:
+      - viewer@research.edu
+    
+    isPublic: false
 
   - name: nextflow-hello-project-2
-    project: default
-    repoURL: https://github.com/bwalsh/nextflow-hello-project-2.git
-    targetRevision: main
-    path: "."
-    destination:
-      namespace: wf-poc
-    syncPolicy:
-      automated:
-        prune: true
-        selfHeal: true
-    # Per-repository artifact configuration
-    artifacts:
+    repoUrl: https://github.com/bwalsh/nextflow-hello-project-2.git
+    defaultBranch: main
+    tenant: research-team-2
+    workflowTemplateRef: nextflow-repo-runner
+    
+    # Artifact bucket configuration
+    artifactBucket:
+      hostname: https://s3.us-west-2.amazonaws.com
       bucket: calypr-nextflow-hello-2
-      keyPrefix: workflows/
-      endpoint: https://s3.us-west-2.amazonaws.com
       region: us-west-2
       insecure: false
-      credentialsSecret: s3-cred-nextflow-hello-2
-    # Optional: Per-application workflow template configuration
-    # workflow:
-    #   image: nextflow/nextflow:latest
-    #   command: ["nextflow"]
-    #   args: ["run", "main.nf"]
+      pathStyle: false
+      keyPrefix: workflows/
+      externalSecretPath: argo/apps/nextflow-hello-project-2/s3/artifacts
+    
+    # GitHub credentials
+    githubSecretName: github-secret-nextflow-hello-2
+    githubSecretPath: argo/apps/nextflow-hello-project-2/github
+    
+    # Access control (Fence-authenticated emails)
+    adminUsers:
+      - admin@research2.edu
+    readUsers:
+      - viewer@research2.edu
+    
+    isPublic: false
 
 # Turn off Argo CD dependency for testing
 argo-cd:
@@ -75,17 +86,13 @@ ingress:
 authzAdapter:
   replicas: 1
 
-# No S3 for testing
+# No global S3 for testing (use per-repo configuration)
 s3:
   enabled: false
 
 # No events for testing
 events:
   enabled: false
-
-# No workflow templates for testing
-workflowTemplates:
-  createExample: false
 
 # Ensure Argo Workflows server is up (HTTP) and controller installs
 argo-workflows:

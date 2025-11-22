@@ -1,0 +1,65 @@
+{{- /*
+Per-Tenant Artifact Repositories ConfigMap
+Creates an artifact-repositories ConfigMap in each tenant namespace.
+This ConfigMap is required by Argo Workflows to locate artifact storage.
+*/ -}}
+{{- if .Values.repoRegistrations }}
+{{- range $reg := .Values.repoRegistrations }}
+{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+{{- if $reg.artifactBucket }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: artifact-repositories
+  namespace: {{ $namespace }}
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/component: artifact-repository
+    app.kubernetes.io/managed-by: helm
+    calypr.io/application: {{ $reg.name }}
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "2"
+    helm.sh/hook-delete-policy: before-hook-creation
+    repo-registration/name: {{ $reg.name | quote }}
+    repo-registration/repo-url: {{ $reg.repoUrl | quote }}
+data:
+  default-v1: |
+    archiveLogs: true
+    s3:
+      bucket: {{ $reg.artifactBucket.bucket }}
+      {{- if $reg.artifactBucket.keyPrefix }}
+      keyPrefix: {{ $reg.artifactBucket.keyPrefix }}
+      {{- else }}
+      keyPrefix: "workflows/"
+      {{- end }}
+      {{- if $reg.artifactBucket.hostname }}
+      endpoint: {{ $reg.artifactBucket.hostname }}
+      {{- end }}
+      {{- if $reg.artifactBucket.region }}
+      region: {{ $reg.artifactBucket.region }}
+      {{- end }}
+      insecure: {{ $reg.artifactBucket.insecure | default false }}
+      {{- if $reg.artifactBucket.useSDKCreds }}
+      useSDKCreds: {{ $reg.artifactBucket.useSDKCreds }}
+      {{- else }}
+      accessKeySecret:
+        name: s3-credentials-{{ $reg.name }}
+        key: AWS_ACCESS_KEY_ID
+      secretKeySecret:
+        name: s3-credentials-{{ $reg.name }}
+        key: AWS_SECRET_ACCESS_KEY
+      useSDKCreds: false
+      {{- end }}
+      {{- if $reg.artifactBucket.pathStyle }}
+      pathStyle: {{ $reg.artifactBucket.pathStyle }}
+      {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
