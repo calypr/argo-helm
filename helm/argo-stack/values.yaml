@@ -216,7 +216,7 @@ ingressAuth:
   passAuthorization: true
 
 # ============================================================================
-# Argo CD Applications - Multi-Application Support (RECOMMENDED)
+# Argo CD Applications - Multi-Application Support (REMOVED)
 # ============================================================================
 # ⚠️ DEPRECATED: Legacy Application Configuration Pattern
 # ============================================================================
@@ -225,11 +225,12 @@ ingressAuth:
 #
 # See:
 # - docs/DEPRECATION_NOTICE.md for migration guidance
-# - docs/REPO_REGISTRATION_USER_GUIDE.md for the new pattern
+# - docs/repo-registration-guide.md for the new pattern
 # - examples/repo-registrations-values.yaml for examples
 #
 # The templates that used this configuration have been removed:
 # - argocd/applications.yaml (removed)
+# - workflows/per-app-workflowtemplates.yaml (removed)
 # - 21-per-app-artifact-repositories.yaml (removed)
 # - eso/externalsecret-per-app-s3.yaml (removed)
 # - events/eventsource-github.yaml (removed)
@@ -237,9 +238,6 @@ ingressAuth:
 # Migration path:
 # Convert each application entry to a repoRegistrations entry below.
 # ============================================================================
-
-# Keep this empty to avoid confusion
-applications: []
 
 # ============================================================================
 # Argo Events Configuration - GitHub EventSource and Sensor
@@ -259,23 +257,16 @@ events:
     name: github
 
     # ========================================================================
-    # ⚠️ DEPRECATED: Legacy Repository Configuration Pattern
+    # ⚠️ DEPRECATED: Legacy Repository Configuration Pattern (REMOVED)
     # ========================================================================
     # The 'repositories' array pattern has been REMOVED.
     # Please use the RepoRegistration pattern instead.
     #
     # See:
     # - docs/DEPRECATION_NOTICE.md for migration guidance
-    # - docs/REPO_REGISTRATION_USER_GUIDE.md for the new pattern
+    # - docs/repo-registration-guide.md for the new pattern
     # - examples/repo-registrations-values.yaml for examples
-    #
-    # The template that used this configuration has been removed:
-    # - events/eventsource-github.yaml (removed)
-    #
-    # Migration path:
-    # Convert each repository entry to a repoRegistrations entry below.
     # ========================================================================
-    repositories: []
 
     # ========================================================================
     # Secret for GitHub API Token
@@ -307,29 +298,28 @@ events:
         hosts: []  # Add your public hostname to create Ingress, e.g., ["webhooks.example.com"]
         tls: []
 
-  sensor:
-    enabled: true
-    name: run-nextflow-on-push
-    workflowNamespace: wf-poc
-    workflowTemplateRef: nextflow-hello-template
-    parameters:
-      - name: git_revision
-        valueFrom: "{{(events.push.body.head_commit.id)}}"  # from GitHub payload
+  # ========================================================================
+  # Legacy sensor configuration has been removed.
+  # Sensors are now automatically generated from repoRegistrations.
+  # See templates/events/sensor-github-push.yaml
+  # ========================================================================
 
-workflowTemplates:
-  createExample: true
-  namespace: wf-poc
-  nextflowHello:
-    name: nextflow-hello-template
-    image: alpine:3.20
-    command: ["/bin/sh", "-c"]
-    args:
-      - echo "Hello from Argo Events!"
+# ============================================================================
+# Workflow Execution Configuration
+# ============================================================================
+# The RepoRegistration pattern automatically creates per-tenant:
+# - Namespaces (wf-<tenant>-<repo>)
+# - ServiceAccounts (wf-runner)
+# - RBAC roles and bindings
+# - WorkflowTemplates (nextflow-repo-runner)
+#
+# Legacy static namespace configuration has been removed.
+# See templates/11-tenant-rbac-from-repo-registrations.yaml for details.
 
 workflows:
-  namespace: wf-poc
+  # ServiceAccount name used by workflow pods in tenant namespaces
+  # This is created automatically per tenant by repoRegistrations
   runnerServiceAccount: wf-runner
-  templateRef: nextflow-hello-template
 
 # ============================================================================
 # RepoRegistration - Self-Service Repository Onboarding (DECLARATIVE)
@@ -351,7 +341,7 @@ workflows:
 #     repoUrl: https://github.com/myorg/my-nextflow-project.git
 #     defaultBranch: main
 #     tenant: myorg
-#     namespace: wf-poc
+#     # namespace is auto-generated as wf-<tenant>-<repo-name>
 #     workflowTemplateRef: nextflow-repo-runner
 #     artifactBucket:
 #       hostname: https://s3.us-west-2.amazonaws.com
@@ -382,7 +372,7 @@ repoRegistrations: []
   #   repoUrl: https://github.com/YOUR_ORG/nextflow-hello-project.git
   #   defaultBranch: main
   #   tenant: myorg
-  #   namespace: wf-poc
+  #   # namespace is auto-generated as wf-<tenant>-<repo-name>
   #   workflowTemplateRef: nextflow-repo-runner
   #   artifactBucket:
   #     hostname: https://s3.us-west-2.amazonaws.com
