@@ -1,9 +1,9 @@
-# wf-poc/sensor-argo-events-rbac.yaml
+# {{ .Values.namespaces.tenant }}/sensor-argo-events-rbac.yaml
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: argo-events-workflow-access
-  namespace: wf-poc
+  namespace: {{ .Values.namespaces.tenant }}
 rules:
 - apiGroups: ["argoproj.io"]
   resources:
@@ -19,7 +19,7 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: argo-events-workflow-access-binding
-  namespace: wf-poc
+  namespace: {{ .Values.namespaces.tenant }}
 subjects:
 - kind: ServiceAccount
   name: default                  # 👈 the SA in argo-events namespace

@@ -216,7 +216,7 @@ ingressAuth:
   passAuthorization: true
 
 # ============================================================================
-# Argo CD Applications - Multi-Application Support (RECOMMENDED)
+# Argo CD Applications - Multi-Application Support (REMOVED)
 # ============================================================================
 # ⚠️ DEPRECATED: Legacy Application Configuration Pattern
 # ============================================================================
@@ -225,11 +225,12 @@ ingressAuth:
 #
 # See:
 # - docs/DEPRECATION_NOTICE.md for migration guidance
-# - docs/REPO_REGISTRATION_USER_GUIDE.md for the new pattern
+# - docs/repo-registration-guide.md for the new pattern
 # - examples/repo-registrations-values.yaml for examples
 #
 # The templates that used this configuration have been removed:
 # - argocd/applications.yaml (removed)
+# - workflows/per-app-workflowtemplates.yaml (removed)
 # - 21-per-app-artifact-repositories.yaml (removed)
 # - eso/externalsecret-per-app-s3.yaml (removed)
 # - events/eventsource-github.yaml (removed)
@@ -237,9 +238,6 @@ ingressAuth:
 # Migration path:
 # Convert each application entry to a repoRegistrations entry below.
 # ============================================================================
-
-# Keep this empty to avoid confusion
-applications: []
 
 # ============================================================================
 # Argo Events Configuration - GitHub EventSource and Sensor
@@ -259,23 +257,16 @@ events:
     name: github
 
     # ========================================================================
-    # ⚠️ DEPRECATED: Legacy Repository Configuration Pattern
+    # ⚠️ DEPRECATED: Legacy Repository Configuration Pattern (REMOVED)
     # ========================================================================
     # The 'repositories' array pattern has been REMOVED.
     # Please use the RepoRegistration pattern instead.
     #
     # See:
     # - docs/DEPRECATION_NOTICE.md for migration guidance
-    # - docs/REPO_REGISTRATION_USER_GUIDE.md for the new pattern
+    # - docs/repo-registration-guide.md for the new pattern
     # - examples/repo-registrations-values.yaml for examples
-    #
-    # The template that used this configuration has been removed:
-    # - events/eventsource-github.yaml (removed)
-    #
-    # Migration path:
-    # Convert each repository entry to a repoRegistrations entry below.
     # ========================================================================
-    repositories: []
 
     # ========================================================================
     # Secret for GitHub API Token
@@ -307,14 +298,17 @@ events:
         hosts: []  # Add your public hostname to create Ingress, e.g., ["webhooks.example.com"]
         tls: []
 
-  sensor:
-    enabled: true
-    name: run-nextflow-on-push
-    workflowNamespace: wf-poc
-    workflowTemplateRef: nextflow-hello-template
-    parameters:
-      - name: git_revision
-        valueFrom: "{{(events.push.body.head_commit.id)}}"  # from GitHub payload
+  # ========================================================================
+  # Legacy sensor configuration has been removed.
+  # Sensors are now automatically generated from repoRegistrations.
+  # See templates/events/sensor-github-push.yaml
+  # ========================================================================
+
+# ============================================================================
+# Workflow Templates Configuration
+# ============================================================================
+# Example/test workflow templates can be optionally created.
+# The RepoRegistration pattern uses nextflow-repo-runner automatically.
 
 workflowTemplates:
   createExample: true
@@ -326,10 +320,12 @@ workflowTemplates:
     args:
       - echo "Hello from Argo Events!"
 
+# ============================================================================
+# Workflow Execution Configuration
+# ============================================================================
 workflows:
-  namespace: wf-poc
+  # ServiceAccount used by workflow pods (referenced by sensors)
   runnerServiceAccount: wf-runner
-  templateRef: nextflow-hello-template
 
 # ============================================================================
 # RepoRegistration - Self-Service Repository Onboarding (DECLARATIVE)

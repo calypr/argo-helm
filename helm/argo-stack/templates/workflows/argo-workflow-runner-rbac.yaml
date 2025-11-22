@@ -1,15 +1,15 @@
-# wf-poc/argo-workflow-runner-rbac.yaml
+# {{ .Values.namespaces.tenant }}/argo-workflow-runner-rbac.yaml
 apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: wf-runner
-  namespace: wf-poc
+  namespace: {{ .Values.namespaces.tenant }}
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: Role
 metadata:
   name: argo-workflow-runner
-  namespace: wf-poc
+  namespace: {{ .Values.namespaces.tenant }}
 rules:
 # Core pod permissions Argo executor needs
 - apiGroups: [""]
@@ -40,11 +40,11 @@ apiVersion: rbac.authorization.k8s.io/v1
 kind: RoleBinding
 metadata:
   name: argo-workflow-runner-binding
-  namespace: wf-poc
+  namespace: {{ .Values.namespaces.tenant }}
 subjects:
 - kind: ServiceAccount
   name: wf-runner
-  namespace: wf-poc
+  namespace: {{ .Values.namespaces.tenant }}
 roleRef:
   apiGroup: rbac.authorization.k8s.io
   kind: Role
