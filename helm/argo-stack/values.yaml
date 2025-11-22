@@ -312,9 +312,9 @@ events:
 
 workflowTemplates:
   createExample: true
-  # Namespace for example workflow template (defaults to .Values.namespaces.tenant)
+  # Namespace for example workflow template
+  # If not set, defaults to .Values.namespaces.tenant
   # This is only used for the example nextflow-hello template
-  namespace: ""  # Leave empty to use namespaces.tenant
   nextflowHello:
     name: nextflow-hello-template
     image: alpine:3.20
@@ -349,7 +349,7 @@ workflows:
 #     repoUrl: https://github.com/myorg/my-nextflow-project.git
 #     defaultBranch: main
 #     tenant: myorg
-#     namespace: wf-poc
+#     # namespace is auto-generated as wf-<tenant>-<repo-name>
 #     workflowTemplateRef: nextflow-repo-runner
 #     artifactBucket:
 #       hostname: https://s3.us-west-2.amazonaws.com
@@ -380,7 +380,7 @@ repoRegistrations: []
   #   repoUrl: https://github.com/YOUR_ORG/nextflow-hello-project.git
   #   defaultBranch: main
   #   tenant: myorg
-  #   namespace: wf-poc
+  #   # namespace is auto-generated as wf-<tenant>-<repo-name>
   #   workflowTemplateRef: nextflow-repo-runner
   #   artifactBucket:
   #     hostname: https://s3.us-west-2.amazonaws.com
