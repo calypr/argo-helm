@@ -60,8 +60,9 @@ spec:
                     value: {{ $reg.name | quote }}
                   - name: repo-url
                     value: {{ $reg.repoUrl | quote }}
-                  - name: revision
-                    value: '{{`{{ (events.`}}{{ $eventName }}{{`.body.head_commit.id) }}`}}'
+                  # TODO - read from event
+                  # - name: revision
+                  #  value: main
                   {{- if $reg.artifactBucket }}
                   - name: artifact-bucket
                     value: {{ $reg.artifactBucket.bucket | quote }}

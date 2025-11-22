@@ -37,7 +37,7 @@ spec:
         value: {{ $reg.defaultBranch | default "main" | quote }}
       - name: pipeline-file
         description: "Nextflow pipeline entry point file (e.g., main.nf, workflow.nf, pipeline.nf)."
-        value: "main.nf"
+        value: "pipelines/push/main.nf"
       - name: work-dir
         description: "Work directory inside the container."
         value: "/workspace"
@@ -72,6 +72,9 @@ spec:
         args:
           - |
             set -euo pipefail
+            cat <<'EOF'
+            Workflow parameters: {{ "{{workflow.parameters}}" }}
+            EOF
             echo "Cloning repo: {{ "{{workflow.parameters.repo-url}}" }}"
             git clone {{ "{{workflow.parameters.repo-url}}" }} repo
             cd repo
@@ -84,6 +87,8 @@ spec:
             export NXF_WORK="s3://{{ "{{workflow.parameters.artifact-bucket}}" }}/work"
             export NXF_S3_ENDPOINT="{{ "{{workflow.parameters.artifact-endpoint}}" }}"
             export NXF_S3_REGION="{{ "{{workflow.parameters.artifact-region}}" }}"
+
+            env
 
             echo "Running Nextflow pipeline..."
             nextflow run {{ "{{workflow.parameters.pipeline-file}}" }} -with-report report.html -with-trace -with-timeline timeline.html
