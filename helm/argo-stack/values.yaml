@@ -312,7 +312,9 @@ events:
 
 workflowTemplates:
   createExample: true
-  namespace: wf-poc
+  # Namespace for example workflow template (defaults to .Values.namespaces.tenant)
+  # This is only used for the example nextflow-hello template
+  namespace: ""  # Leave empty to use namespaces.tenant
   nextflowHello:
     name: nextflow-hello-template
     image: alpine:3.20

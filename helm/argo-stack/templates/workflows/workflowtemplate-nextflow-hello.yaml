@@ -3,7 +3,7 @@ apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
   name: {{ .Values.workflowTemplates.nextflowHello.name | default "nextflow-hello-template" }}
-  namespace: {{ .Values.workflowTemplates.namespace | default "argo" }}
+  namespace: {{ .Values.workflowTemplates.namespace | default .Values.namespaces.tenant | default "argo-workflows" }}
   labels:
     app.kubernetes.io/name: argo-workflows
     app.kubernetes.io/part-of: argo-stack
