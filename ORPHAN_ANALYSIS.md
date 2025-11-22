@@ -248,29 +248,69 @@ All documentation appears current and relevant:
 
 ## Summary of Recommendations
 
-### High Priority (Should Remove)
-1. ✅ **Remove** `templates/workflows/per-app-workflowtemplates.yaml` (uses deprecated `applications`)
-2. ✅ **Remove** `events.sensor` block from `values.yaml` (lines 310-317)
-3. ✅ **Remove** `events.github.repositories: []` from `values.yaml` (line 278)
-4. ✅ **Remove** `applications: []` from `values.yaml` (line 242)
+### ✅ Completed (High Priority)
+1. ✅ **REMOVED** `templates/workflows/per-app-workflowtemplates.yaml` (used deprecated `applications`)
+2. ✅ **REMOVED** `events.sensor` block from `values.yaml` (lines 310-317)
+3. ✅ **REMOVED** `events.github.repositories: []` from `values.yaml`
+4. ✅ **REMOVED** `applications: []` from `values.yaml`
 
-### Medium Priority (Should Update)
-5. ✅ **Replace** hardcoded `wf-poc` with `{{ .Values.namespaces.tenant }}` in:
+### ✅ Completed (Medium Priority)
+5. ✅ **REPLACED** hardcoded `wf-poc` with `{{ .Values.namespaces.tenant }}` in:
    - `templates/workflows/argo-workflow-runner-rbac.yaml`
    - `templates/10-rbac.yaml`
-   - `templates/events/role-wf-submit.yaml` (if exists)
+   - `templates/events/role-wf-submit.yaml`
+   - `templates/workflows/sensor-argo-events-rbac.yaml`
 
-6. ✅ **Update** `values-multi-app.yaml` to use `repoRegistrations` instead of `applications`
+6. ✅ **UPDATED** `values-multi-app.yaml` to use `repoRegistrations` instead of `applications`
 
-7. ✅ **Simplify** `workflows` block in `values.yaml`:
-   - Keep: `runnerServiceAccount`
-   - Remove: `namespace`, `templateRef`
+7. ✅ **SIMPLIFIED** `workflows` block in `values.yaml`:
+   - Kept: `runnerServiceAccount`
+   - Removed: `namespace`, `templateRef`
 
-### Low Priority (Consider)
-8. ⚠️ **Evaluate** if `workflowtemplate-nextflow-runner.yaml` is still needed
-9. ⚠️ **Evaluate** if `workflowtemplate-nextflow-hello.yaml` should be kept as example
-10. ⚠️ **Document** that `s3` block is legacy (or remove if truly unused)
-11. ⚠️ **Document** that `namespaces.tenant` is for backward compatibility only
+### 🔍 Remaining Items for Consideration (Low Priority)
+8. ⚠️ **EVALUATE** if `workflowtemplate-nextflow-runner.yaml` is still needed
+   - Status: KEPT - May be used for manual testing
+   - Location: `templates/workflows/workflowtemplate-nextflow-runner.yaml`
+   
+9. ⚠️ **EVALUATE** if `workflowtemplate-nextflow-hello.yaml` should be kept as example
+   - Status: KEPT - Useful for testing and examples
+   - Location: `templates/workflows/workflowtemplate-nextflow-hello.yaml`
+   
+10. ⚠️ **DOCUMENT** that `s3` block is legacy (or remove if truly unused)
+    - Status: KEPT - Provides backward compatibility for global artifact config
+    - Location: `values.yaml:188-195`
+    
+11. ⚠️ **DOCUMENT** that `namespaces.tenant` is for backward compatibility only
+    - Status: KEPT - Used by legacy RBAC templates and examples
+    - Location: `values.yaml:11`
+
+---
+
+## Changes Made
+
+### Commit 1: Analysis
+- Created comprehensive ORPHAN_ANALYSIS.md document
+
+### Commit 2: Cleanup
+- **Removed** `per-app-workflowtemplates.yaml` - obsolete template using deprecated `applications` array
+- **Updated** `values.yaml`:
+  - Removed `applications: []` declaration
+  - Removed `events.github.repositories: []` declaration
+  - Removed `events.sensor` configuration block
+  - Simplified `workflows` block (kept only `runnerServiceAccount`)
+  - Updated deprecation comments to reference correct documentation
+- **Updated** all RBAC templates to use `{{ .Values.namespaces.tenant }}` instead of hardcoded `wf-poc`:
+  - `templates/10-rbac.yaml`
+  - `templates/events/role-wf-submit.yaml`
+  - `templates/workflows/argo-workflow-runner-rbac.yaml`
+  - `templates/workflows/sensor-argo-events-rbac.yaml`
+- **Updated** `values-multi-app.yaml` to demonstrate `repoRegistrations` pattern instead of deprecated `applications`
+
+### Impact
+- **Breaking Changes**: None - removed only already-deprecated and unused configurations
+- **Improved Consistency**: All namespace references now use templated values
+- **Better Documentation**: Clearer migration guidance with correct doc links
+- **Reduced Confusion**: Removed orphaned configuration blocks that no longer work
 
 ---
 
