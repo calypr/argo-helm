@@ -41,14 +41,12 @@ spec:
             Run a Nextflow pipeline from a Git repo using S3-backed
             work and artifact storage derived from RepoRegistration.
       container:
-        image: nextflow/nextflow:{{ if .Values.nextflow }}{{ .Values.nextflow.version }}{{ else }}23.10.1{{ end }}
+        image: nextflow-runner:latest
         workingDir: "{{ "{{workflow.parameters.work-dir}}" }}"
         command: ["/bin/sh", "-c"]
         args:
           - |
             set -euo pipefail
-            echo "Installing git..."
-            apk add --no-cache git
             echo "Cloning repo: {{ "{{workflow.parameters.repo-url}}" }}"
             git clone {{ "{{workflow.parameters.repo-url}}" }} repo
             cd repo

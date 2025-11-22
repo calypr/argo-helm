@@ -149,7 +149,7 @@ argo-stack:
 		--set-string s3.hostname=${S3_HOSTNAME} \
 		-f my-values.yaml
 
-deploy: init argo-stack ports
+deploy: init argo-stack docker-install ports
 ports:	
 	echo waiting for pods
 	sleep 10
@@ -397,4 +397,9 @@ eso-cleanup:
 	@helm uninstall external-secrets -n external-secrets-system 2>/dev/null || true
 	@kubectl delete namespace external-secrets-system 2>/dev/null || true
 	@echo "✅ External Secrets Operator removed"
+
+docker-install:
+	docker build -t nextflow-runner:latest -f nextflow-runner/Dockerfile .
+	kind load docker-image nextflow-runner:latest --name kind
+	docker exec -it kind-control-plane crictl images | grep nextflow-runner
 
