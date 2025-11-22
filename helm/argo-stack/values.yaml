@@ -305,28 +305,20 @@ events:
   # ========================================================================
 
 # ============================================================================
-# Workflow Templates Configuration
-# ============================================================================
-# Example/test workflow templates can be optionally created.
-# The RepoRegistration pattern uses nextflow-repo-runner automatically.
-
-workflowTemplates:
-  createExample: true
-  # Namespace for example workflow template
-  # If not set, defaults to .Values.namespaces.tenant
-  # This is only used for the example nextflow-hello template
-  nextflowHello:
-    name: nextflow-hello-template
-    image: alpine:3.20
-    command: ["/bin/sh", "-c"]
-    args:
-      - echo "Hello from Argo Events!"
-
-# ============================================================================
 # Workflow Execution Configuration
 # ============================================================================
+# The RepoRegistration pattern automatically creates per-tenant:
+# - Namespaces (wf-<tenant>-<repo>)
+# - ServiceAccounts (wf-runner)
+# - RBAC roles and bindings
+# - WorkflowTemplates (nextflow-repo-runner)
+#
+# Legacy static namespace configuration has been removed.
+# See templates/11-tenant-rbac-from-repo-registrations.yaml for details.
+
 workflows:
-  # ServiceAccount used by workflow pods (referenced by sensors)
+  # ServiceAccount name used by workflow pods in tenant namespaces
+  # This is created automatically per tenant by repoRegistrations
   runnerServiceAccount: wf-runner
 
 # ============================================================================

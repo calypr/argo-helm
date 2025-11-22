@@ -94,10 +94,6 @@ s3:
 events:
   enabled: false
 
-# No workflow templates for testing
-workflowTemplates:
-  createExample: false
-
 # Ensure Argo Workflows server is up (HTTP) and controller installs
 argo-workflows:
   server:
