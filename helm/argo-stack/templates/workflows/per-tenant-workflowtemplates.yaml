@@ -72,15 +72,16 @@ spec:
         args:
           - |
             set -euo pipefail
+            
             cat <<'EOF'
             Workflow parameters: {{ "{{workflow.parameters}}" }}
             EOF
+            
             echo "Cloning repo: {{ "{{workflow.parameters.repo-url}}" }}"
             git clone {{ "{{workflow.parameters.repo-url}}" }} repo
             cd repo
             git checkout {{ "{{workflow.parameters.revision}}" }}
 
-            echo "Configuring S3 environment for artifacts..."
             echo "Artifact bucket: {{ "{{workflow.parameters.artifact-bucket}}" }}"
 
             env
@@ -101,8 +102,6 @@ spec:
               secretKeyRef:
                 name: s3-credentials-{{ $repoName }}
                 key: AWS_SECRET_ACCESS_KEY
-          # - name: NXF_WORK
-          #   value: "s3://{{ "{{workflow.parameters.artifact-bucket}}" }}/work"
           - name: AWS_REGION
             value: "{{ "{{workflow.parameters.artifact-region}}" }}"
           - name: AWS_S3_ENDPOINT
