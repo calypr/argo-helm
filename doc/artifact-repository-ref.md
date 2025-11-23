@@ -154,15 +154,10 @@ subjects:
 
 ## Submitting Workflows via CLI
 
-You can also specify the artifact repository when submitting workflows from the command line:
+You can specify the artifact repository when submitting workflows from the command line:
 
 ```bash
-# Using argo submit
-argo submit workflow.yaml \
-  --from workflowtemplate/my-template \
-  --artifact-repository-ref genomics-pipeline
-
-# Or in the workflow spec
+# Method 1: Include artifactRepositoryRef in the workflow spec
 cat <<EOF | kubectl apply -f -
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
@@ -173,6 +168,27 @@ spec:
     configMap: artifact-repositories
     key: artifactRepositories.genomics-pipeline
   workflowTemplateRef:
+    name: nextflow-repo-runner
+EOF
+
+# Method 2: Use argo submit with a workflow file
+cat <<EOF > workflow.yaml
+apiVersion: argoproj.io/v1alpha1
+kind: Workflow
+metadata:
+  generateName: test-
+spec:
+  artifactRepositoryRef:
+    configMap: artifact-repositories
+    key: artifactRepositories.genomics-pipeline
+  workflowTemplateRef:
+    name: nextflow-repo-runner
+EOF
+argo submit workflow.yaml
+
+# Method 3: Submit from WorkflowTemplate reference
+# Note: artifactRepositoryRef is embedded in the WorkflowTemplate spec
+argo submit --from workflowtemplate/nextflow-repo-runner
     name: nextflow-repo-runner
 EOF
 ```

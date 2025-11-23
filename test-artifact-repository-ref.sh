@@ -60,12 +60,16 @@ echo ""
 
 echo "Test 4: Verify repo-specific artifact repositories"
 echo "----------------------------------------------------"
-REPO_COUNT=$(kubectl get configmap artifact-repositories -n "$ARGO_NS" -o jsonpath='{.data.artifactRepositories}' | grep -c "^    [a-z].*:" || echo "0")
+# Use a more robust parsing approach - count repository entries by looking for bucket definitions
+ARTIFACT_REPOS_DATA=$(kubectl get configmap artifact-repositories -n "$ARGO_NS" -o jsonpath='{.data.artifactRepositories}')
+# Count occurrences of "bucket:" which indicates a repository configuration (excluding comments)
+REPO_COUNT=$(echo "$ARTIFACT_REPOS_DATA" | grep -v "^[[:space:]]*#" | grep -c "bucket:" || echo "0")
 if [ "$REPO_COUNT" -gt 0 ]; then
     check_pass "Found $REPO_COUNT repository configuration(s) in artifactRepositories"
     echo ""
     echo "Repositories configured:"
-    kubectl get configmap artifact-repositories -n "$ARGO_NS" -o jsonpath='{.data.artifactRepositories}' | grep "^    [a-z].*:" | sed 's/:$//' | sed 's/^/  - /'
+    # Extract repository names using awk - lines that have a colon at end and start with whitespace followed by letters
+    echo "$ARTIFACT_REPOS_DATA" | awk '/^[[:space:]]+[a-z][^#]*:$/ {gsub(/^[[:space:]]+/, ""); gsub(/:$/, ""); print "  - " $0}'
 else
     check_warn "No repo-specific repositories found (only default)"
 fi
@@ -107,10 +111,28 @@ echo "--------------------------------------"
 TEMP_FILE=$(mktemp)
 kubectl get configmap artifact-repositories -n "$ARGO_NS" -o jsonpath='{.data.artifactRepositories}' > "$TEMP_FILE"
 
-if python3 -c "import yaml; yaml.safe_load(open('$TEMP_FILE'))" 2>/dev/null; then
-    check_pass "artifactRepositories data is valid YAML"
+# Try multiple validation methods in order of preference
+if command -v yq &> /dev/null; then
+    # yq is available - most robust
+    if yq eval '.' "$TEMP_FILE" &>/dev/null; then
+        check_pass "artifactRepositories data is valid YAML (validated with yq)"
+    else
+        check_fail "artifactRepositories data is invalid YAML"
+    fi
+elif command -v python3 &> /dev/null; then
+    # python3 with yaml module
+    if python3 -c "import yaml; yaml.safe_load(open('$TEMP_FILE'))" 2>/dev/null; then
+        check_pass "artifactRepositories data is valid YAML (validated with python3)"
+    else
+        check_fail "artifactRepositories data is invalid YAML"
+    fi
 else
-    check_fail "artifactRepositories data is invalid YAML"
+    # Fallback: basic syntax check - look for valid structure
+    if grep -q "bucket:" "$TEMP_FILE" && grep -q "endpoint:" "$TEMP_FILE"; then
+        check_pass "artifactRepositories data appears to have valid YAML structure (basic check)"
+    else
+        check_warn "Unable to fully validate YAML structure (yq/python3 not available)"
+    fi
 fi
 rm -f "$TEMP_FILE"
 echo ""
