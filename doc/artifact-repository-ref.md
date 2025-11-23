@@ -1,12 +1,12 @@
-# Multi-Repository Artifact Storage with `artifactRepositoryRef`
+# Multi-Tenant Artifact Storage
 
 ## Overview
 
-This feature enables Argo Workflows to dynamically select different S3 artifact repositories for each workflow execution using the `spec.artifactRepositoryRef` field. This is particularly useful in multi-tenant environments where different teams or projects need to store workflow artifacts in separate buckets.
+This feature enables Argo Workflows to use different S3 artifact repositories for each tenant/project in a multi-tenant environment. Each tenant namespace gets its own dedicated artifact repository configuration, ensuring isolation and proper access control.
 
 ## Background
 
-By default, Argo Workflows uses a single artifact repository defined in the `workflow-controller-configmap` ConfigMap. With `artifactRepositoryRef`, workflows can override this default and select a specific repository at runtime.
+By default, Argo Workflows uses a single artifact repository defined in a ConfigMap. In multi-tenant environments, we need to support different artifact storage configurations per tenant while maintaining isolation.
 
 **Official Documentation:**
 - [Configure Artifact Repository](https://argo-workflows.readthedocs.io/en/latest/configure-artifact-repository/)
@@ -14,64 +14,58 @@ By default, Argo Workflows uses a single artifact repository defined in the `wor
 
 ## How It Works
 
-### 1. ConfigMap Structure
+### 1. Tenant Namespace ConfigMaps
 
-The `artifact-repositories` ConfigMap in the `argo-workflows` namespace contains multiple repository configurations:
+Each tenant namespace created from a `RepoRegistration` gets its own `artifact-repositories` ConfigMap:
 
 ```yaml
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: artifact-repositories
-  namespace: argo-workflows
+  namespace: wf-myorg-myproject  # Tenant namespace
+  labels:
+    source: repo-registration
+    calypr.io/application: myproject
 data:
-  # Legacy default for backward compatibility
+  # Default key that Argo Workflows automatically discovers
   default-v1: |
     archiveLogs: true
     s3:
-      bucket: default-bucket
-      endpoint: s3.amazonaws.com
-      # ... credentials ...
-  
-  # Multi-repository configuration
-  artifactRepositories: |
-    # Default repository
-    default:
-      archiveLogs: true
-      s3:
-        bucket: default-bucket
-        # ...
-    
-    # Per-project repositories
-    my-project:
-      archiveLogs: true
-      s3:
-        bucket: my-project-artifacts
-        endpoint: s3.us-west-2.amazonaws.com
-        region: us-west-2
-        accessKeySecret:
-          name: s3-credentials-my-project
-          key: AWS_ACCESS_KEY_ID
-        secretKeySecret:
-          name: s3-credentials-my-project
-          key: AWS_SECRET_ACCESS_KEY
+      bucket: myproject-artifacts
+      endpoint: s3.us-west-2.amazonaws.com
+      region: us-west-2
+      keyPrefix: workflows/
+      insecure: false
+      pathStyle: false
+      accessKeySecret:
+        name: s3-credentials-myproject
+        key: AWS_ACCESS_KEY_ID
+      secretKeySecret:
+        name: s3-credentials-myproject
+        key: AWS_SECRET_ACCESS_KEY
+      useSDKCreds: false
 ```
+
+**Key Points:**
+- Each tenant namespace has its own ConfigMap
+- The ConfigMap uses the `default-v1` key which Argo Workflows automatically discovers
+- No explicit `artifactRepositoryRef` is needed in workflows
+- Workflows in a namespace automatically use that namespace's artifact repository
 
 ### 2. Workflow Configuration
 
-Workflows reference a specific repository using `artifactRepositoryRef`:
+Workflows in a tenant namespace automatically use the namespace's artifact repository:
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: my-workflow-
+  namespace: wf-myorg-myproject
 spec:
-  # Select the artifact repository for this workflow
-  artifactRepositoryRef:
-    configMap: artifact-repositories
-    key: artifactRepositories.my-project
-  
+  # No artifactRepositoryRef needed - Argo Workflows automatically
+  # uses the artifact-repositories ConfigMap in this namespace
   serviceAccountName: wf-runner
   entrypoint: main
   templates:
@@ -90,10 +84,11 @@ spec:
 
 When you define a `RepoRegistration` with an `artifactBucket`, the system automatically:
 
-1. Adds an entry to the `artifactRepositories` section of the ConfigMap
-2. Creates necessary S3 credentials via ExternalSecrets
-3. Configures WorkflowTemplates to use `artifactRepositoryRef`
-4. Sets up RBAC permissions for workflows to read the ConfigMap
+1. Creates a tenant namespace (e.g., `wf-myorg-myproject`)
+2. Creates an `artifact-repositories` ConfigMap in that namespace with `default-v1` key
+3. Creates necessary S3 credentials via ExternalSecrets
+4. Creates WorkflowTemplates in the tenant namespace
+5. Sets up ServiceAccount and RBAC in the tenant namespace
 
 **Example RepoRegistration:**
 
@@ -115,80 +110,59 @@ repoRegistrations:
 ```
 
 This automatically creates:
-- An artifact repository entry named `genomics-pipeline`
-- An ExternalSecret to sync S3 credentials from Vault
-- A WorkflowTemplate configured to use this repository
+- Namespace: `wf-myorg-genomics-pipeline`
+- ConfigMap: `artifact-repositories` with proper S3 configuration
+- ExternalSecret: Syncs S3 credentials from Vault to `s3-credentials-genomics-pipeline`
+- WorkflowTemplate: `nextflow-repo-runner` in the tenant namespace
+- ServiceAccount: `wf-runner` with necessary permissions
 
 ## RBAC Requirements
 
-Workflows must have permission to read the `artifact-repositories` ConfigMap. This is automatically configured for tenant namespaces created from RepoRegistrations.
+Workflows need permission to read the `artifact-repositories` ConfigMap in their namespace. This is automatically configured for tenant namespaces created from RepoRegistrations.
 
-**Manual RBAC (if needed):**
+The ServiceAccount `wf-runner` in each tenant namespace is granted the necessary permissions via a Role and RoleBinding created automatically.
 
-```yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: Role
-metadata:
-  name: artifact-repository-reader
-  namespace: argo-workflows
-rules:
-  - apiGroups: [""]
-    resources: ["configmaps"]
-    resourceNames: ["artifact-repositories"]
-    verbs: ["get", "list"]
----
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: artifact-repository-reader
-  namespace: argo-workflows
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: artifact-repository-reader
-subjects:
-  - kind: ServiceAccount
-    name: wf-runner
-    namespace: my-tenant-namespace
-```
+**Note:** Since the ConfigMap is in the same namespace as the workflows, no cross-namespace RBAC is needed.
 
 ## Submitting Workflows via CLI
 
-You can specify the artifact repository when submitting workflows from the command line:
+Workflows automatically use the artifact repository configured in their namespace:
 
 ```bash
-# Method 1: Include artifactRepositoryRef in the workflow spec
+# Submit a workflow in a tenant namespace
+# The workflow automatically uses the artifact-repositories ConfigMap in wf-myorg-myproject
+argo submit -n wf-myorg-myproject --from workflowtemplate/nextflow-repo-runner
+
+# Submit a standalone workflow
 cat <<EOF | kubectl apply -f -
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
   generateName: test-
+  namespace: wf-myorg-myproject
 spec:
-  artifactRepositoryRef:
-    configMap: artifact-repositories
-    key: artifactRepositories.genomics-pipeline
+  serviceAccountName: wf-runner
   workflowTemplateRef:
     name: nextflow-repo-runner
+  arguments:
+    parameters:
+      - name: repo-url
+        value: https://github.com/myorg/myproject
+      - name: revision
+        value: main
 EOF
+```
 
-# Method 2: Use argo submit with a workflow file
-cat <<EOF > workflow.yaml
-apiVersion: argoproj.io/v1alpha1
-kind: Workflow
-metadata:
-  generateName: test-
+**Advanced: Override Artifact Repository (if needed)**
+
+If you need to explicitly reference a different artifact repository, you can use `artifactRepositoryRef`:
+
+```yaml
 spec:
+  # Optional: explicitly reference a ConfigMap key
   artifactRepositoryRef:
     configMap: artifact-repositories
-    key: artifactRepositories.genomics-pipeline
-  workflowTemplateRef:
-    name: nextflow-repo-runner
-EOF
-argo submit workflow.yaml
-
-# Method 3: Submit from WorkflowTemplate reference
-# Note: artifactRepositoryRef is embedded in the WorkflowTemplate spec
-argo submit --from workflowtemplate/nextflow-repo-runner
+    key: default-v1  # or another key if you have multiple configs
 ```
 
 ## Use Cases
@@ -223,26 +197,30 @@ Different storage tiers based on data lifecycle:
 
 ## Validation
 
-### Check ConfigMap
+### Check Tenant Namespace ConfigMap
 
 ```bash
-kubectl get configmap artifact-repositories -n argo-workflows -o yaml
+# List all tenant namespaces
+kubectl get ns -l source=repo-registration
+
+# Check ConfigMap in a specific tenant namespace
+kubectl get configmap artifact-repositories -n wf-myorg-myproject -o yaml
 ```
 
 ### Verify RBAC
 
 ```bash
-# Test if ServiceAccount can read the ConfigMap
+# Test if ServiceAccount can read the ConfigMap in its own namespace
 kubectl auth can-i get configmap/artifact-repositories \
-  --as=system:serviceaccount:my-tenant-namespace:wf-runner \
-  -n argo-workflows
+  --as=system:serviceaccount:wf-myorg-myproject:wf-runner \
+  -n wf-myorg-myproject
 ```
 
 ### Test Workflow
 
 ```bash
-# Submit a test workflow
-argo submit -n my-tenant-namespace --watch <<EOF
+# Submit a test workflow in a tenant namespace
+argo submit -n wf-myorg-myproject --watch <<EOF
 apiVersion: argoproj.io/v1alpha1
 kind: Workflow
 metadata:
@@ -282,26 +260,52 @@ aws s3 ls s3://my-project-artifacts/workflows/
 
 ### Error: "configmaps \"artifact-repositories\" not found"
 
-**Cause:** ConfigMap doesn't exist in the argo-workflows namespace.
+**Cause:** ConfigMap doesn't exist in the workflow's namespace.
 
-**Solution:** Ensure the helm chart is deployed with `s3.enabled: true` or with repoRegistrations defined.
+**Solution:** 
+1. Verify the RepoRegistration has `artifactBucket` configured
+2. Check if the ConfigMap was created in the tenant namespace:
+   ```bash
+   kubectl get configmap artifact-repositories -n wf-myorg-myproject
+   ```
+
+### Error: "failed to resolve artifact repository"
+
+**Cause:** Invalid `artifactRepositoryRef` configuration (if explicitly specified).
+
+**Solution:** 
+1. Remove explicit `artifactRepositoryRef` to use the default behavior
+2. If you must use it, reference `default-v1` key:
+   ```yaml
+   artifactRepositoryRef:
+     configMap: artifact-repositories
+     key: default-v1
+   ```
 
 ### Error: "forbidden: error looking up service account"
 
-**Cause:** RBAC permissions are missing.
+**Cause:** ServiceAccount is missing or RBAC permissions are incorrect.
 
-**Solution:** Verify RoleBinding exists:
-```bash
-kubectl get rolebinding -n argo-workflows | grep artifact-repository-reader
-```
+**Solution:** 
+1. Verify ServiceAccount exists in the tenant namespace:
+   ```bash
+   kubectl get sa wf-runner -n wf-myorg-myproject
+   ```
+2. Check that the namespace was created from a RepoRegistration
 
 ### Artifacts Not Appearing in Expected Bucket
 
-**Cause:** Repository key name mismatch or credentials issue.
+**Cause:** Repository configuration or credentials issue.
 
 **Solution:**
-1. Verify the key name in ConfigMap matches the one in `artifactRepositoryRef`
-2. Check S3 credentials Secret exists and is valid
+1. Check the ConfigMap configuration:
+   ```bash
+   kubectl get configmap artifact-repositories -n wf-myorg-myproject -o yaml
+   ```
+2. Verify S3 credentials Secret exists and is valid:
+   ```bash
+   kubectl get secret s3-credentials-myproject -n wf-myorg-myproject
+   ```
 3. Review workflow controller logs:
    ```bash
    kubectl logs -n argo-workflows deploy/argo-workflows-workflow-controller | grep artifact
@@ -314,13 +318,17 @@ kubectl get rolebinding -n argo-workflows | grep artifact-repository-reader
 **Solution:**
 1. Verify the Secret exists:
    ```bash
-   kubectl get secret s3-credentials-my-project -n my-tenant-namespace
+   kubectl get secret s3-credentials-myproject -n wf-myorg-myproject
    ```
 2. Check ExternalSecret sync status:
    ```bash
-   kubectl get externalsecret -n my-tenant-namespace
+   kubectl get externalsecret -n wf-myorg-myproject
+   kubectl describe externalsecret s3-credentials-myproject -n wf-myorg-myproject
    ```
-3. Verify Vault path contains valid credentials
+3. Verify Vault path contains valid credentials:
+   ```bash
+   kubectl exec -n vault vault-0 -- vault kv get kv/argo/apps/myproject/s3/artifacts
+   ```
 
 ## References
 
