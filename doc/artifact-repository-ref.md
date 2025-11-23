@@ -27,6 +27,9 @@ metadata:
   labels:
     source: repo-registration
     calypr.io/application: myproject
+  annotations:
+    # This annotation tells Argo Workflows which key to use as the default
+    workflows.argoproj.io/default-artifact-repository: default-v1
 data:
   # Default key that Argo Workflows automatically discovers
   default-v1: |
@@ -49,9 +52,20 @@ data:
 
 **Key Points:**
 - Each tenant namespace has its own ConfigMap
-- The ConfigMap uses the `default-v1` key which Argo Workflows automatically discovers
+- The `workflows.argoproj.io/default-artifact-repository` annotation specifies which key to use
+- The ConfigMap uses the `default-v1` key containing the tenant-specific S3 configuration
 - No explicit `artifactRepositoryRef` is needed in workflows
-- Workflows in a namespace automatically use that namespace's artifact repository
+- Argo Workflows automatically discovers this ConfigMap based on the annotation
+
+### Artifact Repository Resolution Order
+
+Argo Workflows resolves artifact repositories in this order:
+
+1. **Workflow-level override**: `spec.artifactRepositoryRef` in the Workflow spec (if present)
+2. **Namespace default**: ConfigMap named `artifact-repositories` in the workflow's namespace with the `workflows.argoproj.io/default-artifact-repository` annotation
+3. **Global default**: The controller's global ConfigMap in the `argo-workflows` namespace
+
+Since we use option #2 (namespace default with annotation), workflows automatically use the correct tenant-specific repository without any explicit configuration.
 
 ### 2. Workflow Configuration
 
@@ -111,7 +125,7 @@ repoRegistrations:
 
 This automatically creates:
 - Namespace: `wf-myorg-genomics-pipeline`
-- ConfigMap: `artifact-repositories` with proper S3 configuration
+- ConfigMap: `artifact-repositories` with proper S3 configuration and `workflows.argoproj.io/default-artifact-repository: default-v1` annotation
 - ExternalSecret: Syncs S3 credentials from Vault to `s3-credentials-genomics-pipeline`
 - WorkflowTemplate: `nextflow-repo-runner` in the tenant namespace
 - ServiceAccount: `wf-runner` with necessary permissions

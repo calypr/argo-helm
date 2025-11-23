@@ -92,7 +92,23 @@ else
 fi
 echo ""
 
-echo "Test 5: Verify ServiceAccount exists in tenant namespaces"
+echo "Test 5: Verify ConfigMaps have Argo Workflows default-artifact-repository annotation"
+echo "-------------------------------------------------------------------------------------"
+if [ -n "$TENANT_NAMESPACES" ]; then
+    for ns in $TENANT_NAMESPACES; do
+        ANNOTATION=$(kubectl get configmap artifact-repositories -n "$ns" -o jsonpath='{.metadata.annotations.workflows\.argoproj\.io/default-artifact-repository}' 2>/dev/null)
+        if [ "$ANNOTATION" = "default-v1" ]; then
+            check_pass "ConfigMap in namespace '$ns' has correct annotation: workflows.argoproj.io/default-artifact-repository=default-v1"
+        else
+            check_fail "ConfigMap in namespace '$ns' missing or incorrect annotation. Expected 'default-v1', got '$ANNOTATION'"
+        fi
+    done
+else
+    check_warn "No tenant namespaces to check"
+fi
+echo ""
+
+echo "Test 6: Verify ServiceAccount exists in tenant namespaces"
 echo "----------------------------------------------------------"
 if [ -n "$TENANT_NAMESPACES" ]; then
     for ns in $TENANT_NAMESPACES; do
@@ -107,7 +123,7 @@ else
 fi
 echo ""
 
-echo "Test 6: Verify S3 credentials secrets exist"
+echo "Test 7: Verify S3 credentials secrets exist"
 echo "--------------------------------------------"
 if [ -n "$TENANT_NAMESPACES" ]; then
     for ns in $TENANT_NAMESPACES; do
@@ -124,7 +140,7 @@ else
 fi
 echo ""
 
-echo "Test 7: Check WorkflowTemplates exist in tenant namespaces"
+echo "Test 8: Check WorkflowTemplates exist in tenant namespaces"
 echo "-----------------------------------------------------------"
 if [ -n "$TENANT_NAMESPACES" ]; then
     for ns in $TENANT_NAMESPACES; do
@@ -140,7 +156,7 @@ else
 fi
 echo ""
 
-echo "Test 8: Validate ConfigMap YAML structure in tenant namespaces"
+echo "Test 9: Validate ConfigMap YAML structure in tenant namespaces"
 echo "----------------------------------------------------------------"
 if [ -n "$TENANT_NAMESPACES" ]; then
     for ns in $TENANT_NAMESPACES; do
@@ -175,7 +191,7 @@ else
 fi
 echo ""
 
-echo "Test 9: Check ServiceAccount ConfigMap permissions in tenant namespaces"
+echo "Test 10: Check ServiceAccount ConfigMap permissions in tenant namespaces"
 echo "------------------------------------------------------------------------"
 if [ -n "$TENANT_NAMESPACES" ]; then
     for ns in $TENANT_NAMESPACES; do
@@ -195,7 +211,7 @@ else
 fi
 echo ""
 
-echo "Test 10: Display sample artifact repository configuration"
+echo "Test 11: Display sample artifact repository configuration"
 echo "----------------------------------------------------------"
 if [ -n "$TENANT_NAMESPACES" ]; then
     FIRST_NS=$(echo "$TENANT_NAMESPACES" | awk '{print $1}')
