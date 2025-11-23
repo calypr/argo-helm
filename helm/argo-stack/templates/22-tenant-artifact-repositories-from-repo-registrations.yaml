@@ -29,6 +29,7 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
     repo-registration/name: {{ $reg.name | quote }}
     repo-registration/repo-url: {{ $reg.repoUrl | quote }}
+    workflows.argoproj.io/default-artifact-repository: default-v1
 data:
   default-v1: |
     archiveLogs: true
