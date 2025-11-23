@@ -52,6 +52,12 @@ spec:
               namespace: {{ $namespace }}
             spec:
               serviceAccountName: {{ $.Values.workflows.runnerServiceAccount | default "wf-runner" }}
+              {{- if $reg.artifactBucket }}
+              # Use workflow-level artifact repository override for this repo
+              artifactRepositoryRef:
+                configMap: artifact-repositories
+                key: artifactRepositories.{{ $reg.name }}
+              {{- end }}
               workflowTemplateRef:
                 name: {{ $reg.workflowTemplateRef | default "nextflow-repo-runner" }}
               arguments:

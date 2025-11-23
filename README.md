@@ -77,6 +77,7 @@ See [README-use-cases.md](./README-use-cases.md)
 ### 🚀 Self-Service Features
 - **🆕 RepoRegistration CRD** - Self-service onboarding for GitHub repositories with automated webhook setup
 - **Per-Repository S3 Buckets** - Dedicated artifact and data storage with tenant isolation
+- **🆕 Multi-Repository Artifact Support** - Workflows can dynamically select artifact repositories using `artifactRepositoryRef` (see [doc/artifact-repository-ref.md](./doc/artifact-repository-ref.md))
 - **Automated Secret Management** - Vault-backed credentials via External Secrets Operator
 - **Fine-Grained Access Control** - Per-repository admin and read-only user management
 
