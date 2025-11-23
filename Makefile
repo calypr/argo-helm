@@ -136,7 +136,8 @@ ct: check-vars kind deps
 init: check-vars kind bump-limits eso-install vault-dev vault-seed deps minio vault-auth 
 
 argo-stack:
-	helm upgrade --install \
+	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
+	envsubst < my-values.yaml | helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
@@ -147,7 +148,7 @@ argo-stack:
 		--set-string s3.insecure=true \
 		--set-string s3.region=${S3_REGION} \
 		--set-string s3.hostname=${S3_HOSTNAME} \
-		-f my-values.yaml
+		-f -
 
 deploy: init argo-stack docker-install ports
 ports:	
@@ -271,8 +272,8 @@ vault-seed:
 		token="$(GITHUB_PAT)" 
 	@echo "➡️  Creating per-app S3 credentials..."
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello/s3 \
-		accessKey="app1-access-key" \
-		secretKey="app1-secret-key"
+		accessKey="minioadmin" \
+		secretKey="minioadmin"
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-2/s3 \
 		accessKey="app2-access-key" \
 		secretKey="app2-secret-key"
