@@ -18,6 +18,9 @@ NC='\033[0m' # No Color
 ARGO_NS="${ARGO_NAMESPACE:-argo-workflows}"
 VALUES_FILE="${VALUES_FILE:-helm/argo-stack/values.yaml}"
 
+# Get tenant namespaces (used in multiple tests)
+TENANT_NAMESPACES=$(kubectl get ns -l source=repo-registration -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
+
 function check_pass() {
     echo -e "${GREEN}✓ PASS:${NC} $1"
 }
@@ -88,7 +91,6 @@ echo ""
 echo "Test 6: Check WorkflowTemplates for artifactRepositoryRef"
 echo "-----------------------------------------------------------"
 # Check tenant namespaces for WorkflowTemplates
-TENANT_NAMESPACES=$(kubectl get ns -l source=repo-registration -o jsonpath='{.items[*].metadata.name}' 2>/dev/null || echo "")
 if [ -n "$TENANT_NAMESPACES" ]; then
     FOUND_REF=0
     for ns in $TENANT_NAMESPACES; do

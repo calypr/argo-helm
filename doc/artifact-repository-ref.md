@@ -189,8 +189,6 @@ argo submit workflow.yaml
 # Method 3: Submit from WorkflowTemplate reference
 # Note: artifactRepositoryRef is embedded in the WorkflowTemplate spec
 argo submit --from workflowtemplate/nextflow-repo-runner
-    name: nextflow-repo-runner
-EOF
 ```
 
 ## Use Cases
