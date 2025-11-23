@@ -89,11 +89,6 @@ spec:
             echo "Configuring S3 environment for artifacts..."
             echo "Artifact bucket: {{ "{{workflow.parameters.artifact-bucket}}" }}"
 
-            # Configure Nextflow to use S3 work directory
-            export NXF_WORK="s3://{{ "{{workflow.parameters.artifact-bucket}}" }}/work"
-            export NXF_S3_ENDPOINT="{{ "{{workflow.parameters.artifact-endpoint}}" }}"
-            export NXF_S3_REGION="{{ "{{workflow.parameters.artifact-region}}" }}"
-
             env
 
             echo "Running Nextflow pipeline..."
@@ -112,5 +107,11 @@ spec:
               secretKeyRef:
                 name: s3-credentials-{{ $repoName }}
                 key: AWS_SECRET_ACCESS_KEY
+          - name: NXF_WORK
+            value: "s3://{{ "{{workflow.parameters.artifact-bucket}}" }}/work"
+          - name: AWS_REGION
+            value: "{{ "{{workflow.parameters.artifact-region}}" }}"
+          - name: AWS_S3_ENDPOINT
+            value: "https://{{ "{{workflow.parameters.artifact-endpoint}}" }}"            
 {{- end }}
 {{- end }}
