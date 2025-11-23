@@ -11,8 +11,8 @@ repoRegistrations:
       hostname: $S3_HOSTNAME
       bucket: $S3_BUCKET
       region: $S3_REGION
-      insecure: false
-      pathStyle: false
+      insecure: true
+      pathStyle: true
       keyPrefix: nextflow-hello-project-workflows/
       # Vault path for S3 credentials (relative to kv/)
       externalSecretPath: argo/apps/nextflow-hello-project/s3/artifacts

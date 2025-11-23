@@ -101,8 +101,8 @@ spec:
               secretKeyRef:
                 name: s3-credentials-{{ $repoName }}
                 key: AWS_SECRET_ACCESS_KEY
-          - name: NXF_WORK
-            value: "s3://{{ "{{workflow.parameters.artifact-bucket}}" }}/work"
+          # - name: NXF_WORK
+          #   value: "s3://{{ "{{workflow.parameters.artifact-bucket}}" }}/work"
           - name: AWS_REGION
             value: "{{ "{{workflow.parameters.artifact-region}}" }}"
           - name: AWS_S3_ENDPOINT

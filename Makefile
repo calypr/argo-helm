@@ -283,8 +283,8 @@ vault-seed:
 		token="$(GITHUB_PAT)"
 	@# nextflow-hello-project S3 artifact credentials
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-project/s3/artifacts \
-		AWS_ACCESS_KEY_ID="nextflow-hello-artifacts-key" \
-		AWS_SECRET_ACCESS_KEY="nextflow-hello-artifacts-secret"
+		AWS_ACCESS_KEY_ID="minioadmin" \
+		AWS_SECRET_ACCESS_KEY="minioadmin"
 	@# genomics-variant-calling GitHub credentials
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/genomics/github \
 		token="$(GITHUB_PAT)"

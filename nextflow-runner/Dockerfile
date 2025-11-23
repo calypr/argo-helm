@@ -9,6 +9,10 @@ RUN apt-get update -y && \
     coreutils && \
     rm -rf /var/lib/apt/lists/*
 
+# Set environment variables
+ENV NXF_ANSI_LOG=false
+ENV NXF_VER=25.10.0
+
 # Install Nextflow
 RUN curl -fsSL https://get.nextflow.io | bash && \
     mv nextflow /usr/local/bin/ && \
@@ -20,6 +24,4 @@ RUN nextflow -version
 # Set working directory
 WORKDIR /workspace
 
-# Set environment variables
-ENV NXF_ANSI_LOG=false
-ENV NXF_VER=23.10.1
+
