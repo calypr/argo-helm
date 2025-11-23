@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts test-secrets all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup
+.PHONY: deps lint template validate kind ct adapter test-artifacts test-secrets test-artifact-repository-ref all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup
 
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
@@ -165,6 +165,10 @@ adapter:
 
 test-artifacts:
 	./test-per-app-artifacts.sh
+
+test-artifact-repository-ref:
+	@echo "🧪 Testing Artifact Repository Ref Feature (Issue #82)"
+	./test-artifact-repository-ref.sh
 
 test-secrets:
 	@echo "🔐 Validating ExternalSecrets exist and are valid..."
