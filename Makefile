@@ -38,18 +38,20 @@ deps:
 lint:
 	helm lint helm/argo-stack --values helm/argo-stack/values.yaml
 
-template: check-vars deps 
+template: check-vars deps
+	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
+	envsubst < my-values.yaml | \
 	helm template argo-stack helm/argo-stack \
 		--debug \
-		--values my-values.yaml \
 		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
 		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
 		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000  \
 		--set-string s3.enabled=${S3_ENABLED} \
-                --set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
-                --set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
-                --set-string s3.bucket=${S3_BUCKET} \
+		--set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
+		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
+		--set-string s3.bucket=${S3_BUCKET} \
+		-f - \
 		--namespace argocd > rendered.yaml
 
 validate:
