@@ -1,11 +1,11 @@
 #!/bin/bash
-# Test script for artifact repository ref feature (Issue #82)
-# Tests the multi-repository artifact configuration and RBAC
+# Test script for multi-tenant artifact repository configuration
+# Tests that each tenant namespace has its own artifact-repositories ConfigMap
 
 set -e
 
-echo "🧪 Testing Artifact Repository Ref Feature"
-echo "=========================================="
+echo "🧪 Testing Multi-Tenant Artifact Repository Configuration"
+echo "=========================================================="
 echo ""
 
 # Colors for output
@@ -34,124 +34,175 @@ function check_warn() {
     echo -e "${YELLOW}⚠ WARN:${NC} $1"
 }
 
-echo "Test 1: Verify artifact-repositories ConfigMap exists"
-echo "-------------------------------------------------------"
+echo "Test 1: Verify global artifact-repositories ConfigMap exists (for legacy/default workflows)"
+echo "--------------------------------------------------------------------------------------------"
 if kubectl get configmap artifact-repositories -n "$ARGO_NS" &>/dev/null; then
     check_pass "ConfigMap 'artifact-repositories' exists in namespace '$ARGO_NS'"
 else
-    check_fail "ConfigMap 'artifact-repositories' not found in namespace '$ARGO_NS'"
+    check_warn "ConfigMap 'artifact-repositories' not found in namespace '$ARGO_NS' (may be ok if only using tenant-specific repos)"
 fi
 echo ""
 
-echo "Test 2: Verify ConfigMap has artifactRepositories key"
-echo "-------------------------------------------------------"
-if kubectl get configmap artifact-repositories -n "$ARGO_NS" -o jsonpath='{.data.artifactRepositories}' | grep -q "default:"; then
-    check_pass "ConfigMap contains 'artifactRepositories' key with default repository"
-else
-    check_fail "ConfigMap missing 'artifactRepositories' key or default entry"
-fi
-echo ""
-
-echo "Test 3: Check for legacy default-v1 key (backward compatibility)"
-echo "----------------------------------------------------------------"
-if kubectl get configmap artifact-repositories -n "$ARGO_NS" -o jsonpath='{.data.default-v1}' | grep -q "bucket:"; then
-    check_pass "Legacy 'default-v1' key exists for backward compatibility"
-else
-    check_warn "Legacy 'default-v1' key not found - may affect existing workflows"
-fi
-echo ""
-
-echo "Test 4: Verify repo-specific artifact repositories"
-echo "----------------------------------------------------"
-# Use a more robust parsing approach - count repository entries by looking for bucket definitions
-ARTIFACT_REPOS_DATA=$(kubectl get configmap artifact-repositories -n "$ARGO_NS" -o jsonpath='{.data.artifactRepositories}')
-# Count occurrences of "bucket:" which indicates a repository configuration (excluding comments)
-REPO_COUNT=$(echo "$ARTIFACT_REPOS_DATA" | grep -v "^[[:space:]]*#" | grep -c "bucket:" || echo "0")
-if [ "$REPO_COUNT" -gt 0 ]; then
-    check_pass "Found $REPO_COUNT repository configuration(s) in artifactRepositories"
-    echo ""
-    echo "Repositories configured:"
-    # Extract repository names using awk - lines that have a colon at end and start with whitespace followed by letters
-    echo "$ARTIFACT_REPOS_DATA" | awk '/^[[:space:]]+[a-z][^#]*:$/ {gsub(/^[[:space:]]+/, ""); gsub(/:$/, ""); print "  - " $0}'
-else
-    check_warn "No repo-specific repositories found (only default)"
-fi
-echo ""
-
-echo "Test 5: Verify RBAC for artifact repository access"
-echo "----------------------------------------------------"
-RBAC_COUNT=$(kubectl get role -n "$ARGO_NS" -l app.kubernetes.io/component=workflow-rbac 2>/dev/null | grep -c artifact-repository-reader || echo "0")
-if [ "$RBAC_COUNT" -gt 0 ]; then
-    check_pass "Found $RBAC_COUNT RBAC Role(s) for artifact repository access"
-else
-    check_warn "No RBAC Roles found - may be expected if no repoRegistrations are configured"
-fi
-echo ""
-
-echo "Test 6: Check WorkflowTemplates for artifactRepositoryRef"
-echo "-----------------------------------------------------------"
-# Check tenant namespaces for WorkflowTemplates
+echo "Test 2: Verify tenant namespaces exist"
+echo "---------------------------------------"
 if [ -n "$TENANT_NAMESPACES" ]; then
-    FOUND_REF=0
+    NAMESPACE_COUNT=$(echo "$TENANT_NAMESPACES" | wc -w)
+    check_pass "Found $NAMESPACE_COUNT tenant namespace(s):"
     for ns in $TENANT_NAMESPACES; do
-        if kubectl get workflowtemplate -n "$ns" -o yaml 2>/dev/null | grep -q "artifactRepositoryRef"; then
-            check_pass "WorkflowTemplate in namespace '$ns' has artifactRepositoryRef configured"
-            FOUND_REF=1
-        fi
+        echo "  - $ns"
     done
-    if [ "$FOUND_REF" -eq 0 ]; then
-        check_warn "No WorkflowTemplates found with artifactRepositoryRef in tenant namespaces"
-    fi
 else
     check_warn "No tenant namespaces found (no repoRegistrations configured)"
 fi
 echo ""
 
-echo "Test 7: Validate ConfigMap structure"
-echo "--------------------------------------"
-# Extract and validate YAML structure
-TEMP_FILE=$(mktemp)
-kubectl get configmap artifact-repositories -n "$ARGO_NS" -o jsonpath='{.data.artifactRepositories}' > "$TEMP_FILE"
-
-# Try multiple validation methods in order of preference
-if command -v yq &> /dev/null; then
-    # yq is available - most robust
-    if yq eval '.' "$TEMP_FILE" &>/dev/null; then
-        check_pass "artifactRepositories data is valid YAML (validated with yq)"
-    else
-        check_fail "artifactRepositories data is invalid YAML"
-    fi
-elif command -v python3 &> /dev/null; then
-    # python3 with yaml module
-    if python3 -c "import yaml; yaml.safe_load(open('$TEMP_FILE'))" 2>/dev/null; then
-        check_pass "artifactRepositories data is valid YAML (validated with python3)"
-    else
-        check_fail "artifactRepositories data is invalid YAML"
+echo "Test 3: Verify each tenant namespace has artifact-repositories ConfigMap"
+echo "-------------------------------------------------------------------------"
+if [ -n "$TENANT_NAMESPACES" ]; then
+    ALL_HAVE_CM=true
+    for ns in $TENANT_NAMESPACES; do
+        if kubectl get configmap artifact-repositories -n "$ns" &>/dev/null; then
+            check_pass "ConfigMap exists in namespace '$ns'"
+        else
+            check_fail "ConfigMap NOT found in namespace '$ns'"
+            ALL_HAVE_CM=false
+        fi
+    done
+    if [ "$ALL_HAVE_CM" = true ]; then
+        echo ""
+        check_pass "All tenant namespaces have artifact-repositories ConfigMap"
     fi
 else
-    # Fallback: basic syntax check - look for valid structure
-    if grep -q "bucket:" "$TEMP_FILE" && grep -q "endpoint:" "$TEMP_FILE"; then
-        check_pass "artifactRepositories data appears to have valid YAML structure (basic check)"
-    else
-        check_warn "Unable to fully validate YAML structure (yq/python3 not available)"
-    fi
+    check_warn "No tenant namespaces to check"
 fi
-rm -f "$TEMP_FILE"
 echo ""
 
-echo "Test 8: Check ServiceAccount permissions"
-echo "------------------------------------------"
-# Check if any wf-runner ServiceAccount exists in tenant namespaces
+echo "Test 4: Verify ConfigMaps have default-v1 key"
+echo "----------------------------------------------"
+if [ -n "$TENANT_NAMESPACES" ]; then
+    for ns in $TENANT_NAMESPACES; do
+        if kubectl get configmap artifact-repositories -n "$ns" -o jsonpath='{.data.default-v1}' 2>/dev/null | grep -q "bucket:"; then
+            check_pass "ConfigMap in namespace '$ns' has 'default-v1' key"
+        else
+            check_fail "ConfigMap in namespace '$ns' missing 'default-v1' key or invalid content"
+        fi
+    done
+else
+    check_warn "No tenant namespaces to check"
+fi
+echo ""
+
+echo "Test 5: Verify ConfigMaps have Argo Workflows default-artifact-repository annotation"
+echo "-------------------------------------------------------------------------------------"
+if [ -n "$TENANT_NAMESPACES" ]; then
+    for ns in $TENANT_NAMESPACES; do
+        ANNOTATION=$(kubectl get configmap artifact-repositories -n "$ns" -o jsonpath='{.metadata.annotations.workflows\.argoproj\.io/default-artifact-repository}' 2>/dev/null)
+        if [ "$ANNOTATION" = "default-v1" ]; then
+            check_pass "ConfigMap in namespace '$ns' has correct annotation: workflows.argoproj.io/default-artifact-repository=default-v1"
+        else
+            check_fail "ConfigMap in namespace '$ns' missing or incorrect annotation. Expected 'default-v1', got '$ANNOTATION'"
+        fi
+    done
+else
+    check_warn "No tenant namespaces to check"
+fi
+echo ""
+
+echo "Test 6: Verify ServiceAccount exists in tenant namespaces"
+echo "----------------------------------------------------------"
 if [ -n "$TENANT_NAMESPACES" ]; then
     for ns in $TENANT_NAMESPACES; do
         if kubectl get sa wf-runner -n "$ns" &>/dev/null; then
-            # Test if SA can read the ConfigMap
+            check_pass "ServiceAccount 'wf-runner' exists in namespace '$ns'"
+        else
+            check_fail "ServiceAccount 'wf-runner' NOT found in namespace '$ns'"
+        fi
+    done
+else
+    check_warn "No tenant namespaces to check"
+fi
+echo ""
+
+echo "Test 7: Verify S3 credentials secrets exist"
+echo "--------------------------------------------"
+if [ -n "$TENANT_NAMESPACES" ]; then
+    for ns in $TENANT_NAMESPACES; do
+        # Extract repo name from namespace (remove wf- prefix)
+        REPO_NAME=$(echo "$ns" | sed 's/^wf-//')
+        if kubectl get secret -n "$ns" 2>/dev/null | grep -q "s3-credentials-"; then
+            check_pass "S3 credentials secret found in namespace '$ns'"
+        else
+            check_warn "No S3 credentials secret found in namespace '$ns'"
+        fi
+    done
+else
+    check_warn "No tenant namespaces to check"
+fi
+echo ""
+
+echo "Test 8: Check WorkflowTemplates exist in tenant namespaces"
+echo "-----------------------------------------------------------"
+if [ -n "$TENANT_NAMESPACES" ]; then
+    for ns in $TENANT_NAMESPACES; do
+        if kubectl get workflowtemplate -n "$ns" &>/dev/null; then
+            WT_COUNT=$(kubectl get workflowtemplate -n "$ns" --no-headers 2>/dev/null | wc -l)
+            check_pass "Found $WT_COUNT WorkflowTemplate(s) in namespace '$ns'"
+        else
+            check_warn "No WorkflowTemplates found in namespace '$ns'"
+        fi
+    done
+else
+    check_warn "No tenant namespaces to check"
+fi
+echo ""
+
+echo "Test 9: Validate ConfigMap YAML structure in tenant namespaces"
+echo "----------------------------------------------------------------"
+if [ -n "$TENANT_NAMESPACES" ]; then
+    for ns in $TENANT_NAMESPACES; do
+        TEMP_FILE=$(mktemp)
+        kubectl get configmap artifact-repositories -n "$ns" -o jsonpath='{.data.default-v1}' 2>/dev/null > "$TEMP_FILE"
+        
+        # Try multiple validation methods in order of preference
+        if command -v yq &> /dev/null; then
+            if yq eval '.' "$TEMP_FILE" &>/dev/null; then
+                check_pass "ConfigMap in namespace '$ns' has valid YAML structure"
+            else
+                check_fail "ConfigMap in namespace '$ns' has invalid YAML"
+            fi
+        elif command -v python3 &> /dev/null; then
+            if python3 -c "import yaml; yaml.safe_load(open('$TEMP_FILE'))" 2>/dev/null; then
+                check_pass "ConfigMap in namespace '$ns' has valid YAML structure"
+            else
+                check_fail "ConfigMap in namespace '$ns' has invalid YAML"
+            fi
+        else
+            # Basic syntax check
+            if grep -q "bucket:" "$TEMP_FILE"; then
+                check_pass "ConfigMap in namespace '$ns' appears to have valid structure (basic check)"
+            else
+                check_warn "Unable to fully validate YAML structure in namespace '$ns'"
+            fi
+        fi
+        rm -f "$TEMP_FILE"
+    done
+else
+    check_warn "No tenant namespaces to validate"
+fi
+echo ""
+
+echo "Test 10: Check ServiceAccount ConfigMap permissions in tenant namespaces"
+echo "------------------------------------------------------------------------"
+if [ -n "$TENANT_NAMESPACES" ]; then
+    for ns in $TENANT_NAMESPACES; do
+        if kubectl get sa wf-runner -n "$ns" &>/dev/null; then
+            # Test if SA can read the ConfigMap in its own namespace
             if kubectl auth can-i get configmap/artifact-repositories \
                 --as=system:serviceaccount:$ns:wf-runner \
-                -n "$ARGO_NS" &>/dev/null; then
-                check_pass "ServiceAccount wf-runner in namespace '$ns' can read artifact-repositories ConfigMap"
+                -n "$ns" &>/dev/null; then
+                check_pass "ServiceAccount wf-runner in namespace '$ns' can read ConfigMap in its own namespace"
             else
-                check_fail "ServiceAccount wf-runner in namespace '$ns' CANNOT read artifact-repositories ConfigMap"
+                check_fail "ServiceAccount wf-runner in namespace '$ns' CANNOT read ConfigMap in its own namespace"
             fi
         fi
     done
@@ -160,24 +211,40 @@ else
 fi
 echo ""
 
-echo "Test 9: Display artifact repository configuration"
-echo "---------------------------------------------------"
-echo "Current artifact repositories:"
-echo ""
-kubectl get configmap artifact-repositories -n "$ARGO_NS" -o jsonpath='{.data.artifactRepositories}' | head -80
-echo ""
-echo "..."
+echo "Test 11: Display sample artifact repository configuration"
+echo "----------------------------------------------------------"
+if [ -n "$TENANT_NAMESPACES" ]; then
+    FIRST_NS=$(echo "$TENANT_NAMESPACES" | awk '{print $1}')
+    echo "Sample configuration from namespace '$FIRST_NS':"
+    echo ""
+    kubectl get configmap artifact-repositories -n "$FIRST_NS" -o jsonpath='{.data.default-v1}' 2>/dev/null | head -30
+    echo ""
+    echo "..."
+else
+    echo "No tenant namespaces to display"
+fi
 echo ""
 
 echo "=========================================="
 echo -e "${GREEN}All tests completed!${NC}"
 echo ""
 echo "Summary:"
-echo "  - ConfigMap: artifact-repositories exists in $ARGO_NS"
-echo "  - Multi-repository configuration: enabled"
-echo "  - RBAC: configured for tenant namespaces"
-echo "  - WorkflowTemplates: using artifactRepositoryRef"
+if [ -n "$TENANT_NAMESPACES" ]; then
+    NAMESPACE_COUNT=$(echo "$TENANT_NAMESPACES" | wc -w)
+    echo "  - Tenant namespaces: $NAMESPACE_COUNT"
+    echo "  - Each namespace has artifact-repositories ConfigMap"
+    echo "  - Using default-v1 key for automatic discovery"
+    echo "  - ServiceAccounts configured with proper permissions"
+else
+    echo "  - No tenant namespaces configured"
+    echo "  - Configure repoRegistrations to create tenant-specific artifact repositories"
+fi
 echo ""
 echo "To submit a test workflow, use:"
-echo "  argo submit -n <namespace> --from workflowtemplate/nextflow-repo-runner"
+if [ -n "$TENANT_NAMESPACES" ]; then
+    FIRST_NS=$(echo "$TENANT_NAMESPACES" | awk '{print $1}')
+    echo "  argo submit -n $FIRST_NS --from workflowtemplate/nextflow-repo-runner"
+else
+    echo "  (configure repoRegistrations first)"
+fi
 echo ""

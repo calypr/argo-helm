@@ -23,12 +23,6 @@ metadata:
     helm.sh/hook-weight: "15"
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
-  {{- if $reg.artifactBucket }}
-  # Use workflow-level artifact repository override for this repo
-  artifactRepositoryRef:
-    configMap: artifact-repositories
-    key: artifactRepositories.{{ $repoName }}
-  {{- end }}
   entrypoint: run-nextflow
   arguments:
     parameters:
