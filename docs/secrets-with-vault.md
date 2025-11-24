@@ -1,3 +1,5 @@
+[Home](index.md) > Secrets, Vault, and External Secrets Operator
+
 # 🔐 Maintaining Secrets with HashiCorp Vault
 
 This guide describes how to manage all sensitive configuration for the **Argo Stack** using **HashiCorp Vault** as the single source of truth, synchronized into Kubernetes Secrets by the **External Secrets Operator (ESO)**.

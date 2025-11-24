@@ -1,3 +1,5 @@
+[Home](index.md) > Development and Engineering Notes
+
 # 🧰 Administrator Guide — Managing Argo Events and Nextflow Integration
 
 This document describes how administrators configure the Argo environment so that GitHub repositories can automatically trigger **Nextflow workflows**.

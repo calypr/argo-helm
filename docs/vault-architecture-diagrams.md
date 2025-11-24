@@ -1,3 +1,5 @@
+[Home](index.md) > Architecture and Design
+
 # Vault Integration Architecture Diagrams
 
 This document contains architecture diagrams for the Vault + ESO integration.

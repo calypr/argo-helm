@@ -1,3 +1,5 @@
+[Home](index.md) > User Guides
+
 # 🔄 GitHub → Argo Workflows Bridge (via Argo Events)
 
 This guide explains how to configure your GitHub repository so that every push automatically triggers an **Argo Workflow** in your Kubernetes cluster.  

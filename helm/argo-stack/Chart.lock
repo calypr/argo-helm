@@ -12,4 +12,4 @@ dependencies:
   repository: https://charts.external-secrets.io
   version: 1.0.0
 digest: sha256:3509e21638c5f6671c249671742e03bbdaf4b7baa1ea4261fd74caf48a841178
-generated: "2025-11-15T19:05:45.336326375Z"
+generated: "2025-11-19T22:25:09.746731-08:00"

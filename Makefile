@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup
+.PHONY: deps lint template validate kind ct adapter test-artifacts test-secrets test-artifact-repository-ref all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup
 
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
@@ -38,18 +38,20 @@ deps:
 lint:
 	helm lint helm/argo-stack --values helm/argo-stack/values.yaml
 
-template: check-vars deps 
+template: check-vars deps
+	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
+	envsubst < my-values.yaml | \
 	helm template argo-stack helm/argo-stack \
 		--debug \
-		--values helm/argo-stack/values.yaml \
 		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
 		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
 		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000  \
 		--set-string s3.enabled=${S3_ENABLED} \
-                --set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
-                --set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
-                --set-string s3.bucket=${S3_BUCKET} \
+		--set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
+		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
+		--set-string s3.bucket=${S3_BUCKET} \
+		-f - \
 		--namespace argocd > rendered.yaml
 
 validate:
@@ -133,8 +135,11 @@ ct: check-vars kind deps
 	ct lint --config .ct.yaml --debug
 	ct install --config .ct.yaml --debug --helm-extra-args "--timeout 15m"
 
-argo-stack: check-vars kind bump-limits eso-install vault-dev vault-seed deps minio vault-auth 
-	helm upgrade --install \
+init: check-vars kind bump-limits eso-install vault-dev vault-seed deps minio vault-auth 
+
+argo-stack:
+	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
+	envsubst < my-values.yaml | helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
@@ -145,16 +150,17 @@ argo-stack: check-vars kind bump-limits eso-install vault-dev vault-seed deps mi
 		--set-string s3.insecure=true \
 		--set-string s3.region=${S3_REGION} \
 		--set-string s3.hostname=${S3_HOSTNAME} \
-		-f my-values.yaml
+		-f -
+
+deploy: init argo-stack docker-install ports
+ports:	
 	echo waiting for pods
 	sleep 10
-
-deploy: argo-stack
 	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
 	echo starting port forwards
 	kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 --address=0.0.0.0 -n argo-workflows &
 	kubectl port-forward svc/argo-stack-argocd-server         8080:443  --address=0.0.0.0 -n argocd &
-	kubectl port-forward svc/github-eventsource-svc 12000:12000             --address=0.0.0.0 -n argo-events &
+	kubectl port-forward svc/github-repo-registrations-eventsource-svc 12000:12000 --address=0.0.0.0 -n argo-events &
 	echo UIs available on port 2746 and port 8080, event exposed on 12000
 
 adapter:
@@ -162,6 +168,46 @@ adapter:
 
 test-artifacts:
 	./test-per-app-artifacts.sh
+
+test-artifact-repository-ref:
+	@echo "🧪 Testing Artifact Repository Ref Feature (Issue #82)"
+	./test-artifact-repository-ref.sh
+
+test-secrets:
+	@echo "🔐 Validating ExternalSecrets exist and are valid..."
+	@echo ""
+	@echo "📋 Checking ArgoCD ExternalSecrets in namespace: argocd"
+	@kubectl get externalsecret argocd-secret -n argocd -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ argocd-secret not found"
+	@kubectl get externalsecret argocd-initial-admin-secret -n argocd -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ argocd-initial-admin-secret not found"
+	@echo ""
+	@echo "📋 Checking GitHub ExternalSecrets in namespace: argo-events"
+	@kubectl get externalsecret github-secret-nextflow-hello -n argo-events -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ github-secret-nextflow-hello not found"
+	# @kubectl get externalsecret github-secret-genomics -n argo-events -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ github-secret-genomics not found"
+	# @kubectl get externalsecret github-secret-internal-dev -n argo-events -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ github-secret-internal-dev not found"
+	@echo ""
+	@echo "📋 Checking S3 ExternalSecrets in tenant namespaces"
+	@kubectl get externalsecret s3-credentials-nextflow-hello-project -n wf-bwalsh-nextflow-hello-project -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ s3-credentials-nextflow-hello-project not found in wf-bwalsh-nextflow-hello-project"
+	# @kubectl get externalsecret s3-credentials-genomics-variant-calling -n wf-genomics-lab-variant-calling-pipeline -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ s3-credentials-genomics-variant-calling not found in wf-genomics-lab-variant-calling-pipeline"
+	# @kubectl get externalsecret s3-data-credentials-genomics-variant-calling -n wf-genomics-lab-variant-calling-pipeline -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ s3-data-credentials-genomics-variant-calling not found in wf-genomics-lab-variant-calling-pipeline"
+	# @kubectl get externalsecret s3-credentials-local-dev-workflows -n wf-internal-dev-workflows -o jsonpath='{.metadata.name}{"\t"}{.status.conditions[?(@.type=="Ready")].status}{"\n"}' || echo "❌ s3-credentials-local-dev-workflows not found in wf-internal-dev-workflows"
+	@echo ""
+	@echo "📊 Summary of all ExternalSecrets:"
+	@echo "Namespace: argocd"
+	@kubectl get externalsecret -n argocd -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SYNCED:.status.conditions[?(@.type=="Ready")].lastTransitionTime' 2>/dev/null || echo "  No ExternalSecrets found"
+	@echo ""
+	@echo "Namespace: argo-events"
+	@kubectl get externalsecret -n argo-events -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SYNCED:.status.conditions[?(@.type=="Ready")].lastTransitionTime' 2>/dev/null || echo "  No ExternalSecrets found"
+	@echo ""
+	@echo "Namespace: wf-bwalsh-nextflow-hello-project"
+	@kubectl get externalsecret -n wf-bwalsh-nextflow-hello-project -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SYNCED:.status.conditions[?(@.type=="Ready")].lastTransitionTime' 2>/dev/null || echo "  No ExternalSecrets found"
+	# @echo ""
+	# @echo "Namespace: wf-genomics-lab-variant-calling-pipeline"
+	# @kubectl get externalsecret -n wf-genomics-lab-variant-calling-pipeline -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SYNCED:.status.conditions[?(@.type=="Ready")].lastTransitionTime' 2>/dev/null || echo "  No ExternalSecrets found"
+	# @echo ""
+	# @echo "Namespace: wf-internal-dev-workflows"
+	# @kubectl get externalsecret -n wf-internal-dev-workflows -o custom-columns='NAME:.metadata.name,READY:.status.conditions[?(@.type=="Ready")].status,SYNCED:.status.conditions[?(@.type=="Ready")].lastTransitionTime' 2>/dev/null || echo "  No ExternalSecrets found"
+	# @echo ""
+	@echo "✅ ExternalSecret validation complete"
 
 password:
 	kubectl get secret argocd-initial-admin-secret \
@@ -228,11 +274,37 @@ vault-seed:
 		token="$(GITHUB_PAT)" 
 	@echo "➡️  Creating per-app S3 credentials..."
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello/s3 \
-		accessKey="app1-access-key" \
-		secretKey="app1-secret-key"
+		accessKey="minioadmin" \
+		secretKey="minioadmin"
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-2/s3 \
 		accessKey="app2-access-key" \
 		secretKey="app2-secret-key"
+	@echo "➡️  Seeding Vault with secrets from my-values.yaml repoRegistrations..."
+	@# nextflow-hello-project GitHub credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-project/github \
+		token="$(GITHUB_PAT)"
+	@# nextflow-hello-project S3 artifact credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-project/s3/artifacts \
+		AWS_ACCESS_KEY_ID="minioadmin" \
+		AWS_SECRET_ACCESS_KEY="minioadmin"
+	@# genomics-variant-calling GitHub credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/genomics/github \
+		token="$(GITHUB_PAT)"
+	@# genomics-variant-calling S3 artifact credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/genomics/s3/artifacts \
+		AWS_ACCESS_KEY_ID="genomics-artifacts-key" \
+		AWS_SECRET_ACCESS_KEY="genomics-artifacts-secret"
+	@# genomics-variant-calling S3 data bucket credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/genomics/s3/data \
+		AWS_ACCESS_KEY_ID="genomics-data-key" \
+		AWS_SECRET_ACCESS_KEY="genomics-data-secret"
+	@# local-dev-workflows GitHub credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/internal-dev/github \
+		token="$(GITHUB_PAT)"
+	@# local-dev-workflows MinIO credentials
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/internal-dev/minio \
+		AWS_ACCESS_KEY_ID="minioadmin" \
+		AWS_SECRET_ACCESS_KEY="minioadmin"
 	@echo "➡️  Enabling Kubernetes auth method..."
 	@kubectl exec -n vault vault-0 -- vault auth enable kubernetes 2>/dev/null || echo "   (Kubernetes auth already enabled)"
 	@echo "➡️  Configuring Kubernetes auth..."
@@ -241,14 +313,21 @@ vault-seed:
 	@echo "✅ Vault seeded with test data"
 	@echo ""
 	@echo "📋 Available secrets:"
-	@echo "   kv/argo/argocd/admin        - Argo CD admin credentials"
-	@echo "   kv/argo/argocd/oidc         - Argo CD OIDC client secret"
-	@echo "   kv/argo/argocd/server       - Argo CD server secret key"
-	@echo "   kv/argo/workflows/artifacts - Workflow artifact storage credentials"
-	@echo "   kv/argo/workflows/oidc      - Workflow OIDC client secret"
-	@echo "   kv/argo/authz               - AuthZ adapter OIDC secret"
-	@echo "   kv/argo/events/github       - GitHub webhook token"
-	@echo "   kv/argo/apps/*/s3           - Per-app S3 credentials"
+	@echo "   kv/argo/argocd/admin                            - Argo CD admin credentials"
+	@echo "   kv/argo/argocd/oidc                             - Argo CD OIDC client secret"
+	@echo "   kv/argo/argocd/server                           - Argo CD server secret key"
+	@echo "   kv/argo/workflows/artifacts                     - Workflow artifact storage credentials"
+	@echo "   kv/argo/workflows/oidc                          - Workflow OIDC client secret"
+	@echo "   kv/argo/authz                                   - AuthZ adapter OIDC secret"
+	@echo "   kv/argo/events/github                           - GitHub webhook token"
+	@echo "   kv/argo/apps/*/s3                               - Per-app S3 credentials (legacy)"
+	@echo "   kv/argo/apps/nextflow-hello-project/github      - nextflow-hello-project GitHub token"
+	@echo "   kv/argo/apps/nextflow-hello-project/s3/artifacts - nextflow-hello-project S3 credentials"
+	@echo "   kv/argo/apps/genomics/github                    - genomics-variant-calling GitHub token"
+	@echo "   kv/argo/apps/genomics/s3/artifacts              - genomics-variant-calling S3 artifact credentials"
+	@echo "   kv/argo/apps/genomics/s3/data                   - genomics-variant-calling S3 data credentials"
+	@echo "   kv/argo/apps/internal-dev/github                - local-dev-workflows GitHub token"
+	@echo "   kv/argo/apps/internal-dev/minio                 - local-dev-workflows MinIO credentials"
 
 vault-list:
 	@echo "📋 Listing all secrets in Vault..."
@@ -269,7 +348,7 @@ vault-cleanup:
 
 vault-auth:
 	@echo "🧹 Binding ServiceAccount to Vault dev server..."
-	@printf '%s\n' 'path "kv/data/argo/*" {' '  capabilities = ["read"]' '}' \
+	@printf '%s\n%s\n' 'path "kv/data/argo/*" {' '  capabilities = ["read"]' '}' \
 	  | kubectl exec -i -n vault vault-0 -- vault policy write argo-stack -
 	@kubectl exec -n vault vault-0 -- vault write auth/kubernetes/role/argo-stack \
                 bound_service_account_names=eso-vault-auth \
@@ -297,7 +376,23 @@ eso-install:
 	@echo "⏳ Waiting for External Secrets Operator to be ready..."
 	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=external-secrets -n external-secrets-system --timeout=120s
 	@echo "⏳ Waiting for CRDs to be established..."
-	@kubectl wait --for condition=established --timeout=60s crd/externalsecrets.external-secrets.io crd/secretstores.external-secrets.io crd/clustersecretstores.external-secrets.io
+	@kubectl wait --for condition=established --timeout=60s crd/externalsecrets.external-secrets.io
+	@kubectl wait --for condition=established --timeout=60s crd/secretstores.external-secrets.io
+	@kubectl wait --for condition=established --timeout=60s crd/clustersecretstores.external-secrets.io
+	@echo "⏳ Waiting for webhook CA certificate to be generated..."
+	@MAX_WAIT=60; \
+	ELAPSED=0; \
+	while [ $$ELAPSED -lt $$MAX_WAIT ]; do \
+		if kubectl get validatingwebhookconfiguration externalsecret-validate -o jsonpath='{.webhooks[0].clientConfig.caBundle}' 2>/dev/null | grep -q "."; then \
+			echo "✅ Webhook CA certificate is ready"; \
+			break; \
+		fi; \
+		sleep 2; \
+		ELAPSED=$$((ELAPSED + 2)); \
+	done; \
+	if [ $$ELAPSED -ge $$MAX_WAIT ]; then \
+		echo "⚠️  Webhook CA certificate not ready after $${MAX_WAIT}s, but continuing..."; \
+	fi
 	@echo "✅ External Secrets Operator installed successfully"
 
 eso-status:
@@ -309,4 +404,9 @@ eso-cleanup:
 	@helm uninstall external-secrets -n external-secrets-system 2>/dev/null || true
 	@kubectl delete namespace external-secrets-system 2>/dev/null || true
 	@echo "✅ External Secrets Operator removed"
+
+docker-install:
+	docker build -t nextflow-runner:latest -f nextflow-runner/Dockerfile .
+	kind load docker-image nextflow-runner:latest --name kind
+	docker exec -it kind-control-plane crictl images | grep nextflow-runner
 
