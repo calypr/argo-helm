@@ -1,0 +1,78 @@
+# Example: Vault Integration with AppRole Auth
+# This example shows how to configure the argo-stack chart to use
+# HashiCorp Vault with AppRole authentication (useful for CI/CD or when
+# Kubernetes auth is not available).
+
+# Enable External Secrets integration
+externalSecrets:
+  enabled: true
+  installOperator: true
+  
+  external-secrets:
+    installCRDs: true
+  
+  vault:
+    enabled: true
+    address: "https://vault.example.com"
+    
+    # TLS configuration for production
+    caBundleSecretName: "vault-ca-bundle"
+    caBundleSecretKey: "ca.crt"
+    
+    # AppRole authentication
+    auth:
+      method: "approle"
+      mount: "approle"  # AppRole mount path in Vault
+      
+      approle:
+        # Get role ID from: vault read auth/approle/role/argo-stack/role-id
+        roleId: "xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx"
+        
+        # Create secret first:
+        # kubectl create secret generic vault-approle-secret \
+        #   --from-literal=secretId='YOUR_SECRET_ID' \
+        #   -n argocd
+        secretRef:
+          name: "vault-approle-secret"
+          key: "secretId"
+    
+    kv:
+      engineVersion: 2
+      defaultPathPrefix: "kv/argo"
+    
+    scope: "namespaced"
+    namespace: "argocd"
+  
+  secrets:
+    argocd:
+      adminPasswordPath: "argocd/admin#password"
+      serverSecretKeyPath: "argocd/server#secretKey"
+    
+    workflows:
+      artifactAccessKeyPath: "workflows/artifacts#accessKey"
+      artifactSecretKeyPath: "workflows/artifacts#secretKey"
+    
+    github:
+      tokenPath: "events/github#token"
+
+# S3 and other configurations
+s3:
+  enabled: true
+  hostname: "s3.amazonaws.com"
+  bucket: "my-argo-artifacts"
+  region: "us-west-2"
+
+events:
+  enabled: true
+  github:
+    enabled: true
+    secret:
+      create: true
+      name: "github-secret"
+
+namespaces:
+  argo: argo-workflows
+  argocd: argocd
+  tenant: wf-poc
+  security: security
+  argo-events: argo-events

@@ -1,0 +1,55 @@
+{{- if .Values.repoRegistrations }}
+{{- range $reg := .Values.repoRegistrations }}
+{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+---
+# Role to read artifact-repositories ConfigMap in argo-workflows namespace
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: artifact-repository-reader-{{ $reg.name }}
+  namespace: {{ $.Values.namespaces.argo }}
+  labels:
+    app.kubernetes.io/name: {{ $reg.name }}
+    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/component: workflow-rbac
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
+rules:
+  - apiGroups: [""]
+    resources: ["configmaps"]
+    resourceNames: ["artifact-repositories"]
+    verbs: ["get", "list"]
+---
+# RoleBinding to allow tenant's wf-runner to read artifact-repositories
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: artifact-repository-reader-{{ $reg.name }}
+  namespace: {{ $.Values.namespaces.argo }}
+  labels:
+    app.kubernetes.io/name: {{ $reg.name }}
+    app.kubernetes.io/part-of: argo-stack
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: artifact-repository-reader-{{ $reg.name }}
+subjects:
+  - kind: ServiceAccount
+    name: wf-runner
+    namespace: {{ $namespace }}
+{{- end }}
+{{- end }}
