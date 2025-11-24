@@ -422,9 +422,13 @@ When adding new resources to tenant namespaces:
 
 ---
 
-## Revision History
+## Background on Naming
 
-| Date       | Author              | Changes                          |
-|------------|---------------------|----------------------------------|
-| 2025-11-20 | Copilot SWE Agent   | Initial document creation        |
+Short answer: Yes — but with caveats.
 
+- Helm renders templates in deterministic alphanumeric order by their template name under `templates/` (so `00-namespaces.yaml` will be rendered before `10-deploy.yaml`).
+- Before sending to the Kubernetes API, Helm performs a resource-level sort (Namespaces, `crds/` handling, CRDs, ServiceAccounts, RBAC, Services, Deployments, etc.) so Kind priority can override filename order for safe creation.
+- Files under `crds/` are handled specially (installed separately, not templated).
+- Helm hooks use annotations and `weight` — not filename — to control their order.
+
+Recommendation: use numeric prefixes for readability and to influence ordering among same-priority resources, but rely on Helm’s Kind ordering (and hook weights) for critical sequencing.
