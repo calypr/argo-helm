@@ -1,3 +1,5 @@
+[Home](index.md) > User Guides
+
 # Argo Stack User Guide
 Multi Tenant Workflows via RepoRegistration
 

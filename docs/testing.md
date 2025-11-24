@@ -1,3 +1,5 @@
+[Home](index.md) > Testing and Troubleshooting
+
 # Testing Guide
 
 This document describes the testing infrastructure for the argo-helm chart, with a focus on validating Helm template rendering for the `repoRegistrations` feature.

@@ -1,3 +1,5 @@
+[Home](index.md) > User Guides
+
 # 📝 RepoRegistration Guide — Self-Service Repository Onboarding
 
 This guide explains how to use the **RepoRegistration** custom resource to onboard your Git repositories to the Argo platform with automated configuration for S3 storage, secrets, and access control.

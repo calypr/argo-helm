@@ -1,3 +1,5 @@
+[Home](index.md) > Development and Engineering Notes
+
 # Engineering Note: Helm Resource Creation Order for RepoRegistration
 
 **Date**: 2025-11-20  

@@ -1,3 +1,5 @@
+[Home](index.md) > Architecture and Design
+
 # Vault Integration Summary
 
 This document provides a high-level overview of the Vault + External Secrets Operator (ESO) integration implemented in the argo-stack Helm chart.

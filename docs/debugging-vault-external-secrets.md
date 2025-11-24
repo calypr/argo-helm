@@ -1,3 +1,5 @@
+[Home](index.md) > Secrets, Vault, and External Secrets Operator
+
 
 # **Engineering Note: Debugging Vault + External Secrets Operator Integration**
 
