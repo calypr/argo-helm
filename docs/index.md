@@ -12,111 +12,78 @@ structure, development workflows, testing, and troubleshooting.
 # Table of Contents
 
 ## 1. User Guides
-- [User Guide](user-guide.md)
-- [User Guide New](user-guide-new.md)
-- [Repo Registration Guide](repo-registration-guide.md)
-- [Tenant Onboarding](tenant-onboarding.md)
-- [GitHub Integration Guide](github.md)
+- [User Guide](user-guide.md) - Comprehensive guide for running Nextflow workflows from GitHub
+- [Repo Registration Guide](repo-registration-guide.md) - Self-service repository onboarding
+- [Tenant Onboarding](tenant-onboarding.md) - Step-by-step tenant setup
+- [GitHub Integration Guide](github.md) - GitHub webhook and integration setup
 
-## 2. Architecture and Design
-- [ADR Multi Tenant Namespaces](adr-multi-tenant-namespaces.md)
-- [Artifact Repository Reference](artifact-repository-ref.md)
-- [Template Overlap Analysis](template-overlap-analysis.md)
-- [Templates Reference](templates.md)
-- [Vault Architecture Diagrams](vault-architecture-diagrams.md)
-- [Vault Seeding Strategy](vault-seeding-strategy.md)
-- [Vault Integration Summary](vault-integration-summary.md)
+## 2. Operations and Administration
+- [Admin Guide](admin-guide.md) - Platform administration and operations
+- [Secrets With Vault](secrets-with-vault.md) - Complete Vault + External Secrets Operator guide
+- [Troubleshooting](troubleshooting.md) - Comprehensive troubleshooting for all components
 
-## 3. Development and Engineering Notes
-- [Development Guide](development.md)
-- [Engineering Note Resource Creation Order](engineering-note-resource-creation-order.md)
-- [Admin Guide](admin-guide.md)
+## 3. Architecture and Design
+- [ADR Multi Tenant Namespaces](adr-multi-tenant-namespaces.md) - Multi-tenancy architecture decisions
+- [Artifact Repository Reference](artifact-repository-ref.md) - Artifact storage configuration
+- [Templates Reference](templates.md) - Helm template documentation
+- [Template Overlap Analysis](template-overlap-analysis.md) - Template usage analysis
+- [Vault Architecture Diagrams](vault-architecture-diagrams.md) - Vault integration diagrams
+- [Vault Seeding Strategy](vault-seeding-strategy.md) - Vault initialization strategy
+- [Vault Integration Summary](vault-integration-summary.md) - High-level Vault integration overview
 
-## 4. Secrets, Vault, and External Secrets Operator
-- [Secrets With Vault](secrets-with-vault.md)
-- [Debugging Vault External Secrets](debugging-vault-external-secrets.md)
-- [Testing Vault Integration](testing-vault-integration.md)
-
-## 5. Testing and Troubleshooting
-- [Testing Guide](testing.md)
-- [Troubleshooting](troubleshooting.md)
-- [Workflow Troubleshooting](workflow-troubleshooting.md)
+## 4. Development
+- [Development Guide](development.md) - Developer setup and workflows
+- [Testing Guide](testing.md) - Testing strategies and procedures
+- [Testing Vault Integration](testing-vault-integration.md) - Vault-specific testing
+- [Engineering Note: Resource Creation Order](engineering-note-resource-creation-order.md) - Resource dependency management
+- [Debugging Vault External Secrets](debugging-vault-external-secrets.md) - Vault debugging techniques
 
 ---
 
 ## Document Summaries
 
-### User Guide (user-guide.md)
-High level introduction to the Argo Stack multi tenant architecture, including
-namespaces, RepoRegistration, workflows, RBAC, and artifact repositories.
+### User Guides
 
-### User Guide New (user-guide-new.md)
-An updated and refined version of the User Guide with improved diagrams and
-clearer explanations.
+**[User Guide](user-guide.md)** - Comprehensive guide for data managers and developers to run Nextflow workflows from GitHub, including GitHub integration, artifact storage, and self-service repository registration.
 
-### Repo Registration Guide (repo-registration-guide.md)
-Explains the RepoRegistration custom resource, required fields, and how it
-drives namespace, RBAC, workflow templates, and artifact repository wiring.
+**[Repo Registration Guide](repo-registration-guide.md)** - Details on the RepoRegistration custom resource, required fields, and how it automates namespace, RBAC, workflow templates, and artifact repository wiring.
 
-### Tenant Onboarding (tenant-onboarding.md)
-Step by step checklist for onboarding a new GitHub repository as a tenant.
+**[Tenant Onboarding](tenant-onboarding.md)** - Step-by-step checklist for onboarding a new GitHub repository as a tenant.
 
-### GitHub Integration Guide (github.md)
-Describes GitHub webhook configuration, expected payloads, and how GitHub
-events flow into Argo Events and Argo Workflows.
+**[GitHub Integration Guide](github.md)** - GitHub webhook configuration, expected payloads, and event flow into Argo Events and Argo Workflows.
 
-### ADR Multi Tenant Namespaces (adr-multi-tenant-namespaces.md)
-Architecture decision record documenting the choice of per tenant namespaces
-and trade offs.
+### Operations and Administration
 
-### Artifact Repository Reference (artifact-repository-ref.md)
-Details how artifact repository references are resolved at global, app, and
-tenant levels.
+**[Admin Guide](admin-guide.md)** - Operational guidance for platform administrators managing the Argo Stack, including deployment, monitoring, and maintenance.
 
-### Template Overlap Analysis (template-overlap-analysis.md)
-Analysis of template usage before and after the repo registration refactor.
+**[Secrets With Vault](secrets-with-vault.md)** - Complete guide to managing secrets using HashiCorp Vault and External Secrets Operator, including authentication methods, secret rotation, and troubleshooting.
 
-### Templates Reference (templates.md)
-Complete reference for all Helm templates in helm/argo-stack/templates.
+**[Troubleshooting](troubleshooting.md)** - Comprehensive troubleshooting guide covering GitHub webhooks, Argo Events, Argo Workflows, artifact storage, and Vault integration.
 
-### Vault Architecture Diagrams (vault-architecture-diagrams.md)
-Collection of diagrams showing Vault, SecretStore, ExternalSecret, and
-controller interactions.
+### Architecture and Design
 
-### Vault Seeding Strategy (vault-seeding-strategy.md)
-Explains how Vault is initially seeded and updated with secrets required by
-the stack.
+**[ADR Multi Tenant Namespaces](adr-multi-tenant-namespaces.md)** - Architecture decision record documenting the choice of per-tenant namespaces and trade-offs.
 
-### Vault Integration Summary (vault-integration-summary.md)
-High level summary of Vault integration across Argo components and tenants.
+**[Artifact Repository Reference](artifact-repository-ref.md)** - How artifact repository references are resolved at global, app, and tenant levels.
 
-### Development Guide (development.md)
-Guide for contributors covering repo layout, local development workflows,
-and coding conventions.
+**[Templates Reference](templates.md)** - Complete reference for all Helm templates in helm/argo-stack/templates.
 
-### Engineering Note Resource Creation Order (engineering-note-resource-creation-order.md)
-Explains the order in which resources must be created to avoid race conditions
-and failed dependencies.
+**[Template Overlap Analysis](template-overlap-analysis.md)** - Analysis of template usage before and after the repo registration refactor.
 
-### Admin Guide (admin-guide.md)
-Operational guidance for platform administrators managing the Argo Stack.
+**[Vault Architecture Diagrams](vault-architecture-diagrams.md)** - Collection of diagrams showing Vault, SecretStore, ExternalSecret, and controller interactions.
 
-### Secrets With Vault (secrets-with-vault.md)
-Explains how secrets are stored in Vault and exposed to Kubernetes using
-External Secrets.
+**[Vault Seeding Strategy](vault-seeding-strategy.md)** - How Vault is initially seeded and updated with secrets required by the stack.
 
-### Debugging Vault External Secrets (debugging-vault-external-secrets.md)
-Practical troubleshooting guide for Vault, SecretStore, and ExternalSecret
-issues.
+**[Vault Integration Summary](vault-integration-summary.md)** - High-level summary of Vault integration across Argo components and tenants.
 
-### Testing Vault Integration (testing-vault-integration.md)
-Describes how to validate Vault and External Secrets integration end to end.
+### Development
 
-### Testing Guide (testing.md)
-General testing strategies for workflows, templates, and events.
+**[Development Guide](development.md)** - Guide for contributors covering repo layout, local development workflows, and coding conventions.
 
-### Troubleshooting (troubleshooting.md)
-Central troubleshooting guide for common issues across the stack.
+**[Testing Guide](testing.md)** - General testing strategies for workflows, templates, and events.
 
-### Workflow Troubleshooting (workflow-troubleshooting.md)
-Focused guide for diagnosing workflow level failures and misconfigurations.
+**[Testing Vault Integration](testing-vault-integration.md)** - How to validate Vault and External Secrets integration end-to-end.
+
+**[Engineering Note: Resource Creation Order](engineering-note-resource-creation-order.md)** - Resource creation order to avoid race conditions and failed dependencies.
+
+**[Debugging Vault External Secrets](debugging-vault-external-secrets.md)** - Practical debugging techniques for Vault, SecretStore, and ExternalSecret issues.
