@@ -23,4 +23,6 @@ helm-extra-set-args: >
   --set argo-workflows.server.enabled=true
   --set argo-workflows.server.secure=false
   --set argo-workflows.server.extraArgs[0]=--auth-mode=server
+  --set externalSecrets.enabled=false
+  --set externalSecrets.installOperator=false
 

@@ -72,6 +72,14 @@ See [README-use-cases.md](./README-use-cases.md)
 - **Per-request Authorization** - Real-time access control
 - **Service Account Management** - Automated RBAC configuration
 - **Secure Artifact Storage** - S3-compatible with encryption support
+- **🆕 Vault Integration** - HashiCorp Vault + External Secrets Operator for centralized secret management
+
+### 🚀 Self-Service Features
+- **🆕 RepoRegistration CRD** - Self-service onboarding for GitHub repositories with automated webhook setup
+- **Per-Repository S3 Buckets** - Dedicated artifact and data storage with tenant isolation
+- **🆕 Multi-Repository Artifact Support** - Workflows can dynamically select artifact repositories using `artifactRepositoryRef` (see [doc/artifact-repository-ref.md](./doc/artifact-repository-ref.md))
+- **Automated Secret Management** - Vault-backed credentials via External Secrets Operator
+- **Fine-Grained Access Control** - Per-repository admin and read-only user management
 
 ### 🌐 Infrastructure
 - **NGINX Ingress Ready** - Production-grade external access
@@ -404,7 +412,19 @@ kubectl get namespaces | grep -E "(argo|security|wf-poc)"
 
 ## ⚙️ Configuration
 
-### 🔐 Authorization Adapter Configuration
+##### ⚠️ Deprecation Notice - Legacy Configuration Pattern
+
+**The legacy configuration pattern using `.Values.applications` has been REMOVED.**
+
+For self-service repository onboarding with automated secret management, S3 bucket configuration, and access control, use the **RepoRegistration** pattern instead.
+
+See:
+- [Deprecation Notice](docs/DEPRECATION_NOTICE.md) for migration guidance
+- [RepoRegistration User Guide](docs/REPO_REGISTRATION_USER_GUIDE.md) for the new pattern
+
+---
+
+# 🔐 Authorization Adapter Configuration
 
 The authorization adapter supports flexible configuration:
 
@@ -535,6 +555,133 @@ argoWorkflows:
         - email
         - groups
 ```
+
+### 🔐 Secret Management with Vault
+
+The chart supports **HashiCorp Vault** integration via **External Secrets Operator (ESO)** for centralized secret management:
+
+**Benefits:**
+- ✅ No plaintext secrets in Git or Helm values
+- ✅ Automatic secret rotation without redeployment
+- ✅ Centralized audit logging in Vault
+- ✅ Multi-tenant secret isolation with Vault policies
+
+**Quick Setup:**
+
+```yaml
+externalSecrets:
+  enabled: true
+  installOperator: true  # Set to false if ESO already installed
+  
+  vault:
+    enabled: true
+    address: "https://vault.example.com"
+    
+    auth:
+      method: "kubernetes"  # or "approle"
+      role: "argo-stack"
+      serviceAccountName: "eso-vault-auth"
+    
+    kv:
+      engineVersion: 2
+      defaultPathPrefix: "kv/argo"
+  
+  secrets:
+    argocd:
+      adminPasswordPath: "argocd/admin#password"
+      serverSecretKeyPath: "argocd/server#secretKey"
+    workflows:
+      artifactAccessKeyPath: "workflows/artifacts#accessKey"
+      artifactSecretKeyPath: "workflows/artifacts#secretKey"
+    github:
+      tokenPath: "events/github#token"
+```
+
+**Seed Vault with secrets:**
+
+```bash
+# For local development - install Vault, MinIO, and ESO
+make vault-dev vault-seed
+make minio-dev minio-create-bucket
+make eso-install
+
+# For production
+vault kv put kv/argo/argocd/admin password="SecurePassword123!"
+vault kv put kv/argo/workflows/artifacts accessKey="..." secretKey="..."
+vault kv put kv/argo/events/github token="ghp_..."
+```
+
+📖 **Full Guide:** See [docs/secrets-with-vault.md](docs/secrets-with-vault.md) for detailed configuration, rotation workflows, and best practices.
+
+📁 **Examples:** Check [examples/vault/](examples/vault/) for sample configurations with different auth methods.
+
+---
+
+## 🔧 Self-Service Repository Onboarding
+
+The **RepoRegistration** custom resource provides a declarative way to onboard Git repositories with automated configuration for ArgoCD, Argo Events, S3 storage, and secrets management.
+
+### Quick Start
+
+Define your repository configuration in a single YAML file:
+
+```yaml
+apiVersion: platform.calypr.io/v1alpha1
+kind: RepoRegistration
+metadata:
+  name: my-nextflow-project
+  namespace: wf-poc
+spec:
+  repoUrl: https://github.com/myorg/my-nextflow-project.git
+  tenant: myorg
+  workflowTemplateRef: nextflow-repo-runner
+  
+  # S3 artifact storage
+  artifactBucket:
+    hostname: https://s3.us-west-2.amazonaws.com
+    bucket: my-project-artifacts
+    region: us-west-2
+    externalSecretPath: argo/apps/my-project/s3/artifacts
+  
+  # GitHub credentials
+  githubSecretName: github-secret-my-project
+  githubSecretPath: argo/apps/my-project/github
+  
+  # Access control
+  adminUsers:
+    - admin@myorg.com
+  readUsers:
+    - viewer@myorg.com
+```
+
+### What Gets Created
+
+For each `RepoRegistration`, the platform automatically creates:
+
+- ✅ **ArgoCD Application** for continuous deployment
+- ✅ **Argo Events GitHub webhook** for CI/CD triggers
+- ✅ **ExternalSecrets** for S3 and GitHub credentials from Vault
+- ✅ **Artifact Repository ConfigMap** for workflow outputs
+- ✅ **Access control** aligned with Fence/Arborist
+
+### Usage Methods
+
+**Method 1:** Using Helm values (deployment-time):
+```bash
+helm upgrade --install argo-stack ./helm/argo-stack \
+  --values examples/repo-registrations-values.yaml
+```
+
+**Method 2:** Using CRDs (runtime with controller):
+```bash
+kubectl apply -f examples/repo-registrations-example.yaml
+```
+
+📖 **Full Guide:** See [docs/repo-registration-guide.md](docs/repo-registration-guide.md) for complete documentation and examples.
+
+📁 **Examples:** 
+- [repo-registrations-example.yaml](examples/repo-registrations-example.yaml) - Sample CRs
+- [repo-registrations-values.yaml](examples/repo-registrations-values.yaml) - Helm values approach
 
 ---
 
@@ -716,6 +863,52 @@ argocdApplication:
 - ✅ More explicit destination configuration
 - ✅ Better alignment with Argo CD's multi-tenancy model
 - ✅ Easier to manage complex deployments
+
+### 🎯 Self-Service Repository Registration
+
+For **automated, self-service onboarding** of GitHub repositories, use the `RepoRegistration` Custom Resource Definition (CRD). This enables developers to register their repositories without administrator intervention.
+
+**Key Features:**
+- ✅ Automated GitHub webhook setup
+- ✅ Dedicated S3 buckets for artifacts and data with tenant isolation
+- ✅ Vault-backed secret management via External Secrets Operator
+- ✅ Fine-grained user access control (admin vs. read-only)
+- ✅ Automatic reconciliation and lifecycle management
+
+**Quick Example:**
+
+```yaml
+apiVersion: platform.calypr.io/v1alpha1
+kind: RepoRegistration
+metadata:
+  name: my-nextflow-repo
+  namespace: argo
+spec:
+  # Required fields
+  repoUrl: https://github.com/myorg/my-nextflow-repo.git
+  tenant: myteam
+  workflowTemplateRef: nextflow-repo-runner
+  githubSecretName: my-repo-github-creds
+  
+  # Dedicated S3 buckets (optional)
+  artifactBucket:
+    hostname: https://s3.us-west-2.amazonaws.com
+    bucket: my-team-artifacts
+    region: us-west-2
+    externalSecretPath: kv/argo/apps/my-repo/s3/artifacts
+  
+  # User access control
+  adminUsers:
+    - admin@example.com
+  readUsers:
+    - viewer@example.com
+```
+
+📚 **Full Documentation:** See [User Guide - Self-Service Repository Registration](docs/user-guide.md#9-self-service-repository-registration) for:
+- Complete field reference
+- Multiple configuration examples (minimal, MinIO, AWS S3)
+- Troubleshooting guide
+- Security best practices
 
 ### 🔧 Custom Authorization Logic
 
