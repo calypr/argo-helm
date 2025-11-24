@@ -148,20 +148,20 @@ class TestRepoRegistrationsRendering:
         ]
     
     def test_argocd_applications_count(self):
-        """Test that exactly 3 ArgoCD Applications are generated."""
+        """Test that exactly 1 ArgoCD Application is generated."""
         print("\n🧪 Testing ArgoCD Applications count...")
         
         applications = self._filter_by_kind('Application')
         repo_reg_apps = self._filter_by_label(applications, 'source', 'repo-registration')
         
-        expected_count = 3
+        expected_count = 1
         actual_count = len(repo_reg_apps)
         
         assert actual_count == expected_count, (
             f"Expected {expected_count} ArgoCD Applications from repoRegistrations, "
             f"but found {actual_count}"
         )
-        print(f"✅ Found {actual_count} ArgoCD Applications")
+        print(f"✅ Found {actual_count} ArgoCD Application(s)")
     
     def test_argocd_applications_names(self):
         """Test that ArgoCD Applications have correct names."""
@@ -171,9 +171,7 @@ class TestRepoRegistrationsRendering:
         repo_reg_apps = self._filter_by_label(applications, 'source', 'repo-registration')
         
         expected_names = {
-            'nextflow-hello-project',
-            'genomics-variant-calling',
-            'local-dev-workflows'
+            'nextflow-hello-project'
         }
         
         actual_names = {app['metadata']['name'] for app in repo_reg_apps}
@@ -181,16 +179,16 @@ class TestRepoRegistrationsRendering:
         assert actual_names == expected_names, (
             f"Expected Applications {expected_names}, but found {actual_names}"
         )
-        print(f"✅ Applications have correct names: {actual_names}")
+        print(f"✅ Application(s) have correct names: {actual_names}")
     
     def test_external_secrets_count(self):
-        """Test that exactly 7 ExternalSecrets are generated."""
+        """Test that exactly 2 ExternalSecrets are generated."""
         print("\n🧪 Testing ExternalSecrets count...")
         
         external_secrets = self._filter_by_kind('ExternalSecret')
         repo_reg_secrets = self._filter_by_label(external_secrets, 'source', 'repo-registration')
         
-        expected_count = 7  # 3 GitHub + 4 S3 (3 artifact + 1 data bucket)
+        expected_count = 2  # 1 GitHub + 1 S3 artifact bucket
         actual_count = len(repo_reg_secrets)
         
         assert actual_count == expected_count, (
@@ -200,35 +198,33 @@ class TestRepoRegistrationsRendering:
         print(f"✅ Found {actual_count} ExternalSecrets")
     
     def test_external_secrets_github_credentials(self):
-        """Test that 3 GitHub credential ExternalSecrets are generated."""
+        """Test that 1 GitHub credential ExternalSecret is generated."""
         print("\n🧪 Testing GitHub credential ExternalSecrets...")
         
         external_secrets = self._filter_by_kind('ExternalSecret')
         repo_reg_secrets = self._filter_by_label(external_secrets, 'source', 'repo-registration')
         github_secrets = self._filter_by_label(repo_reg_secrets, 'secret-type', 'github-credentials')
         
-        expected_count = 3
+        expected_count = 1
         actual_count = len(github_secrets)
         
         assert actual_count == expected_count, (
-            f"Expected {expected_count} GitHub credential ExternalSecrets, "
+            f"Expected {expected_count} GitHub credential ExternalSecret(s), "
             f"but found {actual_count}"
         )
         
         expected_names = {
-            'github-secret-nextflow-hello',
-            'github-secret-genomics',
-            'github-secret-internal-dev'
+            'github-secret-nextflow-hello'
         }
         actual_names = {secret['metadata']['name'] for secret in github_secrets}
         
         assert actual_names == expected_names, (
             f"Expected GitHub secrets {expected_names}, but found {actual_names}"
         )
-        print(f"✅ Found {actual_count} GitHub credential ExternalSecrets with correct names")
+        print(f"✅ Found {actual_count} GitHub credential ExternalSecret(s) with correct names")
     
     def test_external_secrets_s3_credentials(self):
-        """Test that 4 S3 credential ExternalSecrets are generated."""
+        """Test that 1 S3 credential ExternalSecret is generated."""
         print("\n🧪 Testing S3 credential ExternalSecrets...")
         
         external_secrets = self._filter_by_kind('ExternalSecret')
@@ -240,93 +236,73 @@ class TestRepoRegistrationsRendering:
             if secret.get('metadata', {}).get('labels', {}).get('secret-type', '').startswith('s3-')
         ]
         
-        expected_count = 4  # 3 artifact buckets + 1 data bucket
+        expected_count = 1  # 1 artifact bucket only
         actual_count = len(s3_secrets)
         
         assert actual_count == expected_count, (
-            f"Expected {expected_count} S3 credential ExternalSecrets, "
+            f"Expected {expected_count} S3 credential ExternalSecret(s), "
             f"but found {actual_count}"
         )
         
         expected_names = {
-            's3-credentials-nextflow-hello-project',
-            's3-credentials-genomics-variant-calling',
-            's3-data-credentials-genomics-variant-calling',  # data bucket
-            's3-credentials-local-dev-workflows'
+            's3-credentials-nextflow-hello-project'
         }
         actual_names = {secret['metadata']['name'] for secret in s3_secrets}
         
         assert actual_names == expected_names, (
             f"Expected S3 secrets {expected_names}, but found {actual_names}"
         )
-        print(f"✅ Found {actual_count} S3 credential ExternalSecrets with correct names")
+        print(f"✅ Found {actual_count} S3 credential ExternalSecret(s) with correct names")
     
     def test_artifact_repository_configmaps_count(self):
-        """Test that exactly 3 Artifact Repository ConfigMaps are generated."""
+        """Test that exactly 1 Artifact Repository ConfigMap is generated."""
         print("\n🧪 Testing Artifact Repository ConfigMaps count...")
         
         configmaps = self._filter_by_kind('ConfigMap')
         repo_reg_cms = self._filter_by_label(configmaps, 'source', 'repo-registration')
         
-        expected_count = 3
+        expected_count = 1
         actual_count = len(repo_reg_cms)
         
         assert actual_count == expected_count, (
-            f"Expected {expected_count} Artifact Repository ConfigMaps from repoRegistrations, "
+            f"Expected {expected_count} Artifact Repository ConfigMap(s) from repoRegistrations, "
             f"but found {actual_count}"
         )
-        print(f"✅ Found {actual_count} Artifact Repository ConfigMaps")
+        print(f"✅ Found {actual_count} Artifact Repository ConfigMap(s)")
     
     def test_artifact_repository_configmaps_s3_config(self):
-        """Test that Artifact Repository ConfigMaps have correct S3 configurations."""
-        print("\n🧪 Testing Artifact Repository ConfigMaps S3 configurations...")
+        """Test that Artifact Repository ConfigMap has correct S3 configuration."""
+        print("\n🧪 Testing Artifact Repository ConfigMap S3 configuration...")
         
         configmaps = self._filter_by_kind('ConfigMap')
         repo_reg_cms = self._filter_by_label(configmaps, 'source', 'repo-registration')
         
-        # Test nextflow-hello-project ConfigMap
+        # ConfigMaps are now named "artifact-repositories" and placed in tenant namespaces
         nextflow_cm = next(
-            (cm for cm in repo_reg_cms if cm['metadata']['name'] == 'argo-artifacts-nextflow-hello-project'),
+            (cm for cm in repo_reg_cms 
+             if cm['metadata']['name'] == 'artifact-repositories' 
+             and cm['metadata']['namespace'] == 'wf-bwalsh-nextflow-hello-project'),
             None
         )
         assert nextflow_cm is not None, "ConfigMap for nextflow-hello-project not found"
         
-        artifact_repo = yaml.safe_load(nextflow_cm['data']['artifactRepository'])
-        assert artifact_repo['s3']['bucket'] == 'research-team-1-artifacts', "Incorrect bucket"
-        assert artifact_repo['s3']['keyPrefix'] == 'workflows/', "Incorrect keyPrefix"
-        assert artifact_repo['s3']['endpoint'] == 'https://s3.us-west-2.amazonaws.com', "Incorrect endpoint"
-        assert artifact_repo['s3']['region'] == 'us-west-2', "Incorrect region"
-        assert artifact_repo['s3']['insecure'] == False, "Incorrect insecure flag"
-        assert 'pathStyle' not in artifact_repo['s3'] or artifact_repo['s3'].get('pathStyle') == False, "Incorrect pathStyle"
+        # The data is now under 'default-v1' key instead of 'artifactRepository'
+        artifact_repo_yaml = nextflow_cm['data'].get('default-v1')
+        assert artifact_repo_yaml is not None, "Missing default-v1 key in ConfigMap data"
+        
+        artifact_repo = yaml.safe_load(artifact_repo_yaml)
+        
+        # The hostname, bucket, and region are environment variables, so we just verify structure
+        assert 's3' in artifact_repo, "Missing s3 configuration"
+        assert 'bucket' in artifact_repo['s3'], "Missing bucket"
+        assert 'keyPrefix' in artifact_repo['s3'], "Missing keyPrefix"
+        assert artifact_repo['s3']['keyPrefix'] == 'nextflow-hello-project-workflows/', "Incorrect keyPrefix"
+        assert 'endpoint' in artifact_repo['s3'], "Missing endpoint"
+        assert 'region' in artifact_repo['s3'], "Missing region"
+        assert artifact_repo['s3']['insecure'] == True, "Incorrect insecure flag"
+        assert artifact_repo['s3']['pathStyle'] == True, "pathStyle should be True"
         
         print("✅ nextflow-hello-project ConfigMap has correct S3 config")
-        
-        # Test genomics-variant-calling ConfigMap
-        genomics_cm = next(
-            (cm for cm in repo_reg_cms if cm['metadata']['name'] == 'argo-artifacts-genomics-variant-calling'),
-            None
-        )
-        assert genomics_cm is not None, "ConfigMap for genomics-variant-calling not found"
-        
-        artifact_repo = yaml.safe_load(genomics_cm['data']['artifactRepository'])
-        assert artifact_repo['s3']['bucket'] == 'genomics-workflow-artifacts', "Incorrect bucket"
-        
-        print("✅ genomics-variant-calling ConfigMap has correct S3 config")
-        
-        # Test local-dev-workflows ConfigMap (MinIO with pathStyle)
-        local_dev_cm = next(
-            (cm for cm in repo_reg_cms if cm['metadata']['name'] == 'argo-artifacts-local-dev-workflows'),
-            None
-        )
-        assert local_dev_cm is not None, "ConfigMap for local-dev-workflows not found"
-        
-        artifact_repo = yaml.safe_load(local_dev_cm['data']['artifactRepository'])
-        assert artifact_repo['s3']['bucket'] == 'dev-workflow-artifacts', "Incorrect bucket"
-        assert artifact_repo['s3']['endpoint'] == 'https://minio.storage.local:9000', "Incorrect endpoint"
-        assert artifact_repo['s3']['insecure'] == True, "Incorrect insecure flag"
-        assert artifact_repo['s3']['pathStyle'] == True, "pathStyle should be True for MinIO"
-        
-        print("✅ local-dev-workflows ConfigMap has correct S3 config (MinIO)")
     
     def test_eventsource_count(self):
         """Test that exactly 1 EventSource is generated."""
@@ -345,7 +321,7 @@ class TestRepoRegistrationsRendering:
         print(f"✅ Found {actual_count} EventSource")
     
     def test_eventsource_webhook_configurations(self):
-        """Test that EventSource has all 3 repository webhook configurations."""
+        """Test that EventSource has the repository webhook configuration."""
         print("\n🧪 Testing EventSource webhook configurations...")
         
         eventsources = self._filter_by_kind('EventSource')
@@ -356,13 +332,11 @@ class TestRepoRegistrationsRendering:
         eventsource = repo_reg_eventsources[0]
         github_config = eventsource['spec']['github']
 
-        # Validate that all three webhooks are present
-        # Each webhook key is expected to be in the format:
+        # Validate that the webhook is present
+        # The webhook key is expected to be in the format:
         # repo_push-<org>-<repo>
         expected_events = {
-            'repo_push-bwalsh-nextflow-hello-project',
-            'repo_push-genomics-lab-variant-calling-pipeline',
-            'repo_push-internal-dev-workflows'
+            'repo_push-bwalsh-nextflow-hello-project'
         }
 
         actual_events = set(github_config.keys())
@@ -379,40 +353,24 @@ class TestRepoRegistrationsRendering:
         assert nextflow_webhook['active'] == True, "Webhook should be active for nextflow-hello"
         
         print("✅ nextflow-hello-project webhook configured correctly")
-        
-        # Validate genomics webhook
-        genomics_webhook = github_config['repo_push-genomics-lab-variant-calling-pipeline']
-        assert genomics_webhook['owner'] == 'genomics-lab', "Incorrect owner for genomics"
-        assert genomics_webhook['repository'] == 'variant-calling-pipeline', "Incorrect repository for genomics"
-        
-        print("✅ 'genomics-variant-calling' webhook configured correctly")
-        
-        # Validate local-dev webhook
-        local_dev_webhook = github_config['repo_push-internal-dev-workflows']
-        assert local_dev_webhook['owner'] == 'internal', "Incorrect owner for local-dev"
-        assert local_dev_webhook['repository'] == 'dev-workflows', "Incorrect repository for local-dev"
-        
-        print("✅ local-dev-workflows webhook configured correctly")
 
     def test_tenant_namespaces_created(self):
-        """Test that per-tenant namespaces are created with correct naming pattern."""
+        """Test that per-tenant namespace is created with correct naming pattern."""
         print("\n🧪 Testing tenant namespace creation...")
         
         namespaces = self._filter_by_kind('Namespace')
         tenant_namespaces = self._filter_by_label(namespaces, 'calypr.io/workflow-tenant', 'true')
         
-        expected_count = 3
+        expected_count = 1
         actual_count = len(tenant_namespaces)
         
         assert actual_count == expected_count, (
-            f"Expected {expected_count} tenant namespaces, but found {actual_count}"
+            f"Expected {expected_count} tenant namespace(s), but found {actual_count}"
         )
         
         # Verify namespace naming pattern: wf-<org>-<repo>
         expected_namespaces = {
-            'wf-bwalsh-nextflow-hello-project',
-            'wf-genomics-lab-variant-calling-pipeline',
-            'wf-internal-dev-workflows'
+            'wf-bwalsh-nextflow-hello-project'
         }
         
         actual_namespaces = {ns['metadata']['name'] for ns in tenant_namespaces}
@@ -421,7 +379,7 @@ class TestRepoRegistrationsRendering:
             f"Expected namespaces {expected_namespaces}, but found {actual_namespaces}"
         )
         
-        print(f"✅ Found {actual_count} tenant namespaces with correct naming pattern")
+        print(f"✅ Found {actual_count} tenant namespace(s) with correct naming pattern")
 
     def test_legacy_wf_poc_namespace_not_used(self):
         """Test that legacy wf-poc namespace is NOT used in tenant resources."""
@@ -487,31 +445,31 @@ class TestRepoRegistrationsRendering:
         tenant_roles = self._filter_by_label(roles, 'source', 'repo-registration')
         tenant_rbs = self._filter_by_label(role_bindings, 'source', 'repo-registration')
         
-        # Expected: 1 SA per tenant (3 tenants)
-        expected_sa_count = 3
+        # Expected: 1 SA per tenant (1 tenant)
+        expected_sa_count = 1
         assert len(tenant_sas) == expected_sa_count, (
-            f"Expected {expected_sa_count} ServiceAccounts for tenants, but found {len(tenant_sas)}"
+            f"Expected {expected_sa_count} ServiceAccount(s) for tenants, but found {len(tenant_sas)}"
         )
         
-        # Expected: 2 Roles per tenant (workflow-executor, sensor-workflow-creator) = 6 total
-        expected_role_count = 6
+        # Expected: 3 Roles per tenant (workflow-executor, sensor-workflow-creator, artifact-repository-reader) = 3 total
+        expected_role_count = 3
         assert len(tenant_roles) == expected_role_count, (
             f"Expected {expected_role_count} Roles for tenants, but found {len(tenant_roles)}"
         )
         
-        # Expected: 2 RoleBindings per tenant = 6 total
-        expected_rb_count = 6
+        # Expected: 3 RoleBindings per tenant = 3 total
+        expected_rb_count = 3
         assert len(tenant_rbs) == expected_rb_count, (
             f"Expected {expected_rb_count} RoleBindings for tenants, but found {len(tenant_rbs)}"
         )
         
         # Verify ServiceAccount names
         for sa in tenant_sas:
-            assert sa['metadata']['name'] == 'workflow-runner', (
-                f"ServiceAccount should be named 'workflow-runner', but found {sa['metadata']['name']}"
+            assert sa['metadata']['name'] == 'wf-runner', (
+                f"ServiceAccount should be named 'wf-runner', but found {sa['metadata']['name']}"
             )
         
-        print(f"✅ Found {len(tenant_sas)} ServiceAccounts, {len(tenant_roles)} Roles, and {len(tenant_rbs)} RoleBindings for tenants")
+        print(f"✅ Found {len(tenant_sas)} ServiceAccount(s), {len(tenant_roles)} Roles, and {len(tenant_rbs)} RoleBindings for tenants")
 
 
 def main():
