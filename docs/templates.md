@@ -1,3 +1,5 @@
+[Home](index.md) > Architecture and Design
+
 # Argo Stack Template Documentation
 
 This document provides **complete documentation for every Helm template** in the `helm/argo-stack/templates` directory.

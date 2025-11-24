@@ -1,3 +1,5 @@
+[Home](index.md) > User Guides
+
 # 👩‍🔬 User Guide — Running Nextflow Workflows from GitHub
 
 This guide explains how to connect your **GitHub repository** to the Argo environment so that every **push** automatically runs a **Nextflow workflow** on the compute cluster.

@@ -1,3 +1,5 @@
+[Home](index.md) > Architecture and Design
+
 # Vault Seeding Strategy for RepoRegistrations
 
 ## Overview

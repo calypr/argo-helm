@@ -1,3 +1,5 @@
+[Home](index.md) > Architecture and Design
+
 # Template Overlap and Redundancy Analysis
 
 ## Executive Summary

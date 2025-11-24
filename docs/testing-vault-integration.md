@@ -1,3 +1,5 @@
+[Home](index.md) > Secrets, Vault, and External Secrets Operator
+
 # Testing Guide: Vault + ESO Integration
 
 This guide describes how to test the Vault and External Secrets Operator integration with the argo-stack chart.
