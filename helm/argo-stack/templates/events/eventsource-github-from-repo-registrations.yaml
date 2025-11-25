@@ -78,9 +78,8 @@ metadata:
   namespace: {{ .Values.events.namespace | default "argo-events" }}
   labels:
     source: repo-registration
-  annotations:
-    kubernetes.io/ingress.class: {{ .Values.events.github.webhook.ingress.className | default "nginx" | quote }}
 spec:
+  ingressClassName: {{ .Values.events.github.webhook.ingress.className | default "nginx" }}
   rules:
   {{- range $h := (.Values.events.github.webhook.ingress.hosts | default list) }}
     - host: {{ $h }}
