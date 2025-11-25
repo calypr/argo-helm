@@ -8,12 +8,19 @@ NOTE: Only the route with primary: true should have the cert-manager.io/cluster-
 annotation. Other routes just reference the TLS secret without the annotation to avoid
 cert-manager ownership conflicts. If no route has primary: true, no ingress will have
 the cluster-issuer annotation (the Certificate must be created manually or by another means).
+
+For cross-namespace routing (when serviceNamespace differs from namespace), we use
+an ExternalName service as a proxy. The ExternalName service is created in the
+externalname-services.yaml template.
 */}}
 {{- if .Values.ingressAuthzOverlay.enabled }}
 {{- $root := . }}
 {{- $config := .Values.ingressAuthzOverlay }}
 {{- range $routeName, $route := $config.routes }}
 {{- if $route.enabled }}
+{{- $serviceNamespace := $route.serviceNamespace | default $route.namespace }}
+{{- $isCrossNamespace := ne $route.namespace $serviceNamespace }}
+{{- $serviceName := ternary (printf "%s-proxy" $route.service) $route.service $isCrossNamespace }}
 ---
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -24,6 +31,10 @@ metadata:
     {{- include "ingress-authz-overlay.labels" $root | nindent 4 }}
     app.kubernetes.io/component: ingress
     ingress-authz-overlay.calypr.io/route: {{ $routeName | quote }}
+    {{- if $isCrossNamespace }}
+    ingress-authz-overlay.calypr.io/cross-namespace: "true"
+    ingress-authz-overlay.calypr.io/target-namespace: {{ $serviceNamespace | quote }}
+    {{- end }}
   annotations:
     # Helm release tracking
     meta.helm.sh/release-name: {{ $root.Release.Name }}
@@ -38,6 +49,10 @@ metadata:
     # Path rewriting for subpath support
     nginx.ingress.kubernetes.io/use-regex: "true"
     nginx.ingress.kubernetes.io/rewrite-target: {{ $route.rewriteTarget | default "/$2" }}
+    {{- end }}
+    {{- if $isCrossNamespace }}
+    # Cross-namespace routing via ExternalName service
+    nginx.ingress.kubernetes.io/upstream-vhost: {{ $route.service }}.{{ $serviceNamespace }}.svc.cluster.local
     {{- end }}
 spec:
   ingressClassName: {{ $config.ingressClassName | default "nginx" | quote }}
@@ -60,7 +75,7 @@ spec:
           {{- end }}
             backend:
               service:
-                name: {{ $route.service }}
+                name: {{ $serviceName }}
                 port:
                   number: {{ $route.port }}
 {{- end }}

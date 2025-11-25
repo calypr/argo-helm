@@ -102,8 +102,13 @@ ingressAuthzOverlay:
       # Set primary: true to designate this route as the certificate owner
       # Only the primary route gets the cert-manager.io/cluster-issuer annotation
       primary: true
+      # Namespace where the ingress will be created
       namespace: argo-stack
+      # Service name to route to
       service: argo-stack-argo-workflows-server
+      # Namespace where the actual service exists (for cross-namespace routing)
+      # If different from namespace, an ExternalName service will be created
+      serviceNamespace: argo-workflows
       port: 2746
       pathPrefix: /workflows
       # Use regex path matching for subpaths
@@ -116,6 +121,8 @@ ingressAuthzOverlay:
       enabled: true
       namespace: argo-stack
       service: argo-stack-argocd-server
+      # ArgoCD server is in argocd namespace
+      serviceNamespace: argocd
       port: 8080
       pathPrefix: /applications
       useRegex: true
@@ -126,6 +133,8 @@ ingressAuthzOverlay:
       enabled: true
       namespace: argo-stack
       service: github-repo-registrations-eventsource-svc
+      # EventSource is in argo-events namespace
+      serviceNamespace: argo-events
       port: 12000
       pathPrefix: /registrations
       useRegex: true
@@ -136,6 +145,8 @@ ingressAuthzOverlay:
       enabled: true
       namespace: calypr-api
       service: calypr-api
+      # Service is in same namespace as ingress
+      serviceNamespace: calypr-api
       port: 3000
       pathPrefix: /api
       useRegex: true
@@ -146,6 +157,8 @@ ingressAuthzOverlay:
       enabled: true
       namespace: calypr-tenants
       service: calypr-tenants
+      # Service is in same namespace as ingress
+      serviceNamespace: calypr-tenants
       port: 3001
       pathPrefix: /tenants
       useRegex: true
