@@ -40,7 +40,7 @@ metadata:
     nginx.ingress.kubernetes.io/rewrite-target: {{ $route.rewriteTarget | default "/$2" }}
     {{- end }}
 spec:
-  ingressClassName: {{ $config.ingressClassName | default "nginx" }}
+  ingressClassName: {{ $config.ingressClassName | default "nginx" | quote }}
   {{- if $config.tls.enabled }}
   tls:
     - hosts:
