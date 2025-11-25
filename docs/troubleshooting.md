@@ -219,8 +219,7 @@ kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx --tail=100
 
 ```bash
 # Test from inside the cluster
-kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
-  curl -v http://argo-stack-argo-workflows-server.argo-stack:2746/
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never --   curl -v http://argo-stack-argo-workflows-server.argo-workflows:2746/
 
 # Test the ingress controller service directly
 kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
@@ -260,7 +259,7 @@ az network nsg rule list --resource-group <rg> --nsg-name <nsg-name>
 
 1. Verify backend service exists:
 ```bash
-kubectl get svc -n argo-stack argo-stack-argo-workflows-server
+kubectl get svc -n argo-workflows argo-stack-argo-workflows-server
 ```
 
 2. Check ingress path configuration matches service expectations
