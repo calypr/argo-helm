@@ -123,6 +123,526 @@ kubectl get eventsources -A
 
 ## Ingress and Connectivity Troubleshooting
 
+### Issue: Connection Refused but Internal Services Work
+
+**Symptoms:**
+Internal cluster connectivity works perfectly, but external access fails:
+
+```bash
+# ✅ Internal service access works:
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://argo-stack-argo-workflows-server.argo-workflows:2746/
+# Returns 200 OK with HTML content
+
+# ✅ ExternalName proxy also works:
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://argo-stack-argo-workflows-server-proxy.argo-stack:2746/
+# Returns 200 OK
+
+# ❌ But external access fails:
+curl https://calypr-demo.ddns.net/workflows
+# curl: (7) Failed to connect to calypr-demo.ddns.net port 443 after 2 ms: Could not connect to server
+```
+
+**Cause:** This "Connection refused" error at the network level means the **ingress-nginx controller's LoadBalancer service** is not exposing ports to the external network. This is distinct from a 404 error (which would mean the ingress is reachable but routing is misconfigured).
+
+Common causes:
+- LoadBalancer service is pending (no external IP provisioned)
+- NodePort is not exposed in firewall/security groups
+- DNS is not pointing to the correct IP
+- Cloud provider LoadBalancer controller is not configured
+
+**Solution - Step-by-Step Diagnosis:**
+
+#### 1. Check the ingress-nginx LoadBalancer Service
+
+```bash
+# Check the service type and external IP
+kubectl get svc -n ingress-nginx
+
+# Expected output for LoadBalancer type:
+# NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)
+# ingress-nginx-controller   LoadBalancer   10.100.x.x      <public-ip>     80:30080/TCP,443:30443/TCP
+
+# Expected output for NodePort type:
+# NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)
+# ingress-nginx-controller   NodePort       10.100.x.x      <none>          80:30080/TCP,443:30443/TCP
+```
+
+#### 2. If EXTERNAL-IP is `<pending>`
+
+This means the cloud LoadBalancer hasn't been provisioned:
+
+```bash
+# Check service events for errors
+kubectl describe svc ingress-nginx-controller -n ingress-nginx
+
+# Common causes:
+# - AWS Load Balancer Controller not installed (EKS)
+# - Insufficient IAM permissions for LB creation
+# - Subnet/VPC configuration issues
+# - Quota exceeded for load balancers
+```
+
+**For AWS EKS:** See [Troubleshooting AWS LoadBalancer Pending](#troubleshooting-aws-loadbalancer-pending) for detailed AWS-specific steps including IAM permissions, subnet tagging, and AWS Load Balancer Controller setup.
+
+Quick check:
+```bash
+# Check if AWS Load Balancer Controller is installed
+kubectl get deployment -n kube-system aws-load-balancer-controller
+
+# If not installed, the Kubernetes service will stay in <pending>
+```
+
+**For bare metal / on-premises clusters:**
+
+LoadBalancer type won't work without a load balancer controller. Options:
+- Use MetalLB: https://metallb.universe.tf/
+- Switch to NodePort and configure external LB manually
+- Use HostPort on specific nodes
+
+#### 3. If using NodePort, check external access
+
+```bash
+# Get the NodePort for port 443
+kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.port==443)].nodePort}'
+# Example output: 30443
+
+# Get node external IP
+kubectl get nodes -o wide
+# Note the EXTERNAL-IP of your nodes
+
+# Verify firewall allows traffic on the NodePort
+# Then test: curl https://<node-external-ip>:<nodeport>/
+```
+
+#### 4. Verify DNS Resolution
+
+```bash
+# Check that your domain resolves to the correct IP
+nslookup calypr-demo.ddns.net
+
+# This should return the LoadBalancer external IP or Node external IP
+# If it returns an incorrect IP, update your DNS
+```
+
+#### 5. Test Direct Access to the LoadBalancer IP
+
+```bash
+# Get the LoadBalancer IP
+LB_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "LoadBalancer IP: $LB_IP"
+
+# If AWS NLB (uses hostname instead of IP):
+LB_HOSTNAME=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+echo "LoadBalancer Hostname: $LB_HOSTNAME"
+
+# Test direct access
+curl -v -k https://$LB_IP/workflows
+
+# If this works but your domain doesn't, the issue is DNS
+```
+
+#### 6. AWS-Specific: Check Security Groups
+
+See [AWS Security Group Configuration](#aws-security-group-configuration) for detailed security group verification.
+
+The LoadBalancer security group must allow:
+- Inbound 443 from 0.0.0.0/0 (or your IP range)
+- Inbound 80 from 0.0.0.0/0 (for HTTP-01 ACME challenges)
+
+#### 7. Verify ingress-nginx Controller is Healthy
+
+```bash
+# Check pods are running
+kubectl get pods -n ingress-nginx
+
+# Check controller logs for errors
+kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx --tail=50
+
+# Look for:
+# - "successfully synced" messages (good)
+# - Error loading certificate (TLS issue)
+# - Backend connection errors
+```
+
+#### 8. kind Cluster Specific Issues
+
+If you're using **kind** (Kubernetes IN Docker), the networking works differently:
+
+**Problem:** MetalLB's external IP only exists inside the Docker network, not accessible from your host machine.
+
+**Solution for kind:**
+
+1. **Access via localhost** using the port mappings defined in your kind config:
+```bash
+# If you configured extraPortMappings for ports 80/443
+curl -k https://localhost/workflows
+
+# Update /etc/hosts to use localhost for your domain
+echo "127.0.0.1 calypr-demo.ddns.net" | sudo tee -a /etc/hosts
+curl -k https://calypr-demo.ddns.net/workflows
+```
+
+2. **Use NodePort instead of LoadBalancer** with kind:
+```yaml
+# kind-config.yaml
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+networking:
+  kubeProxyMode: "iptables"
+nodes:
+- role: control-plane
+  extraPortMappings:
+  - containerPort: 30080  # NodePort for HTTP
+    hostPort: 80
+  - containerPort: 30443  # NodePort for HTTPS
+    hostPort: 443
+```
+
+Then patch the ingress-nginx service:
+```bash
+kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"NodePort","ports":[{"name":"http","port":80,"nodePort":30080},{"name":"https","port":443,"nodePort":30443}]}}'
+```
+
+3. **Check iptables rules inside the kind container** (not on host):
+```bash
+# Rules exist inside the kind node container, not on the host
+docker exec -it kind-control-plane bash
+
+# Inside the container
+iptables-save | grep KUBE-SERVICES
+iptables-save | grep ingress-nginx
+```
+
+4. **Let's Encrypt certificates won't work in kind** - use self-signed certs instead:
+
+kind clusters aren't accessible from the internet, so Let's Encrypt HTTP-01 challenges will fail. You'll see "Kubernetes Ingress Controller Fake Certificate" in your browser.
+
+**Solution - Use self-signed certificates for kind:**
+
+```bash
+# Create a self-signed certificate
+openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout tls.key -out tls.crt \
+  -subj "/CN=calypr-demo.ddns.net/O=calypr-demo"
+
+# Create the TLS secret
+kubectl create secret tls calypr-demo-tls \
+  -n argo-stack \
+  --cert=tls.crt \
+  --key=tls.key
+
+# Delete the Certificate resource (stop cert-manager from managing it)
+kubectl delete certificate calypr-demo-tls -n argo-stack
+
+# Remove cert-manager annotation from ingress
+kubectl annotate ingress ingress-authz-workflows -n argo-stack cert-manager.io/cluster-issuer-
+```
+
+Your browser will show a security warning (expected for self-signed certs), but you can proceed.
+
+---
+
+### Issue: kube-proxy Not Creating iptables/nftables Rules
+
+**Symptoms:**
+- NodePort connections fail (Connection refused)
+- Testing `curl localhost:<nodeport>` fails
+- No KUBE-* chains in iptables/nftables output
+
+**Cause:** kube-proxy is configured for iptables mode but the system uses nftables, and no rules are being created.
+
+**Diagnosis:**
+
+1. **Check if kube-proxy rules exist:**
+```bash
+# On systems using iptables-nft backend
+sudo nft list ruleset | grep KUBE-SERVICES
+
+# On systems using iptables-legacy
+sudo iptables-save | grep KUBE-SERVICES
+
+# If you get "incompatible, use 'nft' tool" error:
+# Your system uses nftables but you're trying to use iptables commands
+```
+
+2. **Verify which iptables backend is active:**
+```bash
+sudo update-alternatives --display iptables
+# Look for: link currently points to /usr/sbin/iptables-nft
+```
+
+3. **Check kube-proxy configuration:**
+```bash
+kubectl get cm kube-proxy -n kube-system -o yaml | grep "mode:"
+# Should show: mode: iptables or mode: nft
+```
+
+**Solution:**
+
+**For kind clusters:**
+- kube-proxy runs inside the kind container
+- Check rules from inside: `docker exec -it kind-control-plane iptables-save`
+- The host's iptables/nftables are separate from the kind node's
+
+**For bare metal/VM clusters with nftables:**
+
+If your system uses iptables-nft and kube-proxy shows "Using iptables Proxier" but creates no rules:
+
+1. **Verify kube-proxy mode in ConfigMap:**
+```bash
+kubectl edit cm kube-proxy -n kube-system
+```
+
+Ensure `mode: iptables` is set (it should work with iptables-nft).
+
+2. **Restart kube-proxy:**
+```bash
+kubectl delete pod -n kube-system -l k8s-app=kube-proxy
+```
+
+3. **Verify rules are created:**
+```bash
+# Wait 30 seconds, then check
+sudo nft list ruleset | grep KUBE-SERVICES
+```
+
+4. **If still no rules, check kube-proxy logs:**
+```bash
+kubectl logs -n kube-system -l k8s-app=kube-proxy --tail=100
+# Look for errors about iptables/nftables initialization
+```
+
+---
+
+### Issue: Let's Encrypt Certificate Not Issuing (Fake Certificate Shown)
+
+**Symptoms:**
+- Browser shows "Kubernetes Ingress Controller Fake Certificate"
+- Certificate status shows `Ready: False` with reason `DoesNotExist`
+- CertificateRequest or Challenge resources stuck in pending state
+
+**Diagnosis:**
+
+1. **Check Certificate status:**
+```bash
+kubectl describe certificate calypr-demo-tls -n argo-stack
+
+# Look for conditions showing why it's not ready
+# Common reasons: DoesNotExist, Pending, Failed
+```
+
+2. **Check CertificateRequest:**
+```bash
+kubectl get certificaterequest -n argo-stack
+kubectl describe certificaterequest <name> -n argo-stack
+
+# Check for failure reasons
+```
+
+3. **Check ACME Challenge (for Let's Encrypt):**
+```bash
+kubectl get challenges -A
+kubectl describe challenge <name> -n argo-stack
+
+# Look for HTTP-01 or DNS-01 challenge status
+```
+
+4. **Check cert-manager logs:**
+```bash
+kubectl logs -n cert-manager -l app=cert-manager --tail=100
+kubectl logs -n cert-manager -l app=webhook --tail=100
+```
+
+**Common Causes and Solutions:**
+
+#### Cause 1: Domain Not Accessible from Internet (kind/local clusters)
+
+**For kind or local development clusters**, Let's Encrypt cannot reach your domain to verify ownership via HTTP-01 challenge.
+
+**Solution:** Use self-signed certificates (see [kind Cluster Specific Issues](#8-kind-cluster-specific-issues) section).
+
+#### Cause 2: HTTP-01 Challenge Fails - Port 80 Not Reachable
+
+Let's Encrypt needs to reach `http://your-domain/.well-known/acme-challenge/` on port 80.
+
+**Check:**
+```bash
+# Verify ingress responds on port 80
+curl -v http://calypr-demo.ddns.net/.well-known/acme-challenge/test
+
+# Check if port 80 is open in firewall/security groups
+# AWS: Check security group allows inbound port 80 from 0.0.0.0/0
+# On-prem: Check firewall allows port 80 from Let's Encrypt IPs
+```
+
+**Solution:**
+```bash
+# Ensure LoadBalancer/NodePort exposes port 80
+kubectl get svc ingress-nginx-controller -n ingress-nginx
+
+# Should show: 80:xxxxx/TCP in PORT(S) column
+```
+
+#### Cause 3: Use DNS-01 Challenge for kind/Local Clusters
+
+**For kind clusters or when using dynamic DNS providers like No-IP.com**, HTTP-01 challenges won't work because:
+- kind clusters aren't publicly accessible from the internet
+- Dynamic DNS IPs may not route directly to your cluster
+
+**Solution: Use DNS-01 challenge with webhook solver**
+
+cert-manager doesn't have native No-IP.com support, but you can use the generic **webhook solver with custom scripts** or **acme-dns**:
+
+**Option A: Use acme-dns (Recommended for No-IP.com)**
+
+1. **Set up acme-dns server** (one-time setup):
+```bash
+# Deploy acme-dns in your cluster
+kubectl apply -f https://raw.githubusercontent.com/joohoi/acme-dns/master/k8s/acme-dns-deployment.yaml
+
+# Or use the public acme-dns service at auth.acme-dns.io
+```
+
+2. **Install cert-manager acme-dns webhook**:
+```bash
+helm repo add cert-manager-webhook-acme-dns https://k8s-at-home.github.io/charts
+helm install acme-dns-webhook cert-manager-webhook-acme-dns/cert-manager-webhook-acme-dns \
+  -n cert-manager
+```
+
+3. **Register your domain with acme-dns** (follow prompts):
+```bash
+curl -X POST https://auth.acme-dns.io/register
+# Returns: {"username":"xxx","password":"xxx","fulldomain":"xxx.auth.acme-dns.io","subdomain":"xxx"}
+```
+
+4. **Add CNAME record in No-IP.com**:
+```
+_acme-challenge.calypr-demo.ddns.net CNAME <fulldomain from above>
+```
+
+5. **Create ClusterIssuer with acme-dns**:
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+    - dns01:
+        acmeDNS:
+          host: https://auth.acme-dns.io
+          accountSecretRef:
+            name: acme-dns-credentials
+            key: acmedns.json
+```
+
+6. **Create the credentials secret**:
+```bash
+cat > acmedns.json <<EOF
+{
+  "calypr-demo.ddns.net": {
+    "username": "<from registration>",
+    "password": "<from registration>",
+    "fulldomain": "<from registration>",
+    "subdomain": "<from registration>",
+    "allowfrom": []
+  }
+}
+EOF
+
+kubectl create secret generic acme-dns-credentials \
+  -n cert-manager \
+  --from-file=acmedns.json
+```
+
+**Option B: Manual DNS-01 (Not recommended - use acme-dns instead)**
+
+Manual verification requires adding TXT records to No-IP.com each time a certificate renews. This is not practical for automated renewals.
+
+If you still want manual control, you'll need to:
+1. Create a Certificate with manual approval
+2. Check the Challenge resource for the required TXT record
+3. Add the TXT record `_acme-challenge.calypr-demo.ddns.net` to No-IP.com
+4. Wait for validation
+
+For automated renewals, use Option A (acme-dns) instead.
+
+#### Cause 4: ClusterIssuer Not Ready (HTTP-01)
+
+```bash
+kubectl get clusterissuer
+kubectl describe clusterissuer letsencrypt-prod
+
+# Check status shows Ready: True
+```
+
+If ClusterIssuer doesn't exist or isn't ready:
+```bash
+# Create ClusterIssuer for HTTP-01 (production clusters only)
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+    - http01:
+        ingress:
+          class: nginx
+EOF
+```
+
+#### Cause 5: Rate Limiting from Let's Encrypt
+
+If testing repeatedly, you may hit Let's Encrypt rate limits (5 failures per hour, 50 certs per domain per week).
+
+**Solution:** Use letsencrypt-staging for testing:
+```bash
+# Switch to staging issuer in your ingress annotation
+kubectl annotate ingress ingress-authz-workflows -n argo-stack \
+  cert-manager.io/cluster-issuer=letsencrypt-staging --overwrite
+
+# Delete existing certificate to retry
+kubectl delete certificate calypr-demo-tls -n argo-stack
+```
+
+Staging certificates won't be trusted by browsers but allow testing without hitting rate limits.
+
+#### Cause 6: DNS Not Pointing to LoadBalancer IP
+
+```bash
+# Verify DNS resolves to your LoadBalancer IP
+nslookup calypr-demo.ddns.net
+
+# Should return your LoadBalancer's external IP
+LB_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "Expected IP: $LB_IP"
+```
+
+If DNS is wrong, update your DNS provider to point to the LoadBalancer IP.
+
+**Force certificate reissue after fixing DNS:**
+```bash
+kubectl delete certificaterequest -n argo-stack --all
+kubectl delete challenges -n argo-stack --all
+# cert-manager will automatically create new ones
+```
+
+---
+
 ### Issue: Connection Refused on Port 443
 
 **Error:**
