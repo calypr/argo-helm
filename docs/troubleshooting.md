@@ -123,6 +123,151 @@ kubectl get eventsources -A
 
 ## Ingress and Connectivity Troubleshooting
 
+### Issue: Connection Refused but Internal Services Work
+
+**Symptoms:**
+Internal cluster connectivity works perfectly, but external access fails:
+
+```bash
+# ✅ Internal service access works:
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://argo-stack-argo-workflows-server.argo-workflows:2746/
+# Returns 200 OK with HTML content
+
+# ✅ ExternalName proxy also works:
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://argo-stack-argo-workflows-server-proxy.argo-stack:2746/
+# Returns 200 OK
+
+# ❌ But external access fails:
+curl https://calypr-demo.ddns.net/workflows
+# curl: (7) Failed to connect to calypr-demo.ddns.net port 443 after 2 ms: Could not connect to server
+```
+
+**Cause:** This "Connection refused" error at the network level means the **ingress-nginx controller's LoadBalancer service** is not exposing ports to the external network. This is distinct from a 404 error (which would mean the ingress is reachable but routing is misconfigured).
+
+Common causes:
+- LoadBalancer service is pending (no external IP provisioned)
+- NodePort is not exposed in firewall/security groups
+- DNS is not pointing to the correct IP
+- Cloud provider LoadBalancer controller is not configured
+
+**Solution - Step-by-Step Diagnosis:**
+
+#### 1. Check the ingress-nginx LoadBalancer Service
+
+```bash
+# Check the service type and external IP
+kubectl get svc -n ingress-nginx
+
+# Expected output for LoadBalancer type:
+# NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)
+# ingress-nginx-controller   LoadBalancer   10.100.x.x      <public-ip>     80:30080/TCP,443:30443/TCP
+
+# Expected output for NodePort type:
+# NAME                       TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)
+# ingress-nginx-controller   NodePort       10.100.x.x      <none>          80:30080/TCP,443:30443/TCP
+```
+
+#### 2. If EXTERNAL-IP is `<pending>`
+
+This means the cloud LoadBalancer hasn't been provisioned:
+
+```bash
+# Check service events for errors
+kubectl describe svc ingress-nginx-controller -n ingress-nginx
+
+# Common causes:
+# - AWS Load Balancer Controller not installed (EKS)
+# - Insufficient IAM permissions for LB creation
+# - Subnet/VPC configuration issues
+# - Quota exceeded for load balancers
+```
+
+**For AWS EKS:** See [Troubleshooting AWS LoadBalancer Pending](#troubleshooting-aws-loadbalancer-pending) for detailed AWS-specific steps including IAM permissions, subnet tagging, and AWS Load Balancer Controller setup.
+
+Quick check:
+```bash
+# Check if AWS Load Balancer Controller is installed
+kubectl get deployment -n kube-system aws-load-balancer-controller
+
+# If not installed, the Kubernetes service will stay in <pending>
+```
+
+**For bare metal / on-premises clusters:**
+
+LoadBalancer type won't work without a load balancer controller. Options:
+- Use MetalLB: https://metallb.universe.tf/
+- Switch to NodePort and configure external LB manually
+- Use HostPort on specific nodes
+
+#### 3. If using NodePort, check external access
+
+```bash
+# Get the NodePort for port 443
+kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.spec.ports[?(@.port==443)].nodePort}'
+# Example output: 30443
+
+# Get node external IP
+kubectl get nodes -o wide
+# Note the EXTERNAL-IP of your nodes
+
+# Verify firewall allows traffic on the NodePort
+# Then test: curl https://<node-external-ip>:<nodeport>/
+```
+
+#### 4. Verify DNS Resolution
+
+```bash
+# Check that your domain resolves to the correct IP
+nslookup calypr-demo.ddns.net
+
+# This should return the LoadBalancer external IP or Node external IP
+# If it returns an incorrect IP, update your DNS
+```
+
+#### 5. Test Direct Access to the LoadBalancer IP
+
+```bash
+# Get the LoadBalancer IP
+LB_IP=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].ip}')
+echo "LoadBalancer IP: $LB_IP"
+
+# If AWS NLB (uses hostname instead of IP):
+LB_HOSTNAME=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+echo "LoadBalancer Hostname: $LB_HOSTNAME"
+
+# Test direct access
+curl -v -k https://$LB_IP/workflows
+
+# If this works but your domain doesn't, the issue is DNS
+```
+
+#### 6. AWS-Specific: Check Security Groups
+
+See [AWS Security Group Configuration](#aws-security-group-configuration) for detailed security group verification.
+
+The LoadBalancer security group must allow:
+- Inbound 443 from 0.0.0.0/0 (or your IP range)
+- Inbound 80 from 0.0.0.0/0 (for HTTP-01 ACME challenges)
+
+#### 7. Verify ingress-nginx Controller is Healthy
+
+```bash
+# Check pods are running
+kubectl get pods -n ingress-nginx
+
+# Check controller logs for errors
+kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx --tail=50
+
+# Look for:
+# - "successfully synced" messages (good)
+# - Error loading certificate (TLS issue)
+# - Backend connection errors
+```
+
+---
+
 ### Issue: Connection Refused on Port 443
 
 **Error:**
