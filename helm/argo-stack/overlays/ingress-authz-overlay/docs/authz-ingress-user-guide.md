@@ -267,9 +267,48 @@ kubectl get challenges -A
 
 Common issues:
 - **cert-manager not installed**: If you see `no matches for kind "ClusterIssuer"`, install cert-manager first (see [Installing cert-manager](#installing-cert-manager))
+- **Helm ownership conflict**: If you see `invalid ownership metadata; label validation error`, the ClusterIssuer was created outside of Helm. See [Helm Ownership Conflict](#helm-ownership-conflict) below.
 - **Domain not reachable**: Ensure your domain's DNS points to the ingress controller's external IP
 - **Rate limited**: Use `letsencrypt-staging` for testing to avoid production rate limits
 - **Challenge failed**: Check that port 80 is accessible for HTTP-01 challenges
+
+### Helm Ownership Conflict
+
+If you get an error like:
+```
+Error: UPGRADE FAILED: Unable to continue with update: ClusterIssuer "letsencrypt-prod" 
+in namespace "" exists and cannot be imported into the current release: 
+invalid ownership metadata; label validation error: missing key "app.kubernetes.io/managed-by"
+```
+
+This happens when:
+1. The ClusterIssuer was created manually with `kubectl apply`
+2. A Helm chart template tries to create/manage the same ClusterIssuer
+
+**Solution**: ClusterIssuers should be managed **outside** of this Helm chart:
+
+```bash
+# Option 1: Keep the manually created ClusterIssuer (recommended)
+# Simply don't include cluster-issuer templates in the chart
+# This overlay already follows this pattern - it references the ClusterIssuer
+# via annotation but doesn't create it
+
+# Option 2: If you have a local cluster-issuer template file, remove it
+rm helm/argo-stack/overlays/ingress-authz-overlay/templates/cluster-issuer*.yaml
+
+# Option 3: To adopt an existing resource into Helm (advanced)
+# Add Helm labels and annotations to the existing ClusterIssuer:
+kubectl annotate clusterissuer letsencrypt-prod \
+  meta.helm.sh/release-name=ingress-authz-overlay \
+  meta.helm.sh/release-namespace=argo-stack
+kubectl label clusterissuer letsencrypt-prod \
+  app.kubernetes.io/managed-by=Helm
+```
+
+**Note**: This chart intentionally does NOT include ClusterIssuer templates because ClusterIssuers are cluster-scoped resources that typically:
+- Pre-exist before deploying applications
+- Are shared across multiple releases
+- Should be managed separately from application charts
 
 ## Installation
 
