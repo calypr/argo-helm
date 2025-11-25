@@ -540,6 +540,45 @@ curl -I -H "Authorization: Bearer $TOKEN" https://calypr-demo.ddns.net/workflows
 helm uninstall ingress-authz-overlay -n argo-stack
 ```
 
+## Transient start up logs
+
+### Issue
+When the authz-adapter starts up, you may see transient log messages like:
+
+```
+external-secrets-system external-secrets-cert-controller-5f8b8994d5-vrzmj cert-controller {"level":"error","ts":1764050879.7977011,"logger":"controllers.webhook-certs-updater","msg":"could not update webhook config","Webhookconfig":{"name":"secretstore-validate"},"error":"ca cert not yet ready","stacktrace":"github.com/external-secrets/external-secrets/pkg/controllers/webhookconfig.(*Reconciler).Reconcile\n\t/home/runner/work/external-secrets/external-
+```
+
+# ✅ **Short Answer**
+
+**Yes, this is a transient and harmless startup condition.**
+It occurs when the **cert-controller** tries to update the validating/mutating webhook configuration *before* the internal CA bundle has been generated.
+
+ESO keeps retrying until the CA is ready, then the message disappears.
+
+---
+
+# 🧠 **Why This Happens**
+
+External Secrets Operator uses an **internal self-signed CA** to secure:
+
+* The validating webhook
+* The mutating webhook
+* The admission controller
+
+On startup, the control plane usually initializes in this order:
+
+1. Pod starts
+2. Cert controller initializes
+3. Webhook server generates or fetches CA bundle
+4. Cert controller tries to patch webhook config
+5. **If CA is not yet ready → logs “ca cert not yet ready”**
+6. Retry loop resolves it once CA is created
+
+ESO’s cert controller reconciles every few seconds until successful.
+
+---
+
 ## Related Documentation
 
 - [Argo Stack User Guide](../../docs/user-guide.md)
