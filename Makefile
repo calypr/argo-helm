@@ -173,6 +173,10 @@ ports:
 	  --namespace cert-manager \
 	  --create-namespace \
 	  --set crds.enabled=true
+	# install letsencrypt secret see **Create ClusterIssuer with acme-dns**
+	kubectl create secret generic acme-dns-credentials \
+          -n cert-manager \
+          --from-file=acmedns.json
 	# Wait for them to come up
 	kubectl wait --for=condition=Ready pods --all -n cert-manager --timeout=120s
 	# Start letsencrypt

@@ -1,0 +1,9 @@
+{
+  "calypr-demo.ddns.net": {
+    "username": "XXXX",
+    "password": "XXXX",
+    "fulldomain": "XXXX",
+    "subdomain": "XXXX",
+    "allowfrom": []
+  }
+}
