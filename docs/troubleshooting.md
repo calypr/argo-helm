@@ -370,10 +370,16 @@ service:
 ```
 
 For Application Load Balancer (ALB) - requires AWS Load Balancer Controller:
+
+⚠️ **Note:** When using ALB with the AWS Load Balancer Controller, you configure the Ingress resource (not the Service). The Service should use `ClusterIP` or `NodePort` type.
+
 ```yaml
-service:
+# Ingress annotations for ALB (on the Ingress resource, not Service):
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
   annotations:
-    service.beta.kubernetes.io/aws-load-balancer-type: alb
+    kubernetes.io/ingress.class: alb
     alb.ingress.kubernetes.io/scheme: internet-facing
     alb.ingress.kubernetes.io/target-type: ip
 ```
@@ -446,10 +452,12 @@ After LoadBalancer is created, verify security group allows traffic:
 
 ```bash
 # Get the LoadBalancer DNS name
-kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
+LB_DNS=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+echo $LB_DNS
 
 # Find associated security group (from AWS Console or CLI)
-aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='<lb-dns-name>'].SecurityGroups"
+# Replace the DNS name in the query with your actual LoadBalancer DNS
+aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='${LB_DNS}'].SecurityGroups"
 
 # Verify inbound rules allow 80 and 443
 aws ec2 describe-security-groups --group-ids <sg-id> --query "SecurityGroups[].IpPermissions"
@@ -587,9 +595,14 @@ sudo tcpdump -i any port 30443
 
 4. **Firewall configuration (if using firewalld):**
 ```bash
-# Allow NodePort range
-sudo firewall-cmd --permanent --add-port=30000-32767/tcp
+# Option 1: Allow only the specific ports you're using (recommended for security)
+sudo firewall-cmd --permanent --add-port=30080/tcp  # HTTP NodePort
+sudo firewall-cmd --permanent --add-port=30443/tcp  # HTTPS NodePort
 sudo firewall-cmd --reload
+
+# Option 2: Allow entire NodePort range (less secure, but convenient for development)
+# sudo firewall-cmd --permanent --add-port=30000-32767/tcp
+# sudo firewall-cmd --reload
 ```
 
 ---
