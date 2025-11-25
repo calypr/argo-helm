@@ -16,6 +16,40 @@ This overlay provides a **single host, path-based ingress** for all major UIs an
 
 All endpoints are protected by the `authz-adapter` via NGINX external authentication.
 
+## AuthZ Adapter Configuration
+
+**Important**: By default, this overlay does **not** deploy its own authz-adapter. Instead, it reuses the centralized authz-adapter deployed by the main `argo-stack` chart in the `security` namespace.
+
+### Default Configuration (Recommended)
+
+The overlay is configured to use the existing authz-adapter in the `security` namespace:
+
+```yaml
+ingressAuthzOverlay:
+  authzAdapter:
+    deploy: false                # Do NOT deploy a separate adapter
+    namespace: security          # Point to security namespace
+    serviceName: authz-adapter
+    port: 8080
+```
+
+This ensures a single, centralized authz-adapter handles authentication for all ingress routes.
+
+### Deploying a Separate Adapter (Advanced)
+
+If you need the overlay to deploy its own authz-adapter instance:
+
+```yaml
+ingressAuthzOverlay:
+  authzAdapter:
+    deploy: true                 # Deploy a separate adapter
+    namespace: argo-stack        # In the overlay's namespace
+    serviceName: authz-adapter
+    port: 8080
+```
+
+**Note**: Having multiple authz-adapter instances may cause configuration drift and is not recommended.
+
 ## Quick Start
 
 ```bash

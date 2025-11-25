@@ -35,12 +35,16 @@ ingressAuthzOverlay:
   # AuthZ Adapter Configuration
   # ============================================================================
   authzAdapter:
-    # Enable deployment of authz-adapter (set to false if deployed separately)
-    deploy: true
+    # Enable deployment of authz-adapter (set to false if using centralized adapter)
+    # NOTE: By default, the main argo-stack chart deploys authz-adapter to the
+    # 'security' namespace. Set deploy: false to reuse that instance.
+    deploy: false
 
     # Service discovery settings
+    # NOTE: When deploy: false, ensure these point to the existing authz-adapter
+    # deployed by the main argo-stack chart in the 'security' namespace.
     serviceName: authz-adapter
-    namespace: argo-stack
+    namespace: security
     port: 8080
 
     # Auth endpoint path

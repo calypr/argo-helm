@@ -405,15 +405,17 @@ ingressAuthzOverlay:
 
 ### AuthZ Adapter Configuration
 
+By default, this overlay does **not** deploy its own authz-adapter. It reuses the centralized authz-adapter deployed by the main `argo-stack` chart in the `security` namespace:
+
 ```yaml
 ingressAuthzOverlay:
   authzAdapter:
-    # Disable if authz-adapter is deployed separately
-    deploy: true
+    # Use centralized adapter from security namespace (recommended)
+    deploy: false
     
-    # Service location
+    # Service location (points to main argo-stack adapter)
     serviceName: authz-adapter
-    namespace: argo-stack
+    namespace: security
     port: 8080
     path: /check
     
@@ -422,8 +424,19 @@ ingressAuthzOverlay:
     
     # Headers passed from auth response to backends
     responseHeaders: "X-User,X-Email,X-Groups"
+```
+
+If you need to deploy a separate authz-adapter instance (not recommended):
+
+```yaml
+ingressAuthzOverlay:
+  authzAdapter:
+    deploy: true                 # Deploy a separate adapter
+    namespace: argo-stack        # In overlay's namespace
+    serviceName: authz-adapter
+    port: 8080
     
-    # Environment configuration
+    # Environment configuration (only used when deploy: true)
     env:
       fenceBase: "https://calypr-dev.ohsu.edu/user"
 ```
