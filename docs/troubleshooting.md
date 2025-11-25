@@ -266,6 +266,91 @@ kubectl get svc -n argo-stack argo-stack-argo-workflows-server
 2. Check ingress path configuration matches service expectations
 3. Verify the service ports match ingress configuration
 
+### Issue: 404 Due to Cross-Namespace Service Routing
+
+**Error:**
+NGINX ingress returns 404 for all paths (`/workflows`, `/applications`, `/registrations`) even though the backend pods are running and responding correctly when accessed directly within the cluster.
+
+**Symptoms:**
+```bash
+# Direct service access works:
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://argo-stack-argo-workflows-server.argo-workflows:2746/
+# Returns expected HTML
+
+# But ingress returns 404:
+curl https://calypr-demo.ddns.net/workflows
+# Returns 404 Not Found
+```
+
+**Cause:** Kubernetes Ingress resources can **only route to services in the same namespace** as the Ingress. If your ingress is in `argo-stack` namespace but the actual service is in `argo-workflows` namespace, NGINX cannot route to it directly.
+
+Common cross-namespace scenarios:
+- Ingress in `argo-stack` → Service in `argo-workflows` (Argo Workflows Server)
+- Ingress in `argo-stack` → Service in `argocd` (Argo CD Server)
+- Ingress in `argo-stack` → Service in `argo-events` (EventSource Service)
+
+**Solution - Use ExternalName Services:**
+
+The `ingress-authz-overlay` chart supports cross-namespace routing via ExternalName services. Configure each route with both `namespace` (where ingress lives) and `serviceNamespace` (where service actually exists):
+
+```yaml
+# helm/argo-stack/overlays/ingress-authz-overlay/values.yaml
+ingressAuthzOverlay:
+  routes:
+    workflows:
+      namespace: argo-stack           # Where the ingress is created
+      serviceNamespace: argo-workflows # Where the actual service exists
+      service: argo-stack-argo-workflows-server
+      port: 2746
+    applications:
+      namespace: argo-stack
+      serviceNamespace: argocd        # ArgoCD server is in argocd namespace
+      service: argo-stack-argocd-server
+      port: 8080
+    registrations:
+      namespace: argo-stack
+      serviceNamespace: argo-events   # EventSource is in argo-events namespace
+      service: github-repo-registrations-eventsource-svc
+      port: 12000
+```
+
+When `serviceNamespace` differs from `namespace`, the chart automatically creates:
+1. **ExternalName Service** (e.g., `argo-stack-argo-workflows-server-proxy`) in the ingress namespace
+2. This service acts as a DNS proxy pointing to the actual service FQDN
+3. The ingress routes to the proxy service, which forwards to the actual service
+
+**Verify ExternalName Services:**
+```bash
+# Check ExternalName services were created
+kubectl get svc -n argo-stack -l app.kubernetes.io/component=externalname-proxy
+
+# Verify ExternalName targets
+kubectl get svc argo-stack-argo-workflows-server-proxy -n argo-stack -o yaml | grep externalName
+# Should show: externalName: argo-stack-argo-workflows-server.argo-workflows.svc.cluster.local
+```
+
+**Redeploy the overlay:**
+```bash
+helm upgrade --install ingress-authz-overlay \
+  helm/argo-stack/overlays/ingress-authz-overlay \
+  --namespace argo-stack
+```
+
+**Debug cross-namespace routing:**
+```bash
+# 1. Verify direct service access works
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://argo-stack-argo-workflows-server.argo-workflows:2746/
+
+# 2. Verify ExternalName proxy service resolves correctly
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://argo-stack-argo-workflows-server-proxy.argo-stack:2746/
+
+# 3. Check ingress configuration
+kubectl describe ingress ingress-authz-workflows -n argo-stack | grep -A5 "backend"
+```
+
 ### Issue: 503 Service Unavailable
 
 **Error:**
