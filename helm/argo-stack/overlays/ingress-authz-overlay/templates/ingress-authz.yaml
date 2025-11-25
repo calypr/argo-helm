@@ -1,0 +1,63 @@
+{{/*
+Ingress resources for each route in the ingress-authz-overlay.
+Each route creates a separate Ingress resource in its respective namespace,
+all sharing the same host and TLS configuration.
+All routes are protected by the authz-adapter via NGINX external auth.
+*/}}
+{{- if .Values.ingressAuthzOverlay.enabled }}
+{{- $root := . }}
+{{- $config := .Values.ingressAuthzOverlay }}
+{{- range $routeName, $route := $config.routes }}
+{{- if $route.enabled }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-authz-{{ $routeName }}
+  namespace: {{ $route.namespace }}
+  labels:
+    {{- include "ingress-authz-overlay.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: ingress
+    ingress-authz-overlay.calypr.io/route: {{ $routeName | quote }}
+  annotations:
+    # Helm release tracking
+    meta.helm.sh/release-name: {{ $root.Release.Name }}
+    meta.helm.sh/release-namespace: {{ $root.Release.Namespace }}
+    # NGINX external auth annotations
+    {{- include "ingress-authz-overlay.authAnnotations" $root | nindent 4 }}
+    {{- if $config.tls.enabled }}
+    # Let's Encrypt / cert-manager integration
+    cert-manager.io/cluster-issuer: {{ $config.tls.clusterIssuer | quote }}
+    {{- end }}
+    {{- if $route.useRegex }}
+    # Path rewriting for subpath support
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: {{ $route.rewriteTarget | default "/$2" }}
+    {{- end }}
+spec:
+  ingressClassName: {{ $config.ingressClassName | default "nginx" }}
+  {{- if $config.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ $config.host | quote }}
+      secretName: {{ $config.tls.secretName | quote }}
+  {{- end }}
+  rules:
+    - host: {{ $config.host | quote }}
+      http:
+        paths:
+          {{- if $route.useRegex }}
+          - path: {{ $route.pathPrefix }}(/|$)(.*)
+            pathType: ImplementationSpecific
+          {{- else }}
+          - path: {{ $route.pathPrefix }}
+            pathType: Prefix
+          {{- end }}
+            backend:
+              service:
+                name: {{ $route.service }}
+                port:
+                  number: {{ $route.port }}
+{{- end }}
+{{- end }}
+{{- end }}

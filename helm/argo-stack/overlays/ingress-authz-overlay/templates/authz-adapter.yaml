@@ -1,0 +1,101 @@
+{{/*
+AuthZ Adapter Deployment and Service for the ingress-authz-overlay.
+The authz-adapter provides external authentication for NGINX Ingress,
+validating tokens and returning user/group information.
+*/}}
+{{- if and .Values.ingressAuthzOverlay.enabled .Values.ingressAuthzOverlay.authzAdapter.deploy }}
+{{- $config := .Values.ingressAuthzOverlay }}
+{{- $adapter := $config.authzAdapter }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $adapter.serviceName }}
+  namespace: {{ $adapter.namespace }}
+  labels:
+    {{- include "ingress-authz-overlay.labels" . | nindent 4 }}
+    app.kubernetes.io/component: authz-adapter
+    app: {{ $adapter.serviceName }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ $adapter.replicas | default 2 }}
+  selector:
+    matchLabels:
+      app: {{ $adapter.serviceName }}
+      app.kubernetes.io/instance: {{ .Release.Name }}
+  template:
+    metadata:
+      labels:
+        app: {{ $adapter.serviceName }}
+        {{- include "ingress-authz-overlay.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: authz-adapter
+    spec:
+      {{- with $adapter.securityContext }}
+      securityContext:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: authz-adapter
+          image: {{ $adapter.image }}
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: {{ $adapter.port }}
+              protocol: TCP
+          env:
+            - name: FENCE_BASE
+              value: {{ $adapter.env.fenceBase | quote }}
+            - name: TENANT_LOGIN_PATH
+              value: {{ $adapter.env.tenantLoginPath | default "/tenants/login" | quote }}
+            - name: HTTP_TIMEOUT
+              value: {{ $adapter.env.httpTimeout | default "3.0" | quote }}
+            {{- if $adapter.env.gitappBaseUrl }}
+            - name: GITAPP_BASE_URL
+              value: {{ $adapter.env.gitappBaseUrl | quote }}
+            {{- end }}
+          livenessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 5
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 3
+            periodSeconds: 5
+            timeoutSeconds: 2
+            failureThreshold: 2
+          {{- with $adapter.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $adapter.serviceName }}
+  namespace: {{ $adapter.namespace }}
+  labels:
+    {{- include "ingress-authz-overlay.labels" . | nindent 4 }}
+    app.kubernetes.io/component: authz-adapter
+    app: {{ $adapter.serviceName }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+spec:
+  type: ClusterIP
+  selector:
+    app: {{ $adapter.serviceName }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+  ports:
+    - name: http
+      port: {{ $adapter.port }}
+      targetPort: http
+      protocol: TCP
+{{- end }}
