@@ -64,6 +64,27 @@ See the [User Guide](docs/authz-ingress-user-guide.md) for architecture diagrams
 - NGINX Ingress Controller
 - cert-manager (for TLS) - **must be installed before deploying this overlay**
 
+### TLS Certificate Ownership
+
+When using cert-manager's ingress-shim, only **one** ingress resource can "own" a Certificate. 
+This overlay uses a `primary: true` flag on routes to designate which ingress should have the 
+`cert-manager.io/cluster-issuer` annotation.
+
+By default, the `workflows` route is set as primary. Other ingresses reference the same TLS 
+secret but without the cluster-issuer annotation, avoiding the "certificate resource is not 
+owned by this object" error.
+
+To change the primary route:
+
+```yaml
+ingressAuthzOverlay:
+  routes:
+    workflows:
+      primary: false  # Remove primary from workflows
+    applications:
+      primary: true   # Make applications the primary
+```
+
 ### Installing cert-manager
 
 If you see `no matches for kind "ClusterIssuer"`, cert-manager is not installed:

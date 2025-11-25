@@ -193,6 +193,41 @@ Common issues:
 - **ACME Registration Failed**: Check your email address is valid and you can reach Let's Encrypt's API
 - **Secret Not Found in Expected Namespace**: The secret is created in the cert-manager namespace, not your application namespace
 
+### TLS Certificate Ownership
+
+When using multiple ingress resources with the same TLS secret and cert-manager's ingress-shim, you may encounter an error:
+
+```
+certificate resource is not owned by this object. refusing to update non-owned certificate resource
+```
+
+This happens because **cert-manager only allows one Ingress to own a Certificate**. When multiple ingresses have the `cert-manager.io/cluster-issuer` annotation pointing to the same certificate, a conflict occurs.
+
+**Solution**: This overlay uses a `primary: true` flag on routes. Only the primary route's Ingress gets the `cert-manager.io/cluster-issuer` annotation. Other ingresses reference the TLS secret but don't trigger certificate creation.
+
+```yaml
+ingressAuthzOverlay:
+  routes:
+    workflows:
+      enabled: true
+      primary: true  # Only this route has cert-manager.io/cluster-issuer annotation
+      # ...
+    applications:
+      enabled: true
+      # primary: false (default) - uses the TLS secret but doesn't trigger cert creation
+```
+
+By default, the `workflows` route is primary. To change:
+
+```yaml
+ingressAuthzOverlay:
+  routes:
+    workflows:
+      primary: false
+    api:
+      primary: true  # Move certificate ownership to /api route
+```
+
 ### Configuration Options
 
 | Setting | Description | Default |

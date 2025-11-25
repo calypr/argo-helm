@@ -87,10 +87,17 @@ ingressAuthzOverlay:
   # Each route creates a separate Ingress resource in the specified namespace.
   # All routes share the same host and TLS configuration.
   # All routes are protected by the authz-adapter via NGINX external auth.
+  #
+  # IMPORTANT: Only ONE route should have the cert-manager.io/cluster-issuer annotation
+  # to avoid "certificate resource is not owned by this object" errors.
+  # Set `primary: true` on exactly one route to designate it as the certificate owner.
   routes:
-    # Argo Workflows UI
+    # Argo Workflows UI (primary route - manages TLS certificate)
     workflows:
       enabled: true
+      # Set primary: true to designate this route as the certificate owner
+      # Only the primary route gets the cert-manager.io/cluster-issuer annotation
+      primary: true
       namespace: argo-stack
       service: argo-stack-argo-workflows-server
       port: 2746
