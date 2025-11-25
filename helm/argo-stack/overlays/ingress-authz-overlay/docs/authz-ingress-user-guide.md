@@ -51,6 +51,141 @@ sequenceDiagram
 | `/api` | `calypr-api` | 3000 | `calypr-api` | Calypr API Service |
 | `/tenants` | `calypr-tenants` | 3001 | `calypr-tenants` | Calypr Tenant Portal |
 
+## TLS with Let's Encrypt and cert-manager
+
+This overlay uses [cert-manager](https://cert-manager.io/) to automatically provision and renew TLS certificates from [Let's Encrypt](https://letsencrypt.org/).
+
+### How It Works
+
+```mermaid
+sequenceDiagram
+    participant Ingress as Ingress Resource
+    participant CM as cert-manager
+    participant LE as Let's Encrypt
+    participant DNS as DNS Provider
+
+    Note over Ingress: Created with annotation:<br/>cert-manager.io/cluster-issuer: letsencrypt-prod
+    Ingress->>CM: Ingress triggers Certificate request
+    CM->>LE: Request certificate for domain
+    LE->>CM: ACME challenge (HTTP-01 or DNS-01)
+    CM->>DNS: Prove domain ownership
+    DNS-->>LE: Challenge verified
+    LE-->>CM: Issue certificate
+    CM->>Ingress: Store cert in TLS Secret
+    Note over Ingress: HTTPS now available
+```
+
+### ClusterIssuer: letsencrypt-prod
+
+The `letsencrypt-prod` ClusterIssuer is a cluster-wide cert-manager resource that defines how to obtain certificates from Let's Encrypt's production API.
+
+**Prerequisites**: You must create the ClusterIssuer before deploying this overlay:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    # Let's Encrypt production API endpoint
+    server: https://acme-v02.api.letsencrypt.org/directory
+    
+    # Email for certificate expiration notifications
+    email: your-email@example.com
+    
+    # Secret to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    
+    # HTTP-01 challenge solver using ingress
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+```
+
+**Apply the ClusterIssuer**:
+
+```bash
+kubectl apply -f cluster-issuer.yaml
+```
+
+### Configuration Options
+
+| Setting | Description | Default |
+|---------|-------------|---------|
+| `tls.enabled` | Enable TLS for ingress | `true` |
+| `tls.secretName` | Name of the TLS Secret (auto-created by cert-manager) | `calypr-demo-tls` |
+| `tls.clusterIssuer` | Name of the ClusterIssuer to use | `letsencrypt-prod` |
+
+### Using letsencrypt-staging (for Testing)
+
+For testing, use the staging issuer to avoid Let's Encrypt rate limits:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: your-email@example.com
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
+```
+
+Then configure the overlay to use it:
+
+```yaml
+ingressAuthzOverlay:
+  tls:
+    clusterIssuer: letsencrypt-staging
+```
+
+### Verifying Certificate Status
+
+Check if the certificate was issued successfully:
+
+```bash
+# Check Certificate resource
+kubectl get certificate -n argo-stack
+
+# Check certificate details
+kubectl describe certificate -n argo-stack
+
+# Check the TLS secret
+kubectl get secret calypr-demo-tls -n argo-stack
+```
+
+### Troubleshooting Certificates
+
+If the certificate is not being issued:
+
+```bash
+# Check cert-manager logs
+kubectl logs -n cert-manager -l app=cert-manager
+
+# Check Certificate status
+kubectl describe certificate <cert-name> -n argo-stack
+
+# Check CertificateRequest
+kubectl get certificaterequest -n argo-stack
+
+# Check ACME challenges
+kubectl get challenges -A
+```
+
+Common issues:
+- **Domain not reachable**: Ensure your domain's DNS points to the ingress controller's external IP
+- **Rate limited**: Use `letsencrypt-staging` for testing to avoid production rate limits
+- **Challenge failed**: Check that port 80 is accessible for HTTP-01 challenges
+
 ## Installation
 
 ### Prerequisites
