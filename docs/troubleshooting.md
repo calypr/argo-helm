@@ -485,7 +485,97 @@ kubectl get svc ingress-nginx-controller -n ingress-nginx
 # Should show: 80:xxxxx/TCP in PORT(S) column
 ```
 
-#### Cause 3: ClusterIssuer Not Ready
+#### Cause 3: Use DNS-01 Challenge for kind/Local Clusters
+
+**For kind clusters or when using dynamic DNS providers like No-IP.com**, HTTP-01 challenges won't work because:
+- kind clusters aren't publicly accessible from the internet
+- Dynamic DNS IPs may not route directly to your cluster
+
+**Solution: Use DNS-01 challenge with webhook solver**
+
+cert-manager doesn't have native No-IP.com support, but you can use the generic **webhook solver with custom scripts** or **acme-dns**:
+
+**Option A: Use acme-dns (Recommended for No-IP.com)**
+
+1. **Set up acme-dns server** (one-time setup):
+```bash
+# Deploy acme-dns in your cluster
+kubectl apply -f https://raw.githubusercontent.com/joohoi/acme-dns/master/k8s/acme-dns-deployment.yaml
+
+# Or use the public acme-dns service at auth.acme-dns.io
+```
+
+2. **Install cert-manager acme-dns webhook**:
+```bash
+helm repo add cert-manager-webhook-acme-dns https://k8s-at-home.github.io/charts
+helm install acme-dns-webhook cert-manager-webhook-acme-dns/cert-manager-webhook-acme-dns \
+  -n cert-manager
+```
+
+3. **Register your domain with acme-dns** (follow prompts):
+```bash
+curl -X POST https://auth.acme-dns.io/register
+# Returns: {"username":"xxx","password":"xxx","fulldomain":"xxx.auth.acme-dns.io","subdomain":"xxx"}
+```
+
+4. **Add CNAME record in No-IP.com**:
+```
+_acme-challenge.calypr-demo.ddns.net CNAME <fulldomain from above>
+```
+
+5. **Create ClusterIssuer with acme-dns**:
+```yaml
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: your-email@example.com
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+    - dns01:
+        acmeDNS:
+          host: https://auth.acme-dns.io
+          accountSecretRef:
+            name: acme-dns-credentials
+            key: acmedns.json
+```
+
+6. **Create the credentials secret**:
+```bash
+cat > acmedns.json <<EOF
+{
+  "calypr-demo.ddns.net": {
+    "username": "<from registration>",
+    "password": "<from registration>",
+    "fulldomain": "<from registration>",
+    "subdomain": "<from registration>",
+    "allowfrom": []
+  }
+}
+EOF
+
+kubectl create secret generic acme-dns-credentials \
+  -n cert-manager \
+  --from-file=acmedns.json
+```
+
+**Option B: Manual DNS-01 (Not recommended - use acme-dns instead)**
+
+Manual verification requires adding TXT records to No-IP.com each time a certificate renews. This is not practical for automated renewals.
+
+If you still want manual control, you'll need to:
+1. Create a Certificate with manual approval
+2. Check the Challenge resource for the required TXT record
+3. Add the TXT record `_acme-challenge.calypr-demo.ddns.net` to No-IP.com
+4. Wait for validation
+
+For automated renewals, use Option A (acme-dns) instead.
+
+#### Cause 4: ClusterIssuer Not Ready (HTTP-01)
 
 ```bash
 kubectl get clusterissuer
@@ -496,7 +586,7 @@ kubectl describe clusterissuer letsencrypt-prod
 
 If ClusterIssuer doesn't exist or isn't ready:
 ```bash
-# Create ClusterIssuer (production)
+# Create ClusterIssuer for HTTP-01 (production clusters only)
 kubectl apply -f - <<EOF
 apiVersion: cert-manager.io/v1
 kind: ClusterIssuer
@@ -515,7 +605,7 @@ spec:
 EOF
 ```
 
-#### Cause 4: Rate Limiting from Let's Encrypt
+#### Cause 5: Rate Limiting from Let's Encrypt
 
 If testing repeatedly, you may hit Let's Encrypt rate limits (5 failures per hour, 50 certs per domain per week).
 
@@ -531,7 +621,7 @@ kubectl delete certificate calypr-demo-tls -n argo-stack
 
 Staging certificates won't be trusted by browsers but allow testing without hitting rate limits.
 
-#### Cause 5: DNS Not Pointing to LoadBalancer IP
+#### Cause 6: DNS Not Pointing to LoadBalancer IP
 
 ```bash
 # Verify DNS resolves to your LoadBalancer IP
