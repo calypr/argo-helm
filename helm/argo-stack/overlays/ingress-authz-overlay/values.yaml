@@ -1,0 +1,147 @@
+# ============================================================================
+# Ingress AuthZ Overlay Configuration
+# ============================================================================
+# This overlay provides a single host, path-based ingress layer for all
+# major UIs and APIs, protected by a centralized authz-adapter.
+#
+# Usage:
+#   helm upgrade --install ingress-authz-overlay \
+#     helm/argo-stack/overlays/ingress-authz-overlay \
+#     --set ingressAuthzOverlay.enabled=true
+# ============================================================================
+
+ingressAuthzOverlay:
+  # Enable or disable the overlay
+  enabled: true
+
+  # ============================================================================
+  # Host and TLS Configuration
+  # ============================================================================
+  # Single host for all path-based routes
+  host: calypr-demo.ddns.net
+
+  # TLS configuration using cert-manager
+  tls:
+    enabled: true
+    secretName: calypr-demo-tls
+    clusterIssuer: letsencrypt-prod
+
+  # ============================================================================
+  # Ingress Controller Configuration
+  # ============================================================================
+  ingressClassName: nginx
+
+  # ============================================================================
+  # AuthZ Adapter Configuration
+  # ============================================================================
+  authzAdapter:
+    # Enable deployment of authz-adapter (set to false if deployed separately)
+    deploy: true
+
+    # Service discovery settings
+    serviceName: authz-adapter
+    namespace: argo-stack
+    port: 8080
+
+    # Auth endpoint path
+    path: /check
+
+    # Sign-in URL for unauthenticated requests
+    signinUrl: https://calypr-demo.ddns.net/tenants/login
+
+    # Headers to pass back from auth response
+    responseHeaders: "X-User,X-Email,X-Groups,X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Groups"
+
+    # Container image for authz-adapter
+    image: ghcr.io/calypr/argo-helm:latest
+
+    # Number of replicas
+    replicas: 2
+
+    # Environment configuration for the adapter
+    env:
+      # GitApp/Fence base URL for user info
+      fenceBase: "https://calypr-dev.ohsu.edu/user"
+      # Tenant login path
+      tenantLoginPath: "/tenants/login"
+      # HTTP timeout for auth calls
+      httpTimeout: "3.0"
+
+    # Resource limits and requests
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+    # Pod security context
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+
+  # ============================================================================
+  # Route Definitions
+  # ============================================================================
+  # Each route creates a separate Ingress resource in the specified namespace.
+  # All routes share the same host and TLS configuration.
+  # All routes are protected by the authz-adapter via NGINX external auth.
+  routes:
+    # Argo Workflows UI
+    workflows:
+      enabled: true
+      namespace: argo-stack
+      service: argo-stack-argo-workflows-server
+      port: 2746
+      pathPrefix: /workflows
+      # Use regex path matching for subpaths
+      useRegex: true
+      # Rewrite path to remove prefix
+      rewriteTarget: /$2
+
+    # Argo CD Applications UI
+    applications:
+      enabled: true
+      namespace: argo-stack
+      service: argo-stack-argocd-server
+      port: 8080
+      pathPrefix: /applications
+      useRegex: true
+      rewriteTarget: /$2
+
+    # GitHub Repository Registrations EventSource
+    registrations:
+      enabled: true
+      namespace: argo-stack
+      service: github-repo-registrations-eventsource-svc
+      port: 12000
+      pathPrefix: /registrations
+      useRegex: true
+      rewriteTarget: /$2
+
+    # Calypr API Service
+    api:
+      enabled: true
+      namespace: calypr-api
+      service: calypr-api
+      port: 3000
+      pathPrefix: /api
+      useRegex: true
+      rewriteTarget: /$2
+
+    # Calypr Tenants Service
+    tenants:
+      enabled: true
+      namespace: calypr-tenants
+      service: calypr-tenants
+      port: 3001
+      pathPrefix: /tenants
+      useRegex: true
+      rewriteTarget: /$2
+      # Optional: Allow public access to login endpoint
+      # Set to true to skip auth for /tenants/login
+      publicPaths:
+        - /tenants/login
+        - /tenants/logout
+        - /tenants/callback

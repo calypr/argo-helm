@@ -216,6 +216,59 @@ ingressAuth:
   passAuthorization: true
 
 # ============================================================================
+# Ingress AuthZ Overlay - Unified Path-Based Routing with Centralized Auth
+# ============================================================================
+# Enable this overlay to provide a single host, path-based ingress for all
+# major UIs and APIs, protected by the authz-adapter.
+# See: helm/argo-stack/overlays/ingress-authz-overlay/docs/authz-ingress-user-guide.md
+#
+# To use the overlay, install it separately:
+#   helm upgrade --install ingress-authz-overlay \
+#     helm/argo-stack/overlays/ingress-authz-overlay \
+#     --values helm/argo-stack/values.yaml \
+#     --set ingressAuthzOverlay.enabled=true
+
+ingressAuthzOverlay:
+  enabled: false
+  host: calypr-demo.ddns.net
+  tls:
+    secretName: calypr-demo-tls
+    clusterIssuer: letsencrypt-prod
+  authzAdapter:
+    serviceName: authz-adapter
+    namespace: argo-stack
+    port: 8080
+    path: /check
+    signinUrl: https://calypr-demo.ddns.net/tenants/login
+    responseHeaders: X-User, X-Email, X-Groups
+  routes:
+    workflows:
+      namespace: argo-stack
+      service: argo-stack-argo-workflows-server
+      port: 2746
+      pathPrefix: /workflows
+    applications:
+      namespace: argo-stack
+      service: argo-stack-argocd-server
+      port: 8080
+      pathPrefix: /applications
+    registrations:
+      namespace: argo-stack
+      service: github-repo-registrations-eventsource-svc
+      port: 12000
+      pathPrefix: /registrations
+    api:
+      namespace: calypr-api
+      service: calypr-api
+      port: 3000
+      pathPrefix: /api
+    tenants:
+      namespace: calypr-tenants
+      service: calypr-tenants
+      port: 3001
+      pathPrefix: /tenants
+
+# ============================================================================
 # Argo CD Applications - Multi-Application Support (REMOVED)
 # ============================================================================
 # ⚠️ DEPRECATED: Legacy Application Configuration Pattern
