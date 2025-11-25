@@ -8,9 +8,11 @@
 namespaces:
   argo: argo-workflows
   argocd: argocd
-  tenant: wf-poc
+  calypr-tenants: calypr-tenants
   security: security
   argo-events: argo-events
+  argo-stack: argo-stack
+  calypr-api: calypr-api
 
 # ============================================================================
 # External Secrets Operator (ESO) and Vault Integration
@@ -143,7 +145,7 @@ argo-workflows:
       - --auth-mode=server
   controller:
     workflowNamespaces:
-      - wf-poc
+      - argo-workflows
     # Ensure controller uses correct namespace
     namespaceInstallMode: true
     # Enable log archiving for all workflows

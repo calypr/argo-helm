@@ -143,7 +143,7 @@ argo-stack:
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
-		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000 \
+		--set-string events.github.webhook.url=https://${ARGO_HOSTNAME}/registrations\
 		--set-string s3.enabled=${S3_ENABLED} \
 		--set-string s3.bucket=${S3_BUCKET} \
 		--set-string s3.pathStyle=true \
@@ -154,14 +154,22 @@ argo-stack:
 
 deploy: init argo-stack docker-install ports
 ports:	
-	echo waiting for pods
-	sleep 10
-	kubectl wait --for=condition=Ready pod   -l app.kubernetes.io/name=argocd-server   --timeout=120s -n argocd
-	echo starting port forwards
-	kubectl port-forward svc/argo-stack-argo-workflows-server 2746:2746 --address=0.0.0.0 -n argo-workflows &
-	kubectl port-forward svc/argo-stack-argocd-server         8080:443  --address=0.0.0.0 -n argocd &
-	kubectl port-forward svc/github-repo-registrations-eventsource-svc 12000:12000 --address=0.0.0.0 -n argo-events &
-	echo UIs available on port 2746 and port 8080, event exposed on 12000
+	# Add the Jetstack Helm repository
+	helm repo add jetstack https://charts.jetstack.io
+	helm repo update
+	# Install cert-manager with CRDs
+	helm install cert-manager jetstack/cert-manager \
+	  --namespace cert-manager \
+	  --create-namespace \
+	  --set crds.enabled=true
+	# Wait for them to come up
+	kubectl wait --for=condition=Ready pods --all -n cert-manager --timeout=120s
+	# 
+	kubectl apply -f helm/argo-stack/overlays/ingress-authz-overlay/cluster-issuer-letsencrypt.yaml
+	helm upgrade --install ingress-authz-overlay \
+	  helm/argo-stack/overlays/ingress-authz-overlay \
+	  --namespace argo-stack \
+	  --set ingressAuthzOverlay.host=${ARGO_HOSTNAME}
 
 adapter:
 	cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q

@@ -1,0 +1,21 @@
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    # Let's Encrypt production API endpoint
+    server: https://acme-v02.api.letsencrypt.org/directory
+    
+    # Email for certificate expiration notifications
+    email: brian@bwalsh.com
+    
+    # Secret to store the ACME account private key
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    
+    # HTTP-01 challenge solver using ingress
+    solvers:
+      - http01:
+          ingress:
+            class: nginx
