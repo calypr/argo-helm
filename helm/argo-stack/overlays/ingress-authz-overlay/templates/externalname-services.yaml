@@ -1,0 +1,43 @@
+{{/*
+ExternalName Services for cross-namespace routing.
+When the ingress namespace differs from the service namespace, we create an
+ExternalName service in the ingress namespace that points to the actual service
+in its original namespace. This enables NGINX Ingress to route traffic correctly.
+*/}}
+{{- if .Values.ingressAuthzOverlay.enabled }}
+{{- $root := . }}
+{{- $config := .Values.ingressAuthzOverlay }}
+{{- range $routeName, $route := $config.routes }}
+{{- if $route.enabled }}
+{{- $serviceNamespace := $route.serviceNamespace | default $route.namespace }}
+{{- if ne $route.namespace $serviceNamespace }}
+---
+# ExternalName service to enable cross-namespace routing for {{ $routeName }}
+# Routes from {{ $route.namespace }} to {{ $route.service }}.{{ $serviceNamespace }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $route.service }}-proxy
+  namespace: {{ $route.namespace }}
+  labels:
+    {{- include "ingress-authz-overlay.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: externalname-proxy
+    ingress-authz-overlay.calypr.io/route: {{ $routeName | quote }}
+    ingress-authz-overlay.calypr.io/target-namespace: {{ $serviceNamespace | quote }}
+    ingress-authz-overlay.calypr.io/target-service: {{ $route.service | quote }}
+  annotations:
+    # Helm release tracking
+    meta.helm.sh/release-name: {{ $root.Release.Name }}
+    meta.helm.sh/release-namespace: {{ $root.Release.Namespace }}
+spec:
+  type: ExternalName
+  externalName: {{ $route.service }}.{{ $serviceNamespace }}.svc.cluster.local
+  ports:
+    - port: {{ $route.port }}
+      targetPort: {{ $route.port }}
+      protocol: TCP
+      name: http
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

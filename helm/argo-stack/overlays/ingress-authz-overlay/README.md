@@ -6,15 +6,50 @@ A Helm overlay chart providing unified, path-based ingress with centralized auth
 
 This overlay provides a **single host, path-based ingress** for all major UIs and APIs:
 
-| Path | Service | Description |
-|------|---------|-------------|
-| `/workflows` | Argo Workflows Server | Workflow UI (port 2746) |
-| `/applications` | Argo CD Server | GitOps applications UI (port 8080) |
-| `/registrations` | GitHub EventSource | Repository registration events (port 12000) |
-| `/api` | Calypr API | Platform API service (port 3000) |
-| `/tenants` | Calypr Tenants | Tenant portal (port 3001) |
+| Path | Service | Namespace | Description |
+|------|---------|-----------|-------------|
+| `/workflows` | Argo Workflows Server | argo-workflows | Workflow UI (port 2746) |
+| `/applications` | Argo CD Server | argocd | GitOps applications UI (port 8080) |
+| `/registrations` | GitHub EventSource | argo-events | Repository registration events (port 12000) |
+| `/api` | Calypr API | calypr-api | Platform API service (port 3000) |
+| `/tenants` | Calypr Tenants | calypr-tenants | Tenant portal (port 3001) |
 
 All endpoints are protected by the `authz-adapter` via NGINX external authentication.
+
+## Cross-Namespace Routing
+
+This overlay supports **cross-namespace routing** for services that exist in different namespaces than the ingress resource. This is achieved using **ExternalName services** as proxies.
+
+### How It Works
+
+When a route's `serviceNamespace` differs from its `namespace`:
+
+1. An **ExternalName Service** is created in the ingress namespace
+2. This service acts as a DNS proxy pointing to the actual service in the target namespace
+3. The ingress routes to the proxy service, which forwards to the actual service
+
+### Configuration
+
+Each route can specify both the ingress namespace and the actual service namespace:
+
+```yaml
+ingressAuthzOverlay:
+  routes:
+    workflows:
+      # Where the ingress is created
+      namespace: argo-stack
+      # Where the actual service lives
+      serviceNamespace: argo-workflows
+      service: argo-stack-argo-workflows-server
+      port: 2746
+```
+
+When `serviceNamespace` differs from `namespace`, an ExternalName service is automatically created:
+
+- **Service Name**: `<original-service>-proxy`
+- **ExternalName**: `<original-service>.<target-namespace>.svc.cluster.local`
+
+The ingress also adds the `nginx.ingress.kubernetes.io/upstream-vhost` annotation to ensure the correct Host header is sent to the backend service.
 
 ## AuthZ Adapter Configuration
 
