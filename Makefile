@@ -154,6 +154,15 @@ argo-stack:
 
 deploy: init argo-stack docker-install ports
 ports:	
+	# MetalLB provides LoadBalancer functionality for bare metal clusters. For now, we are not using AWS load balancer
+	kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-native.yaml
+	# Wait for MetalLB pods to be ready
+	kubectl wait --namespace metallb-system \
+	  --for=condition=ready pod \
+	  --selector=app=metallb \
+	  --timeout=90s
+	# Configure IP Address Pool
+	kubectl apply -f helm/argo-stack/overlays/ip-address-pool.yaml
 	# Add the Jetstack Helm repository
 	helm repo add jetstack https://charts.jetstack.io
 	helm repo update
@@ -164,12 +173,18 @@ ports:
 	  --set crds.enabled=true
 	# Wait for them to come up
 	kubectl wait --for=condition=Ready pods --all -n cert-manager --timeout=120s
-	# 
+	# Start letsencrypt
 	kubectl apply -f helm/argo-stack/overlays/ingress-authz-overlay/cluster-issuer-letsencrypt.yaml
 	helm upgrade --install ingress-authz-overlay \
 	  helm/argo-stack/overlays/ingress-authz-overlay \
 	  --namespace argo-stack \
 	  --set ingressAuthzOverlay.host=${ARGO_HOSTNAME}
+	# start nginx
+	helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+	helm repo update
+	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  	-n ingress-nginx --create-namespace \
+  	--set controller.service.type=LoadBalancer
 
 adapter:
 	cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q
