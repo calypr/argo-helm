@@ -13,6 +13,10 @@ Data managers, developers, and platform administrators using the Argo Stack for 
 ## Table of Contents
 
 - [General Troubleshooting](#general-troubleshooting)
+- [Ingress and Connectivity Troubleshooting](#ingress-and-connectivity-troubleshooting)
+- [Environment-Specific Ingress Configuration](#environment-specific-ingress-configuration)
+  - [AWS EKS Configuration](#aws-eks-configuration)
+  - [On-Premises / Bare Metal Configuration](#on-premises--bare-metal-configuration)
 - [Workflow Troubleshooting](#workflow-troubleshooting)
 - [Argo Events Issues](#argo-events-issues)
 - [Secret and Vault Issues](#secret-and-vault-issues)
@@ -114,6 +118,506 @@ kubectl get eventsources -A
 ```
 
 **Summary:** `/event-sources` is an Argo Events view. Install **Argo Events (CRDs + controller + EventBus)** and ensure **RBAC** allows argo-server to read them; the 404 will go away.
+
+---
+
+## Ingress and Connectivity Troubleshooting
+
+### Issue: Connection Refused on Port 443
+
+**Error:**
+```
+curl: (7) Failed to connect to calypr-demo.ddns.net port 443 after 2 ms: Could not connect to server
+```
+
+**Cause:** The NGINX Ingress Controller is not accessible. This can happen for several reasons:
+- Ingress Controller is not running
+- LoadBalancer service has no external IP
+- Firewall/Security Group blocking port 443
+- Wrong ingress class configured
+
+**Solution - Step-by-Step Debugging:**
+
+#### 1. Check NGINX Ingress Controller Status
+
+```bash
+# Check if ingress-nginx pods are running
+kubectl get pods -n ingress-nginx
+
+# Check ingress-nginx service and external IP
+kubectl get svc -n ingress-nginx
+
+# Expected output should show EXTERNAL-IP (not <pending>)
+# NAME                                 TYPE           CLUSTER-IP      EXTERNAL-IP     PORT(S)
+# ingress-nginx-controller             LoadBalancer   10.100.x.x      <public-ip>     80:30080/TCP,443:30443/TCP
+```
+
+If `EXTERNAL-IP` shows `<pending>`, the LoadBalancer hasn't been provisioned:
+
+```bash
+# Check events for the service
+kubectl describe svc ingress-nginx-controller -n ingress-nginx
+
+# Check cloud provider logs for LoadBalancer issues
+```
+
+#### 2. Verify Ingress Controller is Installed
+
+```bash
+# Check if ingress-nginx namespace exists
+kubectl get ns ingress-nginx
+
+# If not installed, install with:
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  -n ingress-nginx --create-namespace
+```
+
+#### 3. Check Ingress Resources
+
+```bash
+# List all ingress resources in relevant namespaces
+kubectl get ingress -A
+
+# Describe a specific ingress to check configuration
+kubectl describe ingress ingress-authz-workflows -n argo-stack
+```
+
+Look for:
+- Correct host matching your domain
+- IngressClass set correctly (usually `nginx`)
+- TLS secret exists
+- Backend service exists
+
+#### 4. Verify TLS Certificate
+
+```bash
+# Check if certificate is ready
+kubectl get certificate -n argo-stack
+
+# Check certificate status
+kubectl describe certificate calypr-demo-tls -n argo-stack
+
+# Check if TLS secret exists
+kubectl get secret calypr-demo-tls -n argo-stack
+```
+
+#### 5. Check Ingress Controller Logs
+
+```bash
+# View ingress controller logs for errors
+kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx --tail=100
+
+# Look for errors related to:
+# - Certificate loading
+# - Backend connection
+# - Configuration reloads
+```
+
+#### 6. Verify Network Connectivity
+
+```bash
+# Test from inside the cluster
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://argo-stack-argo-workflows-server.argo-stack:2746/
+
+# Test the ingress controller service directly
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://ingress-nginx-controller.ingress-nginx:80/
+```
+
+#### 7. Check Security Groups / Firewalls (Cloud-specific)
+
+**AWS:**
+```bash
+# Check the LoadBalancer security group allows inbound 443
+aws ec2 describe-security-groups --group-ids <sg-id>
+```
+
+**GCP:**
+```bash
+# Check firewall rules
+gcloud compute firewall-rules list --filter="name~ingress"
+```
+
+**Azure:**
+```bash
+# Check network security group
+az network nsg rule list --resource-group <rg> --nsg-name <nsg-name>
+```
+
+### Issue: 404 Not Found on Ingress Paths
+
+**Error:**
+```
+{"level":"error","ts":...,"msg":"route not found"...}
+```
+
+**Cause:** The ingress path doesn't match any backend or the service doesn't exist.
+
+**Solution:**
+
+1. Verify backend service exists:
+```bash
+kubectl get svc -n argo-stack argo-stack-argo-workflows-server
+```
+
+2. Check ingress path configuration matches service expectations
+3. Verify the service ports match ingress configuration
+
+### Issue: 503 Service Unavailable
+
+**Error:**
+```
+HTTP/1.1 503 Service Temporarily Unavailable
+```
+
+**Cause:** Backend service has no healthy endpoints.
+
+**Solution:**
+
+```bash
+# Check endpoints for the service
+kubectl get endpoints argo-stack-argo-workflows-server -n argo-stack
+
+# Check backend pods are running
+kubectl get pods -n argo-stack -l app.kubernetes.io/name=argo-workflows-server
+
+# Check pod health
+kubectl describe pod <pod-name> -n argo-stack
+```
+
+### Issue: authz-adapter External Auth Failure
+
+**Error:**
+```
+auth-url: http://authz-adapter.security.svc.cluster.local:8080/check failed
+```
+
+**Cause:** The authz-adapter service is not responding.
+
+**Solution:**
+
+```bash
+# Check authz-adapter is running
+kubectl get pods -n security -l app=authz-adapter
+
+# Check authz-adapter service exists
+kubectl get svc authz-adapter -n security
+
+# Test authz-adapter from within cluster
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://authz-adapter.security:8080/healthz
+
+# Check authz-adapter logs
+kubectl logs -n security -l app=authz-adapter --tail=100
+```
+
+### Ingress Debugging Cheat Sheet
+
+| Check | Command |
+|-------|---------|
+| Ingress controller pods | `kubectl get pods -n ingress-nginx` |
+| Ingress controller service | `kubectl get svc -n ingress-nginx` |
+| All ingress resources | `kubectl get ingress -A` |
+| Ingress details | `kubectl describe ingress <name> -n <ns>` |
+| TLS certificates | `kubectl get certificate -A` |
+| Certificate status | `kubectl describe certificate <name> -n <ns>` |
+| Controller logs | `kubectl logs -n ingress-nginx -l app.kubernetes.io/name=ingress-nginx` |
+| authz-adapter status | `kubectl get pods -n security -l app=authz-adapter` |
+| Test internal connectivity | `kubectl run debug --image=curlimages/curl --rm -it -- curl -v <url>` |
+
+---
+
+## Environment-Specific Ingress Configuration
+
+This section covers ingress setup and troubleshooting for different deployment environments.
+
+### AWS EKS Configuration
+
+#### Prerequisites for AWS EKS
+
+1. **AWS Load Balancer Controller** (recommended) or use the default in-tree cloud provider
+2. **IAM permissions** for creating/managing Elastic Load Balancers
+3. **Subnet tags** for automatic subnet discovery
+
+#### Installing NGINX Ingress on AWS EKS
+
+```bash
+# Add the ingress-nginx repository
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+
+# Install with AWS-specific settings
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  -n ingress-nginx --create-namespace \
+  --set controller.service.type=LoadBalancer \
+  --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-type"=nlb \
+  --set controller.service.annotations."service\.beta\.kubernetes\.io/aws-load-balancer-scheme"=internet-facing
+```
+
+#### AWS-Specific Annotations
+
+For Network Load Balancer (NLB) - recommended for production:
+```yaml
+service:
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    # For internal-only access:
+    # service.beta.kubernetes.io/aws-load-balancer-scheme: internal
+```
+
+For Application Load Balancer (ALB) - requires AWS Load Balancer Controller:
+
+⚠️ **Note:** When using ALB with the AWS Load Balancer Controller, you configure the Ingress resource (not the Service). The Service should use `ClusterIP` or `NodePort` type.
+
+```yaml
+# Ingress annotations for ALB (on the Ingress resource, not Service):
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  annotations:
+    kubernetes.io/ingress.class: alb
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+```
+
+#### Troubleshooting AWS LoadBalancer Pending
+
+If `EXTERNAL-IP` stays `<pending>`:
+
+1. **Check service events:**
+```bash
+kubectl describe svc ingress-nginx-controller -n ingress-nginx
+```
+
+Look for events like:
+- `Error syncing load balancer` - IAM permission issues
+- `could not find any suitable subnets` - subnet tagging issues
+
+2. **Verify IAM permissions:**
+
+The node IAM role or service account needs these permissions:
+```json
+{
+  "Effect": "Allow",
+  "Action": [
+    "elasticloadbalancing:CreateLoadBalancer",
+    "elasticloadbalancing:DeleteLoadBalancer",
+    "elasticloadbalancing:DescribeLoadBalancers",
+    "elasticloadbalancing:ModifyLoadBalancerAttributes",
+    "elasticloadbalancing:CreateTargetGroup",
+    "elasticloadbalancing:DeleteTargetGroup",
+    "elasticloadbalancing:DescribeTargetGroups",
+    "elasticloadbalancing:RegisterTargets",
+    "elasticloadbalancing:DeregisterTargets",
+    "ec2:DescribeSecurityGroups",
+    "ec2:DescribeSubnets",
+    "ec2:DescribeVpcs",
+    "ec2:CreateSecurityGroup",
+    "ec2:AuthorizeSecurityGroupIngress"
+  ],
+  "Resource": "*"
+}
+```
+
+3. **Check subnet tags:**
+
+Public subnets need this tag for internet-facing LBs:
+```
+kubernetes.io/role/elb = 1
+```
+
+Private subnets need this tag for internal LBs:
+```
+kubernetes.io/role/internal-elb = 1
+```
+
+4. **Verify cluster tag on subnets:**
+```
+kubernetes.io/cluster/<cluster-name> = shared (or owned)
+```
+
+5. **Check AWS Load Balancer Controller (if using ALB):**
+```bash
+kubectl get pods -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+kubectl logs -n kube-system -l app.kubernetes.io/name=aws-load-balancer-controller
+```
+
+#### AWS Security Group Configuration
+
+After LoadBalancer is created, verify security group allows traffic:
+
+```bash
+# Get the LoadBalancer DNS name
+LB_DNS=$(kubectl get svc ingress-nginx-controller -n ingress-nginx -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+echo $LB_DNS
+
+# Find associated security group (from AWS Console or CLI)
+# Replace the DNS name in the query with your actual LoadBalancer DNS
+aws elbv2 describe-load-balancers --query "LoadBalancers[?DNSName=='${LB_DNS}'].SecurityGroups"
+
+# Verify inbound rules allow 80 and 443
+aws ec2 describe-security-groups --group-ids <sg-id> --query "SecurityGroups[].IpPermissions"
+```
+
+Required inbound rules:
+- Port 80 (HTTP) from 0.0.0.0/0 (or your IP range)
+- Port 443 (HTTPS) from 0.0.0.0/0 (or your IP range)
+
+---
+
+### On-Premises / Bare Metal Configuration
+
+#### Option 1: MetalLB (Recommended for On-Premises)
+
+MetalLB provides LoadBalancer functionality for bare metal clusters.
+
+**Install MetalLB:**
+```bash
+# Install MetalLB
+kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-native.yaml
+
+# Wait for MetalLB pods to be ready
+kubectl wait --namespace metallb-system \
+  --for=condition=ready pod \
+  --selector=app=metallb \
+  --timeout=90s
+```
+
+**Configure IP Address Pool:**
+```bash
+cat <<'YAML' | kubectl apply -f -
+apiVersion: metallb.io/v1beta1
+kind: IPAddressPool
+metadata:
+  name: default-pool
+  namespace: metallb-system
+spec:
+  addresses:
+  - 192.168.1.240-192.168.1.250  # Adjust to your available IP range
+---
+apiVersion: metallb.io/v1beta1
+kind: L2Advertisement
+metadata:
+  name: default
+  namespace: metallb-system
+spec:
+  ipAddressPools:
+  - default-pool
+YAML
+```
+
+**Then install NGINX Ingress with LoadBalancer:**
+```bash
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  -n ingress-nginx --create-namespace \
+  --set controller.service.type=LoadBalancer
+```
+
+#### Option 2: NodePort (Simple, No External Dependencies)
+
+Use NodePort when you don't have a LoadBalancer solution:
+
+```bash
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  -n ingress-nginx --create-namespace \
+  --set controller.service.type=NodePort \
+  --set controller.service.nodePorts.http=30080 \
+  --set controller.service.nodePorts.https=30443
+```
+
+Access via any node IP on the configured ports:
+```bash
+# Get node IPs
+kubectl get nodes -o wide
+
+# Access ingress
+curl http://<node-ip>:30080/
+curl -k https://<node-ip>:30443/
+```
+
+**To use standard ports (80/443)**, set up an external load balancer or reverse proxy (HAProxy, NGINX) pointing to the NodePorts.
+
+#### Option 3: HostNetwork (Direct Node Access)
+
+For single-node clusters or when you need direct port 80/443 access:
+
+```bash
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  -n ingress-nginx --create-namespace \
+  --set controller.hostNetwork=true \
+  --set controller.service.type=ClusterIP \
+  --set controller.kind=DaemonSet
+```
+
+Access directly via node IP on ports 80 and 443.
+
+⚠️ **Note:** Only one ingress controller pod can run per node with hostNetwork.
+
+#### Troubleshooting On-Premises Ingress
+
+1. **MetalLB not assigning IPs:**
+```bash
+# Check MetalLB speaker pods
+kubectl get pods -n metallb-system
+
+# Check MetalLB logs
+kubectl logs -n metallb-system -l component=speaker
+
+# Verify IPAddressPool is configured
+kubectl get ipaddresspool -n metallb-system
+```
+
+2. **NodePort not accessible:**
+```bash
+# Verify service has NodePort assigned
+kubectl get svc ingress-nginx-controller -n ingress-nginx
+
+# Check if port is open on the node
+nc -zv <node-ip> 30443
+
+# Check firewall (iptables/firewalld)
+sudo iptables -L -n | grep 30443
+sudo firewall-cmd --list-ports
+```
+
+3. **Network connectivity from external:**
+```bash
+# Test from external machine
+telnet <node-ip> 30443
+
+# Check if traffic reaches the node
+sudo tcpdump -i any port 30443
+```
+
+4. **Firewall configuration (if using firewalld):**
+```bash
+# Option 1: Allow only the specific ports you're using (recommended for security)
+sudo firewall-cmd --permanent --add-port=30080/tcp  # HTTP NodePort
+sudo firewall-cmd --permanent --add-port=30443/tcp  # HTTPS NodePort
+sudo firewall-cmd --reload
+
+# Option 2: Allow entire NodePort range (less secure, but convenient for development)
+# sudo firewall-cmd --permanent --add-port=30000-32767/tcp
+# sudo firewall-cmd --reload
+```
+
+---
+
+### Environment Comparison Quick Reference
+
+| Feature | AWS EKS | On-Premises (MetalLB) | On-Premises (NodePort) |
+|---------|---------|----------------------|------------------------|
+| LoadBalancer type | NLB/ALB | L2/BGP | N/A |
+| External IP | Automatic | From IP pool | Node IP + port |
+| Standard ports (80/443) | ✅ Yes | ✅ Yes | ❌ No (30000-32767) |
+| TLS termination | Ingress or ALB | Ingress | Ingress |
+| Health checks | AWS-managed | MetalLB | Manual |
+| HA setup | Multi-AZ | Multiple speakers | External LB needed |
+| Setup complexity | Medium | Medium | Low |
 
 ---
 
