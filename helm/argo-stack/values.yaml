@@ -235,8 +235,10 @@ ingressAuthzOverlay:
     secretName: calypr-demo-tls
     clusterIssuer: letsencrypt-prod
   authzAdapter:
+    # Use centralized adapter from security namespace
+    deploy: false
     serviceName: authz-adapter
-    namespace: argo-stack
+    namespace: security
     port: 8080
     path: /check
     signinUrl: https://calypr-demo.ddns.net/tenants/login
