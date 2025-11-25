@@ -55,6 +55,36 @@ sequenceDiagram
 
 This overlay uses [cert-manager](https://cert-manager.io/) to automatically provision and renew TLS certificates from [Let's Encrypt](https://letsencrypt.org/).
 
+### Installing cert-manager
+
+**cert-manager must be installed before creating ClusterIssuers or deploying this overlay.**
+
+If you see an error like:
+```
+no matches for kind "ClusterIssuer" in version "cert-manager.io/v1"
+```
+This means cert-manager is not installed. Install it first:
+
+```bash
+# Add the Jetstack Helm repository
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+
+# Install cert-manager with CRDs
+helm install cert-manager jetstack/cert-manager \
+  --namespace cert-manager \
+  --create-namespace \
+  --set crds.enabled=true
+
+# Verify cert-manager is running
+kubectl get pods -n cert-manager
+```
+
+Wait for all cert-manager pods to be `Running` before proceeding:
+```bash
+kubectl wait --for=condition=Ready pods --all -n cert-manager --timeout=120s
+```
+
 ### How It Works
 
 ```mermaid
@@ -236,6 +266,7 @@ kubectl get challenges -A
 ```
 
 Common issues:
+- **cert-manager not installed**: If you see `no matches for kind "ClusterIssuer"`, install cert-manager first (see [Installing cert-manager](#installing-cert-manager))
 - **Domain not reachable**: Ensure your domain's DNS points to the ingress controller's external IP
 - **Rate limited**: Use `letsencrypt-staging` for testing to avoid production rate limits
 - **Challenge failed**: Check that port 80 is accessible for HTTP-01 challenges
@@ -244,9 +275,17 @@ Common issues:
 
 ### Prerequisites
 
-- Kubernetes cluster with NGINX Ingress Controller
-- cert-manager installed and configured with a ClusterIssuer (e.g., `letsencrypt-prod`)
-- Helm 3.x
+Before installing this overlay, ensure you have:
+
+1. **Kubernetes cluster** (1.19+) with NGINX Ingress Controller installed
+2. **cert-manager installed** (see [Installing cert-manager](#installing-cert-manager) above)
+3. **ClusterIssuer created** (see [ClusterIssuer: letsencrypt-prod](#clusterissuer-letsencrypt-prod))
+4. **Helm 3.x** installed locally
+
+**Installation Order**:
+```
+1. Install cert-manager → 2. Create ClusterIssuer → 3. Install this overlay
+```
 
 ### Install the Overlay
 
