@@ -1051,6 +1051,181 @@ kubectl delete challenges -n argo-stack --all
 
 ---
 
+### Installing a Manual Certificate
+
+If you've obtained a certificate manually (e.g., using `certbot` directly) and want to use it instead of cert-manager automation, follow these steps.
+
+**Scenario:** You have a Let's Encrypt certificate stored locally or on a server:
+```
+Certificate is saved at: /etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem
+```
+
+#### Step 1: Create TLS Secret from Certificate Files
+
+```bash
+# Create the TLS secret from your certificate files
+kubectl create secret tls calypr-demo-tls \
+  -n argo-stack \
+  --cert=/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem \
+  --key=/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem
+
+# If the secret already exists, delete it first:
+kubectl delete secret calypr-demo-tls -n argo-stack
+
+# Then recreate it
+kubectl create secret tls calypr-demo-tls \
+  -n argo-stack \
+  --cert=/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem \
+  --key=/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem
+```
+
+**For certificates on a remote server:**
+
+```bash
+# Copy certificate files from remote server
+scp user@server:/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem ./fullchain.pem
+scp user@server:/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem ./privkey.pem
+
+# Create secret from local files
+kubectl create secret tls calypr-demo-tls \
+  -n argo-stack \
+  --cert=./fullchain.pem \
+  --key=./privkey.pem
+
+# Clean up local copies
+rm ./fullchain.pem ./privkey.pem
+```
+
+#### Step 2: Stop cert-manager from Managing the Certificate
+
+To prevent cert-manager from overwriting your manual certificate:
+
+```bash
+# Remove cert-manager annotation from all ingress resources
+kubectl annotate ingress ingress-authz-workflows -n argo-stack \
+  cert-manager.io/cluster-issuer-
+
+kubectl annotate ingress ingress-authz-applications -n argo-stack \
+  cert-manager.io/cluster-issuer-
+
+kubectl annotate ingress ingress-authz-registrations -n argo-stack \
+  cert-manager.io/cluster-issuer-
+
+# Or remove from all ingress resources at once
+kubectl get ingress -n argo-stack -o name | xargs -I {} \
+  kubectl annotate {} cert-manager.io/cluster-issuer-
+
+# Delete the Certificate resource (prevents cert-manager from managing it)
+kubectl delete certificate calypr-demo-tls -n argo-stack
+```
+
+#### Step 3: Verify Certificate Installation
+
+```bash
+# Check the TLS secret exists
+kubectl get secret calypr-demo-tls -n argo-stack
+
+# Verify certificate details
+kubectl get secret calypr-demo-tls -n argo-stack -o jsonpath='{.data.tls\.crt}' | \
+  base64 -d | openssl x509 -noout -text | grep -A2 "Validity\|Subject:"
+
+# Test HTTPS connection
+curl -vI https://calypr-demo.ddns.net/workflows 2>&1 | grep "subject:\|issuer:\|expire"
+```
+
+#### Step 4: Update Multiple Namespaces (if needed)
+
+If you have ingress resources in multiple namespaces using the same certificate:
+
+```bash
+# Create the same secret in other namespaces
+kubectl create secret tls calypr-demo-tls \
+  -n calypr-api \
+  --cert=/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem \
+  --key=/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem
+
+kubectl create secret tls calypr-demo-tls \
+  -n calypr-tenants \
+  --cert=/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem \
+  --key=/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem
+```
+
+#### Important Notes
+
+**Certificate Expiration:**
+- Let's Encrypt certificates are valid for **90 days**
+- You must manually renew before expiration
+- Set a calendar reminder for 30 days before expiration
+
+**Check expiration date:**
+```bash
+kubectl get secret calypr-demo-tls -n argo-stack -o jsonpath='{.data.tls\.crt}' | \
+  base64 -d | openssl x509 -noout -enddate
+```
+
+**Manual Renewal Process:**
+
+When the certificate is about to expire:
+
+```bash
+# 1. Renew on the server where you originally obtained it
+certbot renew
+
+# 2. Update the Kubernetes secret
+kubectl create secret tls calypr-demo-tls \
+  -n argo-stack \
+  --cert=/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem \
+  --key=/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# 3. Restart ingress controller to pick up new certificate (optional)
+kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
+```
+
+#### Re-enabling Automated cert-manager Management
+
+If you later fix your DNS-01 or HTTP-01 setup and want to return to automated certificate management:
+
+```bash
+# 1. Delete the manual secret
+kubectl delete secret calypr-demo-tls -n argo-stack
+
+# 2. Re-add the cert-manager annotation to your ingress
+kubectl annotate ingress ingress-authz-workflows -n argo-stack \
+  cert-manager.io/cluster-issuer=letsencrypt-prod
+
+# 3. cert-manager will automatically create a new Certificate resource
+# and obtain a certificate from Let's Encrypt
+
+# 4. Verify certificate is being issued
+kubectl get certificate -n argo-stack
+kubectl describe certificate calypr-demo-tls -n argo-stack
+```
+
+#### Alternative: Using cert-manager with Manual Certificates
+
+If you want cert-manager to manage the Certificate resource but provide your own cert:
+
+```bash
+# Create a Certificate resource pointing to an existing secret
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: calypr-demo-tls
+  namespace: argo-stack
+spec:
+  secretName: calypr-demo-tls
+  # Don't specify issuerRef - this tells cert-manager to just manage the secret
+  # without trying to obtain a new certificate
+  dnsNames:
+    - calypr-demo.ddns.net
+EOF
+```
+
+---
+
 ### Issue: Connection Refused on Port 443
 
 **Error:**
