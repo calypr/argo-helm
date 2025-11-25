@@ -40,6 +40,12 @@ spec:
         - name: authz-adapter
           image: {{ $adapter.image }}
           imagePullPolicy: IfNotPresent
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
           ports:
             - name: http
               containerPort: {{ $adapter.port }}

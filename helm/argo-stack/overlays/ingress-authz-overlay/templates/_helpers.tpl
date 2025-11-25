@@ -70,23 +70,3 @@ nginx.ingress.kubernetes.io/auth-snippet: |
   proxy_set_header X-Original-Method $request_method;
   proxy_set_header X-Forwarded-Host $host;
 {{- end }}
-
-{{/*
-Create TLS configuration for ingress.
-*/}}
-{{- define "ingress-authz-overlay.tlsConfig" -}}
-{{- if .Values.ingressAuthzOverlay.tls.enabled }}
-tls:
-  - hosts:
-      - {{ .Values.ingressAuthzOverlay.host | quote }}
-    secretName: {{ .Values.ingressAuthzOverlay.tls.secretName | quote }}
-{{- end }}
-{{- end }}
-
-{{/*
-Create the ingress name for a route.
-*/}}
-{{- define "ingress-authz-overlay.ingressName" -}}
-{{- $routeName := .routeName -}}
-ingress-authz-{{ $routeName }}
-{{- end }}
