@@ -156,15 +156,15 @@ argo-stack:
 
 deploy: init argo-stack docker-install ports
 ports:	
-	# MetalLB provides LoadBalancer functionality for bare metal clusters. For now, we are not using AWS load balancer
-	kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-native.yaml
-	# Wait for MetalLB pods to be ready
-	kubectl wait --namespace metallb-system \
-	  --for=condition=ready pod \
-	  --selector=app=metallb \
-	  --timeout=90s
-	# Configure IP Address Pool
-	kubectl apply -f helm/argo-stack/overlays/ip-address-pool.yaml
+	# # MetalLB provides LoadBalancer functionality for bare metal clusters. For now, we are not using AWS load balancer
+	# kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-native.yaml
+	# # Wait for MetalLB pods to be ready
+	# kubectl wait --namespace metallb-system \
+	#   --for=condition=ready pod \
+	#   --selector=app=metallb \
+	#   --timeout=90s
+	# # Configure IP Address Pool
+	# kubectl apply -f helm/argo-stack/overlays/ip-address-pool.yaml
 	# Add the Jetstack Helm repository
 	helm repo add jetstack https://charts.jetstack.io
 	helm repo update
@@ -191,6 +191,8 @@ ports:
 	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   	-n ingress-nginx --create-namespace \
   	--set controller.service.type=NodePort
+	# Assign external address
+	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{ "spec": { "type": "NodePort", "externalIPs": ["100.22.124.96"] } }'
 	# Solution - Use NodePort instead of LoadBalancer in kind
 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"NodePort","ports":[{"port":80,"nodePort":30080},{"port":443,"nodePort":30443}]}}'
 
