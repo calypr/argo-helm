@@ -276,9 +276,7 @@ Common issues:
 
 If you get an error like:
 ```
-Error: UPGRADE FAILED: Unable to continue with update: ClusterIssuer "letsencrypt-prod" 
-in namespace "" exists and cannot be imported into the current release: 
-invalid ownership metadata; label validation error: missing key "app.kubernetes.io/managed-by"
+Error: UPGRADE FAILED: Unable to continue with update: ClusterIssuer "letsencrypt-prod" in namespace "" exists and cannot be imported into the current release: invalid ownership metadata; label validation error: missing key "app.kubernetes.io/managed-by"
 ```
 
 This happens when:
@@ -305,10 +303,12 @@ kubectl label clusterissuer letsencrypt-prod \
   app.kubernetes.io/managed-by=Helm
 ```
 
-**Note**: This chart intentionally does NOT include ClusterIssuer templates because ClusterIssuers are cluster-scoped resources that typically:
-- Pre-exist before deploying applications
-- Are shared across multiple releases
-- Should be managed separately from application charts
+**Why ClusterIssuers are managed separately**: ClusterIssuers are cluster-scoped resources that affect the entire cluster, not just one namespace. Including them in application-specific Helm charts causes conflicts when:
+- Multiple applications need the same ClusterIssuer
+- The ClusterIssuer already exists (created by a previous deployment or another chart)
+- Different teams deploy applications that reference the same issuer
+
+This chart references the ClusterIssuer via annotation (`cert-manager.io/cluster-issuer`) but leaves its lifecycle management to cluster administrators.
 
 ## Installation
 
