@@ -85,7 +85,7 @@ show-limits:
 
 kind:
 	kind delete cluster || true
-	kind create cluster
+	kind create cluster --config kind-config.yaml
 
 minio:
 	@echo "🗄️ Installing MinIO in cluster..."
@@ -186,7 +186,9 @@ ports:
 	helm repo update
 	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   	-n ingress-nginx --create-namespace \
-  	--set controller.service.type=LoadBalancer
+  	--set controller.service.type=NodePort
+	# Solution - Use NodePort instead of LoadBalancer in kind
+	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"NodePort","ports":[{"port":80,"nodePort":30080},{"port":443,"nodePort":30443}]}}'
 
 adapter:
 	cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q
