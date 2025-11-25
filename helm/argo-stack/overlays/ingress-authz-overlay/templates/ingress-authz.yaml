@@ -3,6 +3,11 @@ Ingress resources for each route in the ingress-authz-overlay.
 Each route creates a separate Ingress resource in its respective namespace,
 all sharing the same host and TLS configuration.
 All routes are protected by the authz-adapter via NGINX external auth.
+
+NOTE: Only the route with primary: true should have the cert-manager.io/cluster-issuer
+annotation. Other routes just reference the TLS secret without the annotation to avoid
+cert-manager ownership conflicts. If no route has primary: true, no ingress will have
+the cluster-issuer annotation (the Certificate must be created manually or by another means).
 */}}
 {{- if .Values.ingressAuthzOverlay.enabled }}
 {{- $root := . }}
@@ -25,8 +30,8 @@ metadata:
     meta.helm.sh/release-namespace: {{ $root.Release.Namespace }}
     # NGINX external auth annotations
     {{- include "ingress-authz-overlay.authAnnotations" $root | nindent 4 }}
-    {{- if $config.tls.enabled }}
-    # Let's Encrypt / cert-manager integration
+    {{- if and $config.tls.enabled $route.primary }}
+    # Let's Encrypt / cert-manager integration (only on primary route to avoid ownership conflicts)
     cert-manager.io/cluster-issuer: {{ $config.tls.clusterIssuer | quote }}
     {{- end }}
     {{- if $route.useRegex }}
