@@ -283,9 +283,9 @@ Before installing this overlay, ensure you have:
 4. **Helm 3.x** installed locally
 
 **Installation Order**:
-```
-1. Install cert-manager → 2. Create ClusterIssuer → 3. Install this overlay
-```
+1. Install cert-manager
+2. Create ClusterIssuer
+3. Install this overlay
 
 ### Install the Overlay
 
