@@ -522,7 +522,39 @@ curl -I -H "Authorization: Bearer $TOKEN" https://calypr-demo.ddns.net/workflows
 
 ### Common Issues
 
-1. **502 Bad Gateway**: AuthZ adapter not reachable
+1. **404 Not Found**: Routes return 404 error
+   - Check if backend services exist in their respective namespaces:
+     ```bash
+     # For workflows
+     kubectl get svc argo-stack-argo-workflows-server -n argo-workflows
+     # For applications (ArgoCD)
+     kubectl get svc argo-stack-argocd-server -n argocd
+     # For registrations
+     kubectl get svc github-repo-registrations-eventsource-svc -n argo-events
+     ```
+   - Verify ExternalName proxy services are created for cross-namespace routing:
+     ```bash
+     kubectl get svc -n argo-stack -l app.kubernetes.io/component=externalname-proxy
+     ```
+   - Check if NGINX ingress controller is running and has ADDRESS assigned:
+     ```bash
+     kubectl get ingress -A -l app.kubernetes.io/name=ingress-authz-overlay
+     ```
+   - Verify backend protocol settings (ArgoCD requires HTTPS):
+     ```bash
+     kubectl get ingress ingress-authz-applications -n argo-stack -o yaml | grep backend-protocol
+     ```
+   - Check NGINX ingress controller logs for routing errors:
+     ```bash
+     kubectl logs -n ingress-nginx -l app.kubernetes.io/component=controller --tail=100
+     ```
+   - Test direct connectivity to backend services:
+     ```bash
+     kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+       curl -v http://argo-stack-argo-workflows-server.argo-workflows:2746/
+     ```
+
+2. **502 Bad Gateway**: AuthZ adapter not reachable
    - Check authz-adapter deployment is running
    - Verify service selector matches pod labels
 

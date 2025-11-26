@@ -126,6 +126,8 @@ ingressAuthzOverlay:
       pathPrefix: /applications
       useRegex: true
       rewriteTarget: /$2
+      # ArgoCD server uses HTTPS by default
+      backendProtocol: HTTPS
 
     # GitHub Repository Registrations EventSource
     registrations:

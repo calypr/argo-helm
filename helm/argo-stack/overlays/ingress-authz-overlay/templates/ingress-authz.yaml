@@ -17,7 +17,8 @@ externalname-services.yaml template.
 {{- $root := . }}
 {{- $config := .Values.ingressAuthzOverlay }}
 {{- range $routeName, $route := $config.routes }}
-{{- if $route.enabled }}
+{{- $routeEnabled := $route.enabled | default true }}
+{{- if $routeEnabled }}
 {{- $serviceNamespace := $route.serviceNamespace | default $route.namespace }}
 {{- $isCrossNamespace := ne $route.namespace $serviceNamespace }}
 {{- $serviceName := ternary (printf "%s-proxy" $route.service) $route.service $isCrossNamespace }}
@@ -45,6 +46,10 @@ metadata:
     # # Let's Encrypt / cert-manager integration (only on primary route to avoid ownership conflicts)
     # cert-manager.io/cluster-issuer: {{ $config.tls.clusterIssuer | quote }}
     # {{- end }}
+    {{- if $route.backendProtocol }}
+    # Backend protocol (e.g., HTTPS for ArgoCD, GRPC for gRPC services)
+    nginx.ingress.kubernetes.io/backend-protocol: {{ $route.backendProtocol | quote }}
+    {{- end }}
     {{- if $route.useRegex }}
     # Path rewriting for subpath support
     nginx.ingress.kubernetes.io/use-regex: "true"
@@ -53,6 +58,15 @@ metadata:
     {{- if $isCrossNamespace }}
     # Cross-namespace routing via ExternalName service
     nginx.ingress.kubernetes.io/upstream-vhost: {{ $route.service }}.{{ $serviceNamespace }}.svc.cluster.local
+    {{- end }}
+    {{- if $route.proxyConnectTimeout }}
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: {{ $route.proxyConnectTimeout | quote }}
+    {{- end }}
+    {{- if $route.proxyReadTimeout }}
+    nginx.ingress.kubernetes.io/proxy-read-timeout: {{ $route.proxyReadTimeout | quote }}
+    {{- end }}
+    {{- if $route.proxySendTimeout }}
+    nginx.ingress.kubernetes.io/proxy-send-timeout: {{ $route.proxySendTimeout | quote }}
     {{- end }}
 spec:
   ingressClassName: {{ $config.ingressClassName | default "nginx" | quote }}
