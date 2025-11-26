@@ -178,11 +178,12 @@ ports:
 	# start nginx
 	helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 	helm repo update
-	kubectl create secret tls calypr-demo-tls -n ingress-nginx --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	sudo rm /tmp/fullchain.pem /tmp/privkey.pem	
 	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   	-n ingress-nginx --create-namespace \
-  	--set controller.service.type=NodePort
+  	--set controller.service.type=NodePort \
+	--set controller.extraArgs.default-ssl-certificate=default/calypr-demo-tls
+	kubectl create secret tls calypr-demo-tls -n ingress-nginx --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	sudo rm /tmp/fullchain.pem /tmp/privkey.pem
 	# Assign external address
 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{ "spec": { "type": "NodePort", "externalIPs": ["100.22.124.96"] } }'
 	# Solution - Use NodePort instead of LoadBalancer in kind

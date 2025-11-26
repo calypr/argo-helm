@@ -196,18 +196,6 @@ s3:
   accessKey: ""
   secretKey: ""
 
-# Ingresses we ship (toggle/hosts)
-ingress:
-  argoWorkflows:
-    enabled: true
-    host: calypr-demo.ddns.net
-    tls:
-      secretName: calypr-demo-tls
-  argocd:
-    enabled: true
-    host: calypr-demo.ddns.net
-    tls:
-      secretName: calypr-demo-tls
 
 # NGINX auth to the adapter
 ingressAuth:
