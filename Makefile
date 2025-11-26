@@ -13,7 +13,8 @@ S3_HOSTNAME          ?= minio.minio-system.svc.cluster.local:9000
 VAULT_TOKEN          ?= root
 
 # Ingress configuration - must be set for production deployments
-# ARGO_HOSTNAME: The domain name for your Argo services (e.g., argo.example.com)
+# ARGO_HOSTNAME: (REQUIRED) The domain name for your Argo services (e.g., argo.example.com)
+#                Must be set as environment variable: export ARGO_HOSTNAME=your-domain.com
 # TLS_SECRET_NAME: Name of the TLS secret for SSL certificates
 # EXTERNAL_IP: External IP address for ingress (leave empty to skip external IP assignment)
 TLS_SECRET_NAME      ?= argo-tls
