@@ -164,38 +164,38 @@ deploy: init argo-stack docker-install ports
 ports:	
 	# manual certificate
 	# If the secret already exists, delete it first:
-	kubectl delete secret $(TLS_SECRET_NAME) -n argo-stack || true
+	kubectl delete secret ${TLS_SECRET_NAME} -n argo-stack || true
 	# Create the TLS secret from your certificate files
 	# Requires: ARGO_HOSTNAME to be set (e.g., argo.example.com)
 	# Certificate location: /etc/letsencrypt/live/${ARGO_HOSTNAME}/
-	sudo cp /etc/letsencrypt/live/$(ARGO_HOSTNAME)/fullchain.pem /tmp/
-	sudo cp /etc/letsencrypt/live/$(ARGO_HOSTNAME)/privkey.pem /tmp/
+	sudo cp /etc/letsencrypt/live/${ARGO_HOSTNAME}/fullchain.pem /tmp/
+	sudo cp /etc/letsencrypt/live/${ARGO_HOSTNAME}/privkey.pem /tmp/
 	sudo chmod 644 /tmp/fullchain.pem /tmp/privkey.pem
-	kubectl create secret tls $(TLS_SECRET_NAME) -n argo-stack --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls $(TLS_SECRET_NAME) -n argocd --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls $(TLS_SECRET_NAME) -n argo-workflows --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls $(TLS_SECRET_NAME) -n argo-events --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls $(TLS_SECRET_NAME) -n calypr-api --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls $(TLS_SECRET_NAME) -n calypr-tenants --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls $(TLS_SECRET_NAME) -n default --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME} -n argo-stack --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME} -n argocd --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME} -n argo-workflows --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME} -n argo-events --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME} -n calypr-api --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME} -n calypr-tenants --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME} -n default --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
 	# install ingress
 	helm upgrade --install ingress-authz-overlay \
 	  helm/argo-stack/overlays/ingress-authz-overlay \
 	  --namespace argo-stack \
-	  --set ingressAuthzOverlay.host=$(ARGO_HOSTNAME)
+	  --set ingressAuthzOverlay.host=${ARGO_HOSTNAME}
 	# start nginx
 	helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 	helm repo update
 	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   	-n ingress-nginx --create-namespace \
   	--set controller.service.type=NodePort \
-	--set controller.extraArgs.default-ssl-certificate=default/$(TLS_SECRET_NAME)
-	kubectl create secret tls $(TLS_SECRET_NAME) -n ingress-nginx --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	--set controller.extraArgs.default-ssl-certificate=default/${TLS_SECRET_NAME}
+	kubectl create secret tls ${TLS_SECRET_NAME} -n ingress-nginx --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
 	sudo rm /tmp/fullchain.pem /tmp/privkey.pem
 	# Assign external address (only if EXTERNAL_IP is set)
-	@if [ -n "$(EXTERNAL_IP)" ]; then \
-		echo "➡️  Assigning external IP: $(EXTERNAL_IP)"; \
-		kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{ "spec": { "type": "NodePort", "externalIPs": ["$(EXTERNAL_IP)"] } }'; \
+	@if [ -n "${EXTERNAL_IP}" ]; then \
+		echo "➡️  Assigning external IP: ${EXTERNAL_IP}"; \
+		kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{ "spec": { "type": "NodePort", "externalIPs": ["${EXTERNAL_IP}"] } }'; \
 	else \
 		echo "⚠️  EXTERNAL_IP not set, skipping external IP assignment"; \
 	fi
