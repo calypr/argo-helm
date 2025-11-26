@@ -12,6 +12,13 @@ S3_HOSTNAME          ?= minio.minio-system.svc.cluster.local:9000
 # Vault configuration for local development (in-cluster deployment)
 VAULT_TOKEN          ?= root
 
+# Ingress configuration - must be set for production deployments
+# ARGO_HOSTNAME: (REQUIRED) The domain name for your Argo services (e.g., argo.example.com)
+#                Must be set as environment variable: export ARGO_HOSTNAME=your-domain.com
+# TLS_SECRET_NAME: Name of the TLS secret for SSL certificates
+# EXTERNAL_IP: External IP address for ingress (leave empty to skip external IP assignment)
+TLS_SECRET_NAME      ?= calypr-demo-tls
+PUBLIC_IP            ?=
 
 check-vars:
 	@echo "🔍 Checking required environment variables..."
@@ -23,8 +30,9 @@ check-vars:
 	fi
 	@echo "✅ Environment validation passed."
 	@test -n "$(GITHUB_PAT)" || (echo "Error: GITHUB_PAT is undefined. Run 'export GITHUB_PAT=...' before installing" && exit 1)
-        @test -n "$(ARGOCD_SECRET_KEY)" || (echo "Error: ARGOCD_SECRET_KEY is undefined. Run 'export ARGOCD_SECRET_KEY=...' before installing" && exit 1)
-        @test -n "$(ARGO_HOSTNAME)" || (echo "Error: ARGO_HOSTNAME is undefined. Run 'export ARGO_HOSTNAME=...' before installing" && exit 1)
+	@test -n "$(ARGOCD_SECRET_KEY)" || (echo "Error: ARGOCD_SECRET_KEY is undefined. Run 'export ARGOCD_SECRET_KEY=...' before installing" && exit 1)
+	@test -n "$(ARGO_HOSTNAME)" || (echo "Error: ARGO_HOSTNAME is undefined. Run 'export ARGO_HOSTNAME=...' before installing" && exit 1)
+	# @test -n "$(PUBLIC_IP)" || (echo "Error: PUBLIC_ID is undefined. Run 'export PUBLIC_ID=...' before installing" && exit 1)
 
 	@echo "✅ Environment validation passed."
 
@@ -163,13 +171,8 @@ ports:
 	sudo cp /etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem /tmp/
 	sudo cp /etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem /tmp/
 	sudo chmod 644 /tmp/fullchain.pem /tmp/privkey.pem
-	kubectl create secret tls calypr-demo-tls -n argo-stack --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n argocd --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n argo-workflows --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n argo-events --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n calypr-api --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n calypr-tenants --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n default --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME}  -n default --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	sudo rm /tmp/fullchain.pem /tmp/privkey.pem
 	# install ingress
 	helm upgrade --install ingress-authz-overlay \
 	  helm/argo-stack/overlays/ingress-authz-overlay \
@@ -181,11 +184,14 @@ ports:
 	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   	-n ingress-nginx --create-namespace \
   	--set controller.service.type=NodePort \
-	--set controller.extraArgs.default-ssl-certificate=default/calypr-demo-tls
-	kubectl create secret tls calypr-demo-tls -n ingress-nginx --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	sudo rm /tmp/fullchain.pem /tmp/privkey.pem
-	# Assign external address
-	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{ "spec": { "type": "NodePort", "externalIPs": ["100.22.124.96"] } }'
+	--set controller.extraArgs.default-ssl-certificate=default/${TLS_SECRET_NAME} 
+	# Assign external address (only if PUBLIC_IP is set)
+	@if [ -n "${PUBLIC_IP}" ]; then \
+		echo "➡️  Assigning external IP: ${PUBLIC_IP}"; \
+		kubectl patch svc ingress-nginx-controller -n ingress-nginx -p "{\"spec\": {\"type\": \"NodePort\", \"externalIPs\": [\"${PUBLIC_IP}\"]}}"; \
+	else \
+		echo "⚠️  PUBLIC_IP not set, skipping external IP assignment"; \
+	fi
 	# Solution - Use NodePort instead of LoadBalancer in kind
 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"NodePort","ports":[{"port":80,"nodePort":30080},{"port":443,"nodePort":30443}]}}'
 
