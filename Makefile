@@ -195,7 +195,7 @@ ports:
 	# Assign external address (only if EXTERNAL_IP is set)
 	@if [ -n "${EXTERNAL_IP}" ]; then \
 		echo "➡️  Assigning external IP: ${EXTERNAL_IP}"; \
-		kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{ "spec": { "type": "NodePort", "externalIPs": ["${EXTERNAL_IP}"] } }'; \
+		kubectl patch svc ingress-nginx-controller -n ingress-nginx -p "{\"spec\": {\"type\": \"NodePort\", \"externalIPs\": [\"${EXTERNAL_IP}\"]}}"; \
 	else \
 		echo "⚠️  EXTERNAL_IP not set, skipping external IP assignment"; \
 	fi
