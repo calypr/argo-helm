@@ -156,31 +156,21 @@ argo-stack:
 
 deploy: init argo-stack docker-install ports
 ports:	
-	# # MetalLB provides LoadBalancer functionality for bare metal clusters. For now, we are not using AWS load balancer
-	# kubectl apply -f https://raw.githubusercontent.com/metallb/metallb/v0.13.12/config/manifests/metallb-native.yaml
-	# # Wait for MetalLB pods to be ready
-	# kubectl wait --namespace metallb-system \
-	#   --for=condition=ready pod \
-	#   --selector=app=metallb \
-	#   --timeout=90s
-	# # Configure IP Address Pool
-	# kubectl apply -f helm/argo-stack/overlays/ip-address-pool.yaml
-	# Add the Jetstack Helm repository
-	helm repo add jetstack https://charts.jetstack.io
-	helm repo update
-	# Install cert-manager with CRDs
-	helm install cert-manager jetstack/cert-manager \
-	  --namespace cert-manager \
-	  --create-namespace \
-	  --set crds.enabled=true
-	# install letsencrypt secret see **Create ClusterIssuer with acme-dns**
-	kubectl create secret generic acme-dns-credentials \
-          -n cert-manager \
-          --from-file=acmedns.json
-	# Wait for them to come up
-	kubectl wait --for=condition=Ready pods --all -n cert-manager --timeout=120s
-	# Start letsencrypt
-	kubectl apply -f helm/argo-stack/overlays/ingress-authz-overlay/cluster-issuer-letsencrypt.yaml
+	# manual certificate
+	# If the secret already exists, delete it first:
+	kubectl delete secret calypr-demo-tls -n argo-stack || true
+	# Create the TLS secret from your certificate files
+	sudo cp /etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem /tmp/
+	sudo cp /etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem /tmp/
+	sudo chmod 644 /tmp/fullchain.pem /tmp/privkey.pem
+	kubectl create secret tls calypr-demo-tls -n argo-stack --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls calypr-demo-tls -n argocd --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls calypr-demo-tls -n argo-workflows --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls calypr-demo-tls -n argo-events --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls calypr-demo-tls -n calypr-api --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls calypr-demo-tls -n calypr-tenants --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls calypr-demo-tls -n default --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	# install ingress
 	helm upgrade --install ingress-authz-overlay \
 	  helm/argo-stack/overlays/ingress-authz-overlay \
 	  --namespace argo-stack \
@@ -188,6 +178,8 @@ ports:
 	# start nginx
 	helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 	helm repo update
+	kubectl create secret tls calypr-demo-tls -n ingress-nginx --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	sudo rm /tmp/fullchain.pem /tmp/privkey.pem	
 	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   	-n ingress-nginx --create-namespace \
   	--set controller.service.type=NodePort

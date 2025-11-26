@@ -200,16 +200,14 @@ s3:
 ingress:
   argoWorkflows:
     enabled: true
-    host: "argo.localtest.me"
+    host: calypr-demo.ddns.net
     tls:
-      enabled: false
-      secretName: ""
+      secretName: calypr-demo-tls
   argocd:
     enabled: true
-    host: "argocd.localtest.me"
+    host: calypr-demo.ddns.net
     tls:
-      enabled: false
-      secretName: ""
+      secretName: calypr-demo-tls
 
 # NGINX auth to the adapter
 ingressAuth:
@@ -231,11 +229,10 @@ ingressAuth:
 #     --set ingressAuthzOverlay.enabled=true
 
 ingressAuthzOverlay:
-  enabled: false
+  enabled: true
   host: calypr-demo.ddns.net
   tls:
     secretName: calypr-demo-tls
-    clusterIssuer: letsencrypt-prod
   authzAdapter:
     # Use centralized adapter from security namespace
     deploy: false

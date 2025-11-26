@@ -24,7 +24,6 @@ ingressAuthzOverlay:
   tls:
     enabled: true
     secretName: calypr-demo-tls
-    clusterIssuer: letsencrypt-prod
 
   # ============================================================================
   # Ingress Controller Configuration

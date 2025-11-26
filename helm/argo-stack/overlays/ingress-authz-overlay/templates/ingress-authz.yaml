@@ -41,10 +41,10 @@ metadata:
     meta.helm.sh/release-namespace: {{ $root.Release.Namespace }}
     # NGINX external auth annotations
     {{- include "ingress-authz-overlay.authAnnotations" $root | nindent 4 }}
-    {{- if and $config.tls.enabled $route.primary }}
-    # Let's Encrypt / cert-manager integration (only on primary route to avoid ownership conflicts)
-    cert-manager.io/cluster-issuer: {{ $config.tls.clusterIssuer | quote }}
-    {{- end }}
+    # {{- if and $config.tls.enabled $route.primary }}
+    # # Let's Encrypt / cert-manager integration (only on primary route to avoid ownership conflicts)
+    # cert-manager.io/cluster-issuer: {{ $config.tls.clusterIssuer | quote }}
+    # {{- end }}
     {{- if $route.useRegex }}
     # Path rewriting for subpath support
     nginx.ingress.kubernetes.io/use-regex: "true"
