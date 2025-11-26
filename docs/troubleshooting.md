@@ -575,6 +575,414 @@ If you still want manual control, you'll need to:
 
 For automated renewals, use Option A (acme-dns) instead.
 
+#### Debugging DNS-01 Challenge Flow
+
+If you've configured DNS-01 challenges but still see self-signed certificates, follow these debugging steps:
+
+**Step 1: Verify ClusterIssuer Configuration**
+
+```bash
+# Check ClusterIssuer exists and is ready
+kubectl get clusterissuer
+kubectl describe clusterissuer letsencrypt-prod
+
+# Look for status: Ready: True
+# If not ready, check the status conditions for error messages
+```
+
+**Step 2: Check Certificate Resource Status**
+
+```bash
+# Check certificate status
+kubectl get certificate -n argo-stack
+kubectl describe certificate calypr-demo-tls -n argo-stack
+
+# Look for:
+# - Ready: False (certificate not issued)
+# - Status conditions showing the reason (e.g., "Issuing", "NotReady")
+# - Last transition time (stuck?)
+```
+
+**Step 3: Inspect CertificateRequest**
+
+```bash
+# List certificate requests
+kubectl get certificaterequest -n argo-stack
+
+# Describe the most recent one
+kubectl describe certificaterequest -n argo-stack | head -50
+
+# Look for:
+# - Approved: True
+# - Ready: False
+# - Status message indicating DNS-01 challenge state
+```
+
+**Step 4: Check Challenge Resources (DNS-01 specific)**
+
+```bash
+# List all challenges
+kubectl get challenges -A
+
+# Describe the challenge
+kubectl describe challenge <challenge-name> -n argo-stack
+
+# Look for:
+# - Type: DNS-01
+# - State: pending, valid, invalid, or errored
+# - Reason field with specific error messages
+# - Presented: True (DNS record was created)
+```
+
+**Step 5: Verify acme-dns Credentials Secret**
+
+If using acme-dns:
+
+```bash
+# Check secret exists
+kubectl get secret acme-dns-credentials -n cert-manager
+
+# Verify the secret has the correct key
+kubectl get secret acme-dns-credentials -n cert-manager -o jsonpath='{.data.acmedns\.json}' | base64 -d | jq .
+
+# Should return JSON with your domain configuration:
+# {
+#   "calypr-demo.ddns.net": {
+#     "username": "...",
+#     "password": "...",
+#     "fulldomain": "xxx.auth.acme-dns.io",
+#     "subdomain": "xxx",
+#     "allowfrom": []
+#   }
+# }
+```
+
+**Step 6: Verify CNAME Record**
+
+```bash
+# Check if CNAME record exists for _acme-challenge subdomain
+nslookup -type=CNAME _acme-challenge.calypr-demo.ddns.net
+
+# Or use dig
+dig _acme-challenge.calypr-demo.ddns.net CNAME +short
+
+# Should return something like: xxx.auth.acme-dns.io
+```
+
+If the CNAME is missing, add it to your DNS provider (e.g., No-IP.com):
+```
+_acme-challenge.calypr-demo.ddns.net CNAME <fulldomain from acme-dns registration>
+```
+
+**Step 7: Check acme-dns TXT Record**
+
+```bash
+# Get the fulldomain from your secret
+FULLDOMAIN=$(kubectl get secret acme-dns-credentials -n cert-manager -o jsonpath='{.data.acmedns\.json}' | base64 -d | jq -r '."calypr-demo.ddns.net".fulldomain')
+
+echo "Full domain: $FULLDOMAIN"
+
+# Check if TXT record is created on acme-dns
+dig @auth.acme-dns.io $FULLDOMAIN TXT +short
+
+# During a challenge, you should see a TXT record with the validation token
+```
+
+**Step 8: Check cert-manager Logs**
+
+```bash
+# cert-manager controller logs (handles Certificate resources)
+kubectl logs -n cert-manager -l app=cert-manager --tail=100 --follow
+
+# cert-manager webhook logs (handles DNS-01 challenge creation)
+kubectl logs -n cert-manager -l app=webhook --tail=100
+
+# Look for:
+# - "DNS record created" or "DNS propagation check"
+# - acme-dns API call logs
+# - Authentication errors
+# - "challenge not ready" or timeout messages
+```
+
+**Step 9: Verify acme-dns Webhook (if installed)**
+
+If you installed the acme-dns webhook:
+
+```bash
+# Check webhook pod is running
+kubectl get pods -n cert-manager | grep acme-dns
+
+# Check webhook logs
+kubectl logs -n cert-manager -l app.kubernetes.io/name=cert-manager-webhook-acme-dns --tail=50
+
+# Test webhook connectivity to acme-dns server
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v https://auth.acme-dns.io/health
+```
+
+**Step 10: Manual Challenge Validation**
+
+Test if Let's Encrypt can validate your DNS-01 challenge:
+
+```bash
+# Get the challenge token from the Challenge resource
+kubectl get challenge -n argo-stack -o yaml
+
+# Look for spec.key (the validation token)
+# The TXT record should be: _acme-challenge.calypr-demo.ddns.net -> CNAME -> fulldomain.auth.acme-dns.io
+
+# Verify Let's Encrypt can resolve it
+dig _acme-challenge.calypr-demo.ddns.net TXT +short
+
+# This should resolve through the CNAME to the acme-dns TXT record
+```
+
+**Step 11: Force Certificate Reissue**
+
+After fixing configuration issues:
+
+```bash
+# Delete failed challenges and certificate requests
+kubectl delete challenges -n argo-stack --all
+kubectl delete certificaterequest -n argo-stack --all
+
+# Optionally delete the certificate to trigger fresh issuance
+kubectl delete certificate calypr-demo-tls -n argo-stack
+
+# cert-manager will automatically recreate them
+# Watch the new challenge
+kubectl get challenges -n argo-stack -w
+```
+
+**Common DNS-01 Issues and Solutions:**
+
+| Symptom | Likely Cause | Solution |
+|---------|--------------|----------|
+| "DNS record not yet propagated" | CNAME not configured or DNS cache | See detailed fix below |
+| Challenge stuck in "pending" | CNAME not configured | Add `_acme-challenge.your-domain CNAME fulldomain.auth.acme-dns.io` |
+| "invalid credentials" | Wrong acme-dns credentials | Re-register with acme-dns and update secret |
+| "DNS record not found" | CNAME propagation delay | Wait 5-10 minutes for DNS propagation |
+| "acme-dns: unauthorized" | Incorrect username/password | Verify credentials in secret match registration |
+| Challenge "invalid" after 60s | DNS propagation too slow | Use longer `--dns01-self-check-period` flag on cert-manager |
+| Certificate stays "Issuing" | Previous challenge failed | Delete old challenges: `kubectl delete challenges -A` |
+
+**Detailed Fix for "DNS record not yet propagated" Error:**
+
+If you see this error in cert-manager logs:
+```
+"propagation check failed" err="DNS record for \"calypr-demo.ddns.net\" not yet propagated"
+```
+
+This means cert-manager is checking for the TXT record but can't find it. Follow these steps:
+
+**1. Verify the CNAME Record Exists:**
+
+```bash
+# Check if CNAME exists
+dig _acme-challenge.calypr-demo.ddns.net CNAME +short
+
+# Should return: xxx.auth.acme-dns.io
+# If empty, the CNAME is missing - add it to your DNS provider
+```
+
+**2. Check DNS Resolution Path:**
+
+```bash
+# Follow the full resolution chain
+dig _acme-challenge.calypr-demo.ddns.net TXT +trace
+
+# This should show:
+# 1. Query to root servers
+# 2. Query to .net servers
+# 3. Query to ddns.net servers (No-IP.com)
+# 4. CNAME pointing to auth.acme-dns.io
+# 5. TXT record on auth.acme-dns.io
+```
+
+**3. Verify acme-dns Has Created the TXT Record:**
+
+```bash
+# Get the fulldomain from your acme-dns credentials
+FULLDOMAIN=$(kubectl get secret acme-dns-credentials -n cert-manager \
+  -o jsonpath='{.data.acmedns\.json}' | base64 -d | \
+  jq -r '."calypr-demo.ddns.net".fulldomain')
+
+echo "Checking TXT record on: $FULLDOMAIN"
+
+# Query acme-dns directly
+dig @auth.acme-dns.io $FULLDOMAIN TXT +short
+
+# Should return a TXT record like: "abc123def456..."
+# If empty, acme-dns hasn't created the record yet
+```
+
+**4. Check cert-manager's View:**
+
+cert-manager uses specific DNS resolvers. Check what it sees:
+
+```bash
+# Get the cert-manager pod name
+CERT_MGR_POD=$(kubectl get pods -n cert-manager -l app=cert-manager -o jsonpath='{.items[0].metadata.name}')
+
+# Check DNS resolution from cert-manager's perspective
+kubectl exec -n cert-manager $CERT_MGR_POD -- nslookup -type=TXT _acme-challenge.calypr-demo.ddns.net
+
+# If this fails but your local dig works, cert-manager is using different DNS servers
+```
+
+**5. Wait for DNS Propagation:**
+
+DNS changes can take time to propagate:
+
+```bash
+# Watch the challenge status
+kubectl get challenges -n argo-stack -w
+
+# cert-manager retries every 60 seconds by default
+# Wait up to 10 minutes for DNS propagation
+```
+
+**6. Check for DNS Caching Issues:**
+
+```bash
+# Flush local DNS cache (on your machine, not cluster)
+# Linux:
+sudo systemd-resolve --flush-caches
+
+# macOS:
+sudo dscacheutil -flushcache; sudo killall -HUP mDNSResponder
+
+# Then retest
+dig _acme-challenge.calypr-demo.ddns.net TXT +short
+```
+
+**7. Verify CNAME Configuration in No-IP.com:**
+
+Log into your No-IP.com account and verify:
+
+1. Go to **Dynamic DNS** → **Hostnames**
+2. Click **Modify** on `calypr-demo.ddns.net`
+3. Check if there's a **DNS Records** or **Advanced** section
+4. Add CNAME record:
+   - **Subdomain**: `_acme-challenge`
+   - **Record Type**: CNAME
+   - **Target**: `<fulldomain>.auth.acme-dns.io` (from your acme-dns registration)
+
+**8. If CNAME is Correct but Still Failing:**
+
+The issue might be cert-manager's DNS resolver configuration:
+
+```bash
+# Check cert-manager deployment for custom DNS settings
+kubectl get deployment -n cert-manager cert-manager -o yaml | grep -A 5 dnsPolicy
+
+# If using ClusterFirst (default), it uses cluster DNS (CoreDNS/kube-dns)
+# Try using public DNS resolvers by adding flags to cert-manager:
+kubectl set env deployment/cert-manager -n cert-manager \
+  --containers=cert-manager \
+  DNS01_RECURSIVE_NAMESERVERS=8.8.8.8:53,1.1.1.1:53
+```
+
+**9. Increase DNS Propagation Check Period:**
+
+If your DNS propagates slowly:
+
+```bash
+# Edit cert-manager deployment to increase check period
+kubectl edit deployment cert-manager -n cert-manager
+
+# Add to container args:
+# - --dns01-recursive-nameservers-only=true
+# - --dns01-self-check-period=10m
+
+# Or use kubectl set:
+kubectl patch deployment cert-manager -n cert-manager --type='json' \
+  -p='[{"op": "add", "path": "/spec/template/spec/containers/0/args/-", "value": "--dns01-self-check-period=10m"}]'
+```
+
+**10. Verify acme-dns API Accessibility:**
+
+```bash
+# Test from within the cluster
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v https://auth.acme-dns.io/health
+
+# Should return: {"ok":true}
+
+# If this fails, check network policies or firewall rules blocking acme-dns
+```
+
+**11. Check acme-dns Registration:**
+
+Verify your acme-dns registration is correct:
+
+```bash
+# View the credentials
+kubectl get secret acme-dns-credentials -n cert-manager \
+  -o jsonpath='{.data.acmedns\.json}' | base64 -d | jq .
+
+# Test the credentials directly
+curl -X POST https://auth.acme-dns.io/update \
+  -H "X-Api-User: <username from above>" \
+  -H "X-Api-Key: <password from above>" \
+  -d '{"subdomain":"<subdomain from above>","txt":"test123"}'
+
+# Should return: {"txt":"test123"}
+```
+
+**12. Monitor cert-manager Logs in Real-Time:**
+
+```bash
+# Watch cert-manager process the DNS-01 challenge
+kubectl logs -n cert-manager -l app=cert-manager --tail=100 -f | grep -i "dns\|propagation\|challenge"
+
+# Look for:
+# - "Calling DNS01 Update" (acme-dns API call)
+# - "Waiting for DNS-01 propagation" (checking DNS)
+# - "DNS record propagated" (success!)
+# - Specific error messages
+```
+
+After fixing the issue, the challenge should transition from "pending" to "valid", and cert-manager will issue the certificate.
+
+**Using Staging for DNS-01 Testing:**
+
+To avoid Let's Encrypt rate limits while debugging:
+
+```bash
+# Create staging ClusterIssuer with DNS-01
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-staging
+spec:
+  acme:
+    server: https://acme-staging-v02.api.letsencrypt.org/directory
+    email: your-email@example.com
+    privateKeySecretRef:
+      name: letsencrypt-staging-account-key
+    solvers:
+    - dns01:
+        acmeDNS:
+          host: https://auth.acme-dns.io
+          accountSecretRef:
+            name: acme-dns-credentials
+            key: acmedns.json
+EOF
+
+# Update ingress to use staging
+kubectl annotate ingress ingress-authz-workflows -n argo-stack \
+  cert-manager.io/cluster-issuer=letsencrypt-staging --overwrite
+
+# Delete certificate to trigger reissuance
+kubectl delete certificate calypr-demo-tls -n argo-stack
+```
+
+Once DNS-01 works with staging, switch back to production.
+
+---
+
 #### Cause 4: ClusterIssuer Not Ready (HTTP-01)
 
 ```bash
@@ -639,6 +1047,181 @@ If DNS is wrong, update your DNS provider to point to the LoadBalancer IP.
 kubectl delete certificaterequest -n argo-stack --all
 kubectl delete challenges -n argo-stack --all
 # cert-manager will automatically create new ones
+```
+
+---
+
+### Installing a Manual Certificate
+
+If you've obtained a certificate manually (e.g., using `certbot` directly) and want to use it instead of cert-manager automation, follow these steps.
+
+**Scenario:** You have a Let's Encrypt certificate stored locally or on a server:
+```
+Certificate is saved at: /etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem
+Key is saved at:         /etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem
+```
+
+#### Step 1: Create TLS Secret from Certificate Files
+
+```bash
+# Create the TLS secret from your certificate files
+kubectl create secret tls calypr-demo-tls \
+  -n argo-stack \
+  --cert=/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem \
+  --key=/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem
+
+# If the secret already exists, delete it first:
+kubectl delete secret calypr-demo-tls -n argo-stack
+
+# Then recreate it
+kubectl create secret tls calypr-demo-tls \
+  -n argo-stack \
+  --cert=/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem \
+  --key=/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem
+```
+
+**For certificates on a remote server:**
+
+```bash
+# Copy certificate files from remote server
+scp user@server:/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem ./fullchain.pem
+scp user@server:/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem ./privkey.pem
+
+# Create secret from local files
+kubectl create secret tls calypr-demo-tls \
+  -n argo-stack \
+  --cert=./fullchain.pem \
+  --key=./privkey.pem
+
+# Clean up local copies
+rm ./fullchain.pem ./privkey.pem
+```
+
+#### Step 2: Stop cert-manager from Managing the Certificate
+
+To prevent cert-manager from overwriting your manual certificate:
+
+```bash
+# Remove cert-manager annotation from all ingress resources
+kubectl annotate ingress ingress-authz-workflows -n argo-stack \
+  cert-manager.io/cluster-issuer-
+
+kubectl annotate ingress ingress-authz-applications -n argo-stack \
+  cert-manager.io/cluster-issuer-
+
+kubectl annotate ingress ingress-authz-registrations -n argo-stack \
+  cert-manager.io/cluster-issuer-
+
+# Or remove from all ingress resources at once
+kubectl get ingress -n argo-stack -o name | xargs -I {} \
+  kubectl annotate {} cert-manager.io/cluster-issuer-
+
+# Delete the Certificate resource (prevents cert-manager from managing it)
+kubectl delete certificate calypr-demo-tls -n argo-stack
+```
+
+#### Step 3: Verify Certificate Installation
+
+```bash
+# Check the TLS secret exists
+kubectl get secret calypr-demo-tls -n argo-stack
+
+# Verify certificate details
+kubectl get secret calypr-demo-tls -n argo-stack -o jsonpath='{.data.tls\.crt}' | \
+  base64 -d | openssl x509 -noout -text | grep -A2 "Validity\|Subject:"
+
+# Test HTTPS connection
+curl -vI https://calypr-demo.ddns.net/workflows 2>&1 | grep "subject:\|issuer:\|expire"
+```
+
+#### Step 4: Update Multiple Namespaces (if needed)
+
+If you have ingress resources in multiple namespaces using the same certificate:
+
+```bash
+# Create the same secret in other namespaces
+kubectl create secret tls calypr-demo-tls \
+  -n calypr-api \
+  --cert=/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem \
+  --key=/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem
+
+kubectl create secret tls calypr-demo-tls \
+  -n calypr-tenants \
+  --cert=/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem \
+  --key=/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem
+```
+
+#### Important Notes
+
+**Certificate Expiration:**
+- Let's Encrypt certificates are valid for **90 days**
+- You must manually renew before expiration
+- Set a calendar reminder for 30 days before expiration
+
+**Check expiration date:**
+```bash
+kubectl get secret calypr-demo-tls -n argo-stack -o jsonpath='{.data.tls\.crt}' | \
+  base64 -d | openssl x509 -noout -enddate
+```
+
+**Manual Renewal Process:**
+
+When the certificate is about to expire:
+
+```bash
+# 1. Renew on the server where you originally obtained it
+certbot renew
+
+# 2. Update the Kubernetes secret
+kubectl create secret tls calypr-demo-tls \
+  -n argo-stack \
+  --cert=/etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem \
+  --key=/etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem \
+  --dry-run=client -o yaml | kubectl apply -f -
+
+# 3. Restart ingress controller to pick up new certificate (optional)
+kubectl rollout restart deployment ingress-nginx-controller -n ingress-nginx
+```
+
+#### Re-enabling Automated cert-manager Management
+
+If you later fix your DNS-01 or HTTP-01 setup and want to return to automated certificate management:
+
+```bash
+# 1. Delete the manual secret
+kubectl delete secret calypr-demo-tls -n argo-stack
+
+# 2. Re-add the cert-manager annotation to your ingress
+kubectl annotate ingress ingress-authz-workflows -n argo-stack \
+  cert-manager.io/cluster-issuer=letsencrypt-prod
+
+# 3. cert-manager will automatically create a new Certificate resource
+# and obtain a certificate from Let's Encrypt
+
+# 4. Verify certificate is being issued
+kubectl get certificate -n argo-stack
+kubectl describe certificate calypr-demo-tls -n argo-stack
+```
+
+#### Alternative: Using cert-manager with Manual Certificates
+
+If you want cert-manager to manage the Certificate resource but provide your own cert:
+
+```bash
+# Create a Certificate resource pointing to an existing secret
+kubectl apply -f - <<EOF
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: calypr-demo-tls
+  namespace: argo-stack
+spec:
+  secretName: calypr-demo-tls
+  # Don't specify issuerRef - this tells cert-manager to just manage the secret
+  # without trying to obtain a new certificate
+  dnsNames:
+    - calypr-demo.ddns.net
+EOF
 ```
 
 ---
