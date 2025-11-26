@@ -47,7 +47,8 @@ metadata:
     # cert-manager.io/cluster-issuer: {{ $config.tls.clusterIssuer | quote }}
     # {{- end }}
     {{- if $route.backendProtocol }}
-    # Backend protocol (e.g., HTTPS for ArgoCD, GRPC for gRPC services)
+    # Backend protocol for services using HTTPS/GRPC internally
+    # Valid values: HTTP, HTTPS, GRPC, GRPCS, AJP, FCGI
     nginx.ingress.kubernetes.io/backend-protocol: {{ $route.backendProtocol | quote }}
     {{- end }}
     {{- if $route.useRegex }}
