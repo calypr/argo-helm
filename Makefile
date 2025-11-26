@@ -12,6 +12,12 @@ S3_HOSTNAME          ?= minio.minio-system.svc.cluster.local:9000
 # Vault configuration for local development (in-cluster deployment)
 VAULT_TOKEN          ?= root
 
+# Ingress configuration - must be set for production deployments
+# ARGO_HOSTNAME: The domain name for your Argo services (e.g., argo.example.com)
+# TLS_SECRET_NAME: Name of the TLS secret for SSL certificates
+# EXTERNAL_IP: External IP address for ingress (leave empty to skip external IP assignment)
+TLS_SECRET_NAME      ?= argo-tls
+EXTERNAL_IP          ?=
 
 check-vars:
 	@echo "🔍 Checking required environment variables..."
@@ -158,34 +164,41 @@ deploy: init argo-stack docker-install ports
 ports:	
 	# manual certificate
 	# If the secret already exists, delete it first:
-	kubectl delete secret calypr-demo-tls -n argo-stack || true
+	kubectl delete secret $(TLS_SECRET_NAME) -n argo-stack || true
 	# Create the TLS secret from your certificate files
-	sudo cp /etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem /tmp/
-	sudo cp /etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem /tmp/
+	# Requires: ARGO_HOSTNAME to be set (e.g., argo.example.com)
+	# Certificate location: /etc/letsencrypt/live/${ARGO_HOSTNAME}/
+	sudo cp /etc/letsencrypt/live/$(ARGO_HOSTNAME)/fullchain.pem /tmp/
+	sudo cp /etc/letsencrypt/live/$(ARGO_HOSTNAME)/privkey.pem /tmp/
 	sudo chmod 644 /tmp/fullchain.pem /tmp/privkey.pem
-	kubectl create secret tls calypr-demo-tls -n argo-stack --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n argocd --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n argo-workflows --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n argo-events --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n calypr-api --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n calypr-tenants --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
-	kubectl create secret tls calypr-demo-tls -n default --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls $(TLS_SECRET_NAME) -n argo-stack --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls $(TLS_SECRET_NAME) -n argocd --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls $(TLS_SECRET_NAME) -n argo-workflows --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls $(TLS_SECRET_NAME) -n argo-events --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls $(TLS_SECRET_NAME) -n calypr-api --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls $(TLS_SECRET_NAME) -n calypr-tenants --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls $(TLS_SECRET_NAME) -n default --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
 	# install ingress
 	helm upgrade --install ingress-authz-overlay \
 	  helm/argo-stack/overlays/ingress-authz-overlay \
 	  --namespace argo-stack \
-	  --set ingressAuthzOverlay.host=${ARGO_HOSTNAME}
+	  --set ingressAuthzOverlay.host=$(ARGO_HOSTNAME)
 	# start nginx
 	helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 	helm repo update
 	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   	-n ingress-nginx --create-namespace \
   	--set controller.service.type=NodePort \
-	--set controller.extraArgs.default-ssl-certificate=default/calypr-demo-tls
-	kubectl create secret tls calypr-demo-tls -n ingress-nginx --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	--set controller.extraArgs.default-ssl-certificate=default/$(TLS_SECRET_NAME)
+	kubectl create secret tls $(TLS_SECRET_NAME) -n ingress-nginx --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
 	sudo rm /tmp/fullchain.pem /tmp/privkey.pem
-	# Assign external address
-	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{ "spec": { "type": "NodePort", "externalIPs": ["100.22.124.96"] } }'
+	# Assign external address (only if EXTERNAL_IP is set)
+	@if [ -n "$(EXTERNAL_IP)" ]; then \
+		echo "➡️  Assigning external IP: $(EXTERNAL_IP)"; \
+		kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{ "spec": { "type": "NodePort", "externalIPs": ["$(EXTERNAL_IP)"] } }'; \
+	else \
+		echo "⚠️  EXTERNAL_IP not set, skipping external IP assignment"; \
+	fi
 	# Solution - Use NodePort instead of LoadBalancer in kind
 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"NodePort","ports":[{"port":80,"nodePort":30080},{"port":443,"nodePort":30443}]}}'
 
