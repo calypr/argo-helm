@@ -1,0 +1,49 @@
+{{- if .Values.githubApp.enabled }}
+{{- if and .Values.githubApp.appId .Values.githubApp.installationId }}
+---
+# Repo Credentials Secret for GitHub App authentication
+# This secret grants Argo CD access to repositories via GitHub App
+# When repoCredsUrl is set, it provides access to all repos under that URL prefix
+#
+# The private key must be provided via one of:
+# 1. ExternalSecret (when vault integration is enabled)
+# 2. Manually created secret named {{ .Values.githubApp.privateKeySecretName }}
+#
+# Argo CD will look up the private key from the referenced secret.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: github-app-repo-creds
+  namespace: {{ .Values.namespaces.argocd }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: argocd
+    app.kubernetes.io/part-of: github-app-auth
+    # This label tells Argo CD this is a repo-creds secret
+    argocd.argoproj.io/secret-type: repo-creds
+  {{- with .Values.githubApp.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+type: Opaque
+stringData:
+  # Type of repository
+  type: git
+  # URL pattern that this credential applies to
+  # Example: https://github.com/your-org grants access to all repos in the org
+  {{- if .Values.githubApp.repoCredsUrl }}
+  url: {{ .Values.githubApp.repoCredsUrl | quote }}
+  {{- else }}
+  url: "https://github.com"
+  {{- end }}
+  # GitHub App ID
+  githubAppID: {{ .Values.githubApp.appId | quote }}
+  # GitHub App Installation ID
+  githubAppInstallationID: {{ .Values.githubApp.installationId | quote }}
+  # Reference to the secret containing the private key
+  # Argo CD will read the private key from this secret
+  githubAppPrivateKeySecret: {{ .Values.githubApp.privateKeySecretName | default "argocd-github-app-key" | quote }}
+{{- end }}
+{{- end }}

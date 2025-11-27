@@ -5,6 +5,10 @@
 This guide explains how to configure your GitHub repository so that every push automatically triggers an **Argo Workflow** in your Kubernetes cluster.  
 It uses the **Argo Events Bridge** (installed by the `argo-stack` Helm chart) with a **GitHub Personal Access Token (PAT)** for automatic webhook management.
 
+> **💡 Recommendation:** For production environments, consider using **GitHub App authentication** instead of PATs.
+> GitHub Apps provide short-lived tokens, better auditability, and fine-grained permissions.
+> See [GitHub App Setup Guide](github-app-setup.md) for details.
+
 ---
 
 ## 🧩 Overview

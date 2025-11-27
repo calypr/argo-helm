@@ -132,6 +132,93 @@ externalSecrets:
       #   secretKeyPath: "apps/nextflow-hello-2/s3#secretKey"
 
 # ============================================================================
+# GitHub App Authentication for Repository Access
+# ============================================================================
+# Use GitHub App for secure, auditable, least-privilege repository access.
+# This replaces Personal Access Tokens (PATs) or SSH keys with short-lived
+# installation tokens that are automatically rotated.
+#
+# See docs/github-app-setup.md for detailed setup instructions.
+
+githubApp:
+  # Enable GitHub App authentication for Argo CD repositories
+  enabled: false
+
+  # GitHub App ID (found in the GitHub App settings)
+  appId: ""
+
+  # GitHub App Installation ID (found in the installation settings)
+  installationId: ""
+
+  # Name of the Kubernetes Secret containing the GitHub App private key
+  # The secret should contain a key named 'privateKey' with the PEM-formatted key
+  privateKeySecretName: "argocd-github-app-key"
+
+  # Vault path for the GitHub App private key (when using External Secrets)
+  # Format: "path#key" where path is relative to vault.kv.defaultPathPrefix
+  privateKeyVaultPath: "argo/argocd/github-app#privateKey"
+
+  # Repository credential scope
+  # Use this to grant access to all repositories under an organization
+  # Example: "https://github.com/your-org" grants access to all repos in the org
+  repoCredsUrl: ""
+
+  # Additional annotations for the repo-creds secret
+  annotations: {}
+
+# ============================================================================
+# Argo CD Notifications - GitHub Status Integration
+# ============================================================================
+# Configure Argo CD to post deployment status updates back to GitHub.
+# This enables developers to see sync status directly in pull requests
+# and commit statuses without switching to the Argo CD UI.
+#
+# See docs/github-app-setup.md for GitHub App permissions setup.
+
+notifications:
+  # Enable Argo CD Notifications controller
+  enabled: false
+
+  # GitHub notification service configuration
+  github:
+    # Enable GitHub status updates
+    enabled: false
+
+    # Use GitHub App for notifications (recommended)
+    # When enabled, uses the same GitHub App as repository authentication
+    useGithubApp: true
+
+    # GitHub App ID (defaults to githubApp.appId if not set)
+    appId: ""
+
+    # GitHub App Installation ID (defaults to githubApp.installationId if not set)
+    installationId: ""
+
+    # Private key secret reference (defaults to githubApp.privateKeySecretName if not set)
+    privateKeySecretName: ""
+
+  # Default notification triggers
+  # These define when notifications are sent
+  triggers:
+    # Notify on successful sync
+    onSyncSucceeded: true
+    # Notify on failed sync
+    onSyncFailed: true
+    # Notify when sync is running
+    onSyncRunning: false
+    # Notify on health degraded
+    onHealthDegraded: false
+
+  # Application annotations to subscribe to notifications
+  # Add these annotations to your Argo CD Applications to enable notifications:
+  #   notifications.argoproj.io/subscribe.on-sync-succeeded.github: ""
+  #   notifications.argoproj.io/subscribe.on-sync-failed.github: ""
+  defaultSubscriptions:
+    # Automatically add notification subscriptions to applications
+    # created from repoRegistrations
+    autoSubscribe: true
+
+# ============================================================================
 # Argo Workflows and Argo CD settings
 # ============================================================================
 

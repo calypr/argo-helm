@@ -16,6 +16,7 @@ structure, development workflows, testing, and troubleshooting.
 - [Repo Registration Guide](repo-registration-guide.md) - Self-service repository onboarding
 - [Tenant Onboarding](tenant-onboarding.md) - Step-by-step tenant setup
 - [GitHub Integration Guide](github.md) - GitHub webhook and integration setup
+- [GitHub App Setup Guide](github-app-setup.md) - GitHub App authentication for Argo CD (recommended)
 
 ## 2. Operations and Administration
 - [Admin Guide](admin-guide.md) - Platform administration and operations
@@ -51,6 +52,8 @@ structure, development workflows, testing, and troubleshooting.
 **[Tenant Onboarding](tenant-onboarding.md)** - Step-by-step checklist for onboarding a new GitHub repository as a tenant.
 
 **[GitHub Integration Guide](github.md)** - GitHub webhook configuration, expected payloads, and event flow into Argo Events and Argo Workflows.
+
+**[GitHub App Setup Guide](github-app-setup.md)** - Recommended guide for configuring GitHub App authentication for Argo CD repositories, including notifications integration for deployment status updates.
 
 ### Operations and Administration
 
