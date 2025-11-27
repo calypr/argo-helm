@@ -2497,3 +2497,423 @@ Your auth-protected ingresses (`/applications`, `/registrations`, `/workflows`, 
 
 With these flags set, ingress-nginx resumes rendering the ingresses and routing works normally.
 
+
+---
+
+# 🔐 How Argo & Argo CD Use `X-Auth-Request-Groups` for Access Control
+
+## Overview
+
+When Argo CD or Argo Workflows are deployed behind an **external authentication proxy** (NGINX ingress with auth, OAuth2 proxy, custom authz-adapter, etc.), the proxy:
+This is written for engineers who need to understand or implement external authentication (OIDC, SSO, NGINX auth, authz-adapter, etc.) in front of the Argo UIs and APIs.
+
+1. Authenticates the user (OIDC/OAuth2/SAML/etc.)
+2. Injects identity headers into the HTTP request before forwarding it to the Argo service
+
+The most important of these headers:
+
+| Header                  | Meaning                                                  |
+| ----------------------- | -------------------------------------------------------- |
+| `X-Auth-Request-User`   | The authenticated username                               |
+| `X-Auth-Request-Email`  | The user’s email address                                 |
+| `X-Auth-Request-Groups` | **A comma-separated list of groups** the user belongs to |
+
+Argo and ArgoCD read these headers and map them into their own RBAC engines.
+
+---
+
+# 📘 Argo CD: How It Uses `X-Auth-Request-Groups`
+
+Argo CD supports external authentication via OIDC or proxy headers. When using an external proxy (e.g., authz-adapter or nginx `auth-url`), Argo CD uses:
+
+* `X-Auth-Request-User`
+* `X-Auth-Request-Groups`
+
+These headers are passed through the Argo CD server and interpreted by Argo CD’s RBAC engine.
+
+---
+
+## 1. Argo CD Maps Headers → “Argo User Info”
+
+Argo CD transforms:
+
+```
+X-Auth-Request-User: alice
+X-Auth-Request-Groups: team-a, workflow-admins
+```
+
+Into the internal user identity:
+
+```json
+{
+  "username": "alice",
+  "groups": ["team-a", "workflow-admins"]
+}
+```
+
+This identity is used for all permission checks.
+
+---
+
+## 2. Argo CD RBAC Is Group-Oriented
+
+Argo CD’s RBAC model allows rules like:
+
+```ini
+g, team-a, role:viewer
+g, workflow-admins, role:admin
+```
+
+If a request contains:
+
+```
+X-Auth-Request-Groups: team-a
+```
+
+Argo CD grants that user all permissions from the `viewer` role.
+
+If the header contains:
+
+```
+X-Auth-Request-Groups: team-a, workflow-admins
+```
+
+The user receives **the union** of all applicable RBAC roles.
+
+---
+
+## 3. Argo CD Uses Groups to Control:
+
+### ✔ Which Applications a user may view
+
+```ini
+p, role:team-a, applications, get, team-a/*, allow
+```
+
+### ✔ Which Projects a user may administer
+
+```ini
+p, role:workflow-admins, projects, update, *, allow
+```
+
+### ✔ Whether a user may sync, delete, or override operations
+
+```ini
+p, role:workflow-admins, applications, sync, *, allow
+```
+
+### ✔ Whether a user may view cluster resources
+
+```ini
+p, role:cluster-readers, clusters, get, *, allow
+```
+
+Argo CD does **not** do authentication; it relies on the proxy.
+Argo CD only trusts `X-Auth-Request-User` and `X-Auth-Request-Groups` to enforce authorization.
+
+---
+
+# 📘 Argo Workflows / Argo Server: How It Uses `X-Auth-Request-Groups`
+
+Argo Workflows behaves similarly, but with more Kubernetes RBAC patterns.
+
+It uses:
+
+* `X-Auth-Request-Subject` (or User)
+* `X-Auth-Request-Groups`
+
+These headers flow into Argo Server, which performs **SubjectAccessReviews** against Kubernetes RBAC.
+
+---
+
+## 1. Argo Workflows Feeds the Headers Into Kubernetes RBAC
+
+For example:
+
+```
+X-Auth-Request-User: alice
+X-Auth-Request-Groups: lab-a, workflow-operators
+```
+
+Argo Server checks:
+
+> “Is this user authorized to perform this Kubernetes action?”
+
+For example, when listing WorkflowTemplates:
+
+```
+apiVersion: authorization.k8s.io/v1
+kind: SubjectAccessReview
+spec:
+  user: "alice"
+  groups:
+    - lab-a
+    - workflow-operators
+  resourceAttributes:
+    namespace: "tenant-a"
+    verb: "get"
+    resource: "workflowtemplates"
+```
+
+The Kubernetes API server returns **“allowed: true/false”** based on RBAC.
+
+Argo Workflows itself **does not store RBAC rules**—it delegates all permission checks to Kubernetes.
+
+Groups determine which `Role` or `ClusterRole` bindings apply.
+
+---
+
+## 2. Common Permission Patterns in Argo Workflows
+
+### ✔ Limit users to a tenant namespace
+
+```
+kind: RoleBinding
+subjects:
+  - kind: Group
+    name: lab-a
+roleRef:
+  kind: Role
+  name: workflow-user
+```
+
+Then users in `lab-a` can:
+
+* Submit workflows in namespace `lab-a`
+* View workflows in namespace `lab-a`
+* Access logs in that namespace
+
+### ✔ Give operators elevated permissions
+
+```
+subjects:
+  - kind: Group
+    name: workflow-operators
+roleRef:
+  name: workflow-admin
+```
+
+### ✔ Restrict WorkflowTemplates, CronWorkflows, and WorkflowExecutions
+
+Because Argo Workflows relies entirely on Kubernetes RBAC, group membership is used for resource-level access.
+
+---
+
+# 🔄 Flow Summary
+
+## Combined Argo + Argo CD Behavior
+
+Here’s the complete picture:
+
+1. User logs in via **SSO** or your **authz-adapter**
+2. Proxy authenticates and sets:
+
+   * `X-Auth-Request-User`
+   * `X-Auth-Request-Groups`
+3. Ingress forwards headers to:
+
+   * Argo CD
+   * Argo Server (Argo Workflows)
+4. Each system interprets groups:
+
+   * Argo CD → **Matches groups to RBAC roles in argocd-rbac-cm**
+   * Argo Workflows → **Performs Kubernetes RBAC checks using groups**
+5. Access is granted or denied.
+
+---
+
+# 🎨 Visual Diagram (Mermaid)
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant AuthProxy as Authz Adapter / Ingress
+    participant ArgoCD as Argo CD
+    participant ArgoSvr as Argo Server (Workflows)
+    participant K8S as Kubernetes API
+
+    User->>AuthProxy: Login (OIDC / SSO)
+    AuthProxy->>User: Set session cookie
+    User->>AuthProxy: Request /applications or /workflows
+    AuthProxy->>ArgoCD: Forward request with X-Auth-Request headers
+    AuthProxy->>ArgoSvr: Forward request with X-Auth-Request headers
+
+    ArgoCD->>ArgoCD: Map groups → RBAC roles
+    ArgoCD->>User: Allow or Deny
+
+    ArgoSvr->>K8S: SubjectAccessReview(user, groups)
+    K8S-->>ArgoSvr: Allowed? true/false
+    ArgoSvr-->>User: Allow or Deny
+```
+
+---
+
+# 🧩 Key Takeaways
+
+### ✔ Argo CD uses groups to map into its **internal RBAC system**
+
+### ✔ Argo Workflows uses groups in **Kubernetes RBAC**
+
+### ✔ Both rely entirely on **auth proxy headers**
+
+### ✔ `X-Auth-Request-Groups` is the core of all authorization decisions
+
+### ✔ Groups = roles = project access = workflow access = namespace access
+
+---
+
+Below is the authoritative breakdown of **default groups** and **“superuser” groups** for both **Argo CD** and **Argo Workflows**.
+Argo CD and Argo Workflows behave differently:
+
+* **Argo CD** has its **own internal RBAC engine** (Casbin).
+* **Argo Workflows** uses **Kubernetes RBAC** exclusively.
+
+Because of that, the concept of “default groups” and “admin groups” differs between the two systems.
+
+---
+
+# 🟥 Argo CD — Default Groups & Admin Role
+
+## 🚫 **There are *no* built-in or default user groups in Argo CD.**
+
+Argo CD fully trusts the identity provider (OIDC, SSO, auth-proxy) to supply:
+
+* `username`
+* `groups`
+
+Argo CD does **not** define any groups internally.
+YOU define all roles and role bindings in the **argocd-rbac-cm** ConfigMap.
+
+### So what group can “do everything” in Argo CD?
+
+👉 **Only users assigned to the `role:admin` role have full access.**
+👉 But Argo CD does **not** create a default admin group.
+
+You can map any external group to the admin role, such as:
+
+```ini
+g, my-admins, role:admin
+```
+
+You can also rely on the built-in **anonymous admin** (not recommended):
+
+```ini
+policy.default: role:admin
+```
+
+But by design:
+
+### **There is no default group in Argo CD with admin privileges.
+
+You must create it.**
+
+---
+
+# 🟥 Argo Workflows — Default Groups & Admin Role
+
+## 🚫 **Argo Workflows does NOT have groups at all.**
+
+Argo Workflows uses **pure Kubernetes RBAC**:
+
+* `Role`
+* `ClusterRole`
+* `RoleBinding`
+* `ClusterRoleBinding`
+
+Argo Workflows never defines internal roles or groups.
+
+### So what “group can do everything” in Argo Workflows?
+
+👉 **Any subject bound to the Kubernetes `cluster-admin` ClusterRole.**
+
+Examples:
+
+#### 1. User with cluster-admin privileges
+
+```yaml
+subjects:
+- kind: User
+  name: alice
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+```
+
+#### 2. Group bound to cluster-admin
+
+```yaml
+subjects:
+- kind: Group
+  name: platform-admins
+roleRef:
+  kind: ClusterRole
+  name: cluster-admin
+```
+
+#### 3. ServiceAccounts in kube-system already have cluster-admin
+
+(e.g. bootstrapped by some distributions)
+
+### Summary for Argo Workflows:
+
+| What controls permissions? | Kubernetes RBAC               |
+| -------------------------- | ----------------------------- |
+| Default “admin group”?     | ❌ None                        |
+| Who can do everything?     | 👉 Members of `cluster-admin` |
+
+---
+
+# 🟦 Combined Summary Table
+
+| System             | Has Default Groups? | Superuser Role        | Who Can Do Everything?                                     |
+| ------------------ | ------------------- | --------------------- | ---------------------------------------------------------- |
+| **Argo CD**        | ❌ No                | `role:admin`          | Anyone mapped to `role:admin` via argocd-rbac-cm           |
+| **Argo Workflows** | ❌ No                | `cluster-admin` (K8s) | Anyone bound to the Kubernetes `cluster-admin` ClusterRole |
+
+---
+
+# 🟩 What Groups Do Users Usually Use?
+
+In production environments:
+
+## Argo CD
+
+Common patterns:
+
+```ini
+g, platform-admins, role:admin
+g, workflow-admins, role:admin
+g, devops-team, role:admin
+```
+
+Viewer-only:
+
+```ini
+g, data-scientists, role:readonly
+```
+
+## Argo Workflows
+
+Common Kubernetes RBAC patterns:
+
+Full admin:
+
+```yaml
+subjects:
+- kind: Group
+  name: platform-admins
+roleRef:
+  name: cluster-admin
+```
+
+Tenant-scoped “workflow user”:
+
+```yaml
+subjects:
+- kind: Group
+  name: lab-a
+roleRef:
+  name: argo-workflow-user
+```
+
+---
