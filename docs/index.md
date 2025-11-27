@@ -19,6 +19,8 @@ structure, development workflows, testing, and troubleshooting.
 
 ## 2. Operations and Administration
 - [Admin Guide](admin-guide.md) - Platform administration and operations
+- [Multi-Tenant RBAC Guide](multi-tenant-rbac-guide.md) - Access control matrix and RBAC configurations
+- [GitHub App Setup](github-app-setup.md) - GitHub App authentication for Argo CD
 - [Secrets With Vault](secrets-with-vault.md) - Complete Vault + External Secrets Operator guide
 - [Troubleshooting](troubleshooting.md) - Comprehensive troubleshooting for all components
 
@@ -55,6 +57,10 @@ structure, development workflows, testing, and troubleshooting.
 ### Operations and Administration
 
 **[Admin Guide](admin-guide.md)** - Operational guidance for platform administrators managing the Argo Stack, including deployment, monitoring, and maintenance.
+
+**[Multi-Tenant RBAC Guide](multi-tenant-rbac-guide.md)** - Unified access control matrix showing how X-Auth-Request-Groups map to Argo CD RBAC roles, Kubernetes RBAC roles, and example configurations for admin, developer, and read-only groups.
+
+**[GitHub App Setup](github-app-setup.md)** - Guide for configuring GitHub App authentication for Argo CD repositories, enabling short-lived tokens and per-repository permissions.
 
 **[Secrets With Vault](secrets-with-vault.md)** - Complete guide to managing secrets using HashiCorp Vault and External Secrets Operator, including authentication methods, secret rotation, and troubleshooting.
 
