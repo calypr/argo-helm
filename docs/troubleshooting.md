@@ -2357,5 +2357,143 @@ Then verify:
 
 ---
 
-**Document Version:** 2025-11-24  
-**Maintainer:** Platform / Data Workflow Team
+# 🛑 Engineering Note — Why Auth Snippet Ingresses Were Not Rendering in ingress-nginx
+
+## 1. How to Detect the Problem
+
+You know this issue is happening when:
+
+### **A. Ingress objects exist, but do not appear in `nginx -T`**
+
+Run:
+
+```bash
+kubectl -n ingress-nginx exec -it <controller-pod> -- nginx -T
+```
+
+If you see **only some ingresses** (e.g., `/events`) but none of your `ingress-authz-*` paths, then the controller is silently rejecting the others.
+
+### **B. NGINX serves 404 from the default backend**
+
+Logs look like:
+
+```
+[upstream-default-backend] 127.0.0.1:8181 404
+```
+
+Meaning nginx never matched your ingress rules.
+
+### **C. The controller logs warn about a “risky annotation”**
+
+This is the key signal:
+
+```
+E store.go:951] annotation group ExternalAuth contains risky annotation based on ingress configuration
+```
+
+If you see this message for an ingress, it **will not be rendered** into the nginx config.
+
+---
+
+## 2. Why It Happens
+
+Starting with **ingress-nginx 1.12+**, the controller introduces a security model where annotations are grouped by **risk level**. Certain annotations—especially those that inject raw NGINX directives—are considered **Critical**.
+
+Your ingresses use:
+
+```yaml
+nginx.ingress.kubernetes.io/auth-snippet: |
+  proxy_set_header Authorization $http_authorization;
+  ...
+```
+
+`auth-snippet` is part of the **ExternalAuth** annotation group and is classified as **Critical risk**.
+
+By default, the ingress-nginx controller only allows annotations up to **“High” risk**, so Critical annotations are rejected.
+
+When a Critical annotation is present but not allowed, the controller:
+
+* Records the warning
+  *“annotation group ExternalAuth contains risky annotation…”*
+* **Silently skips** the ingress when generating nginx.conf
+* Causing all requests to fall through to the default backend (404)
+
+This is expected behavior unless the admin explicitly opts in.
+
+---
+
+## 3. How to Fix It
+
+You must enable two configuration flags in the ingress-nginx controller:
+
+### **A. Allow snippet annotations at all**
+
+```yaml
+controller:
+  allowSnippetAnnotations: true
+```
+
+### **B. Raise the accepted risk level to allow Critical annotations**
+
+```yaml
+controller:
+  config:
+    annotations-risk-level: Critical
+```
+
+Place these in your Helm values (e.g., `values-ingress-nginx.yaml`):
+
+```yaml
+controller:
+  allowSnippetAnnotations: true
+  config:
+    annotations-risk-level: Critical
+```
+
+Then upgrade:
+
+```bash
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
+  -n ingress-nginx \
+  -f values-ingress-nginx.yaml
+```
+
+### **Confirm the fix**
+
+1. Check controller ConfigMap:
+
+```bash
+kubectl -n ingress-nginx get configmap ingress-nginx-controller -o yaml \
+  | grep -E 'allow-snippet|annotations-risk-level'
+```
+
+You should see:
+
+```
+allow-snippet-annotations: "true"
+annotations-risk-level: Critical
+```
+
+2. Re-run nginx config dump:
+
+```bash
+kubectl -n ingress-nginx exec -it <pod> -- nginx -T
+```
+
+Your auth-protected ingresses (`/applications`, `/registrations`, `/workflows`, etc.) will now appear.
+
+3. Requests stop hitting `[upstream-default-backend]` and begin routing correctly.
+
+---
+
+## Summary
+
+| Issue             | Description                                                                 |
+| ----------------- | --------------------------------------------------------------------------- |
+| **Symptom**       | Ingress exists but never routes, nginx returns 404/default backend          |
+| **Log indicator** | `annotation group ExternalAuth contains risky annotation`                   |
+| **Cause**         | `auth-snippet` is a Critical-risk annotation rejected by default            |
+| **Fix**           | Enable `allowSnippetAnnotations` and set `annotations-risk-level: Critical` |
+
+With these flags set, ingress-nginx resumes rendering the ingresses and routing works normally.
+
