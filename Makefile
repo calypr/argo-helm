@@ -149,7 +149,7 @@ argo-stack:
 	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
 	envsubst < my-values.yaml | helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
-		--wait --atomic \
+		--wait --atomic --timeout 10m0s \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
 		--set-string events.github.webhook.url=https://${ARGO_HOSTNAME}/registrations\
 		--set-string s3.enabled=${S3_ENABLED} \
@@ -162,7 +162,7 @@ argo-stack:
 		--set-string ingress.argocd.host=${ARGO_HOSTNAME} \
 		-f -
 
-deploy: init argo-stack docker-install ports
+deploy: init docker-install argo-stack ports
 ports:	
 	# manual certificate
 	# If the secret already exists, delete it first:
@@ -449,4 +449,9 @@ docker-install:
 	docker build -t nextflow-runner:latest -f nextflow-runner/Dockerfile .
 	kind load docker-image nextflow-runner:latest --name kind
 	docker exec -it kind-control-plane crictl images | grep nextflow-runner
+	@echo "✅ loaded docker nextflow-runner"
+	cd authz-adapter ; docker build -t authz-adapter:v0.0.1 -f Dockerfile .
+	kind load docker-image authz-adapter:v0.0.1 --name kind
+	docker exec -it kind-control-plane crictl images | grep authz-adapter
+	@echo "✅ loaded docker authz-adapter"
 
