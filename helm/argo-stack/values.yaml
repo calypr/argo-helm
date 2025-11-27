@@ -181,6 +181,11 @@ authzAdapter:
   replicas: 2
   # Ensure adapter uses security namespace
   namespace: security
+  # Debug mode settings (for development/testing only)
+  # When debugEmail is set, enables debug mode and allows debug_email/debug_groups query params
+  debugEmail: null
+  # Comma-separated list of groups to assign to the debug user
+  debugGroups: null
 
 # ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )

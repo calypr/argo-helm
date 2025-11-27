@@ -450,6 +450,146 @@ To test with different `repoRegistrations` configurations:
 2. Modify test setup to use the new file
 3. Adjust expected counts and values accordingly
 
+## Authz-Adapter Testing
+
+The authz-adapter is a Flask-based authorization service that validates user access. It has its own comprehensive test suite located in `authz-adapter/tests/`.
+
+### Test Structure
+
+```
+authz-adapter/
+├── app.py                    # Main Flask application
+├── Makefile                  # Test commands
+├── pytest.ini                # Pytest configuration
+├── requirements.txt          # Runtime dependencies
+├── requirements-dev.txt      # Development/test dependencies
+└── tests/
+    ├── __init__.py
+    ├── conftest.py           # Shared fixtures
+    ├── test_app.py           # Main application tests
+    ├── test_groups.py        # Group authorization tests
+    ├── test_integration.py   # Integration tests
+    └── test_performance.py   # Performance tests
+```
+
+### Running Authz-Adapter Tests
+
+From the `authz-adapter/` directory:
+
+```bash
+# Install dependencies and run all tests with coverage
+make test
+
+# Run only unit tests
+make test-unit
+
+# Run with coverage report
+make test-coverage
+
+# Clean up test artifacts
+make clean
+```
+
+### Test Classes
+
+#### TestAppBasic
+Basic Flask application tests:
+- App creation verification
+- Health check endpoint (`/healthz`)
+- Missing authorization header handling
+
+#### TestFetchUserDoc
+Tests for fetching user documents from Fence:
+- Bearer token validation
+- Service token fallback
+- Non-200 response handling
+- Timeout and connection error handling
+- Invalid JSON response handling
+
+#### TestCheckEndpoint
+Tests for the `/check` authorization endpoint:
+- Valid user authorization
+- Invalid/inactive user handling
+- Response header validation
+
+#### TestGetDebuggingVars
+Tests for the `get_debugging_vars()` function that supports debug mode:
+
+| Test | Description |
+|------|-------------|
+| `test_get_debugging_vars_returns_none_when_no_debug_email` | Returns `(None, None)` when `DEBUG_EMAIL` env is not set |
+| `test_get_debugging_vars_with_debug_email_env_only` | Works with only `DEBUG_EMAIL` env var set |
+| `test_get_debugging_vars_with_debug_email_and_groups_env` | Works with both `DEBUG_EMAIL` and `DEBUG_GROUPS` env vars |
+| `test_get_debugging_vars_query_params_override_env` | Query params override env vars when `DEBUG_EMAIL` is set |
+| `test_get_debugging_vars_query_email_only` | Query param `debug_email` works with env `DEBUG_EMAIL` |
+| `test_get_debugging_vars_query_groups_with_env_email` | Query param `debug_groups` works with env `DEBUG_EMAIL` |
+| `test_get_debugging_vars_single_group` | Single group parsing works correctly |
+| `test_get_debugging_vars_query_params_ignored_without_debug_email_env` | Query params are ignored without `DEBUG_EMAIL` env (security gate) |
+
+#### TestCheckWithDebuggingVars
+Tests for `/check` endpoint behavior with debug variables:
+
+| Test | Description |
+|------|-------------|
+| `test_check_bypasses_auth_with_debug_email_and_groups` | Auth is bypassed when both `DEBUG_EMAIL` and `DEBUG_GROUPS` are set |
+| `test_check_falls_back_to_auth_when_only_debug_email_set` | Falls back to real auth when only `DEBUG_EMAIL` is set (no groups) |
+| `test_check_with_debug_query_params` | Query params `debug_email` and `debug_groups` work correctly |
+| `test_check_with_debug_groups_override_in_query` | Query `debug_groups` overrides env `DEBUG_GROUPS` |
+| `test_check_query_params_ignored_without_debug_email_env` | Query params ignored without `DEBUG_EMAIL` env (security) |
+| `test_check_without_auth_fails_when_debug_incomplete` | Returns 401 when debug vars incomplete and no auth provided |
+| `test_check_with_empty_debug_groups` | Empty `DEBUG_GROUPS` falls back to real auth |
+
+### Debug Mode Environment Variables
+
+The authz-adapter supports debug mode for testing purposes:
+
+| Variable | Description |
+|----------|-------------|
+| `DEBUG_EMAIL` | When set, enables debug mode and allows `debug_email`/`debug_groups` query params |
+| `DEBUG_GROUPS` | Comma-separated list of groups to assign to the debug user |
+
+**Query Parameters** (only work when `DEBUG_EMAIL` env is set):
+
+| Parameter | Description |
+|-----------|-------------|
+| `debug_email` | Override the debug email address |
+| `debug_groups` | Override the debug groups (comma-separated) |
+
+**Example: Bypass auth for testing**
+
+```bash
+# Set environment variables
+export DEBUG_EMAIL="test@example.com"
+export DEBUG_GROUPS="argo-runner,argo-viewer"
+
+# Start the authz-adapter
+python app.py
+
+# Test /check endpoint without Authorization header
+curl http://localhost:8080/check
+# Returns 200 with X-Auth-Request-Groups: argo-runner,argo-viewer
+```
+
+**Example: Use query params to override**
+
+```bash
+# With DEBUG_EMAIL env set, use query params
+curl "http://localhost:8080/check?debug_email=other@example.com&debug_groups=argo-admin"
+# Returns 200 with:
+#   X-Auth-Request-Email: other@example.com
+#   X-Auth-Request-Groups: argo-admin
+```
+
+### Test Coverage
+
+The authz-adapter test suite maintains >80% code coverage. Run the following command to see the current coverage report:
+
+```bash
+# Run tests with coverage report
+cd authz-adapter
+make test-coverage
+```
+
 ## Related Documentation
 
 - [RepoRegistration User Guide](repo-registration-guide.md) - How to use repoRegistrations
@@ -458,12 +598,20 @@ To test with different `repoRegistrations` configurations:
 
 ## Summary
 
-The test suite provides comprehensive validation of Helm template rendering for the `repoRegistrations` feature. It ensures that:
+The test suites provide comprehensive validation for both Helm template rendering and authz-adapter functionality:
 
+**Helm Template Tests** (`tests/`):
 - ✅ All expected Kubernetes resources are generated
 - ✅ Resource names and labels are correct
 - ✅ Configurations match input values
 - ✅ S3 bucket settings are properly templated
 - ✅ GitHub webhooks are configured correctly
 
-Run the tests regularly during development to catch template errors early and maintain high quality standards for the chart.
+**Authz-Adapter Tests** (`authz-adapter/tests/`):
+- ✅ Authorization flow with Fence integration
+- ✅ Debug mode for testing without Fence
+- ✅ Query param and env var precedence
+- ✅ Error handling for various failure scenarios
+- ✅ Performance and resource usage validation
+
+Run the tests regularly during development to catch errors early and maintain high quality standards.
