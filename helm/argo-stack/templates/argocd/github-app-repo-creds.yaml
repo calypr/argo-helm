@@ -1,0 +1,46 @@
+{{- if .Values.githubApp.enabled }}
+{{- if .Values.githubApp.repoCreds.enabled }}
+{{- /* Only render this Secret if ExternalSecrets is NOT being used for GitHub App */}}
+{{- $useExternalSecret := and .Values.externalSecrets.enabled .Values.githubApp.privateKey.externalSecrets.enabled (not .Values.githubApp.privateKey.existingSecretName) }}
+{{- if not $useExternalSecret }}
+{{- $secretName := .Values.githubApp.repoCreds.secretName | default "argocd-github-app-repo-creds" }}
+---
+# GitHub App Repository Credentials for Argo CD
+# This secret enables GitHub App authentication for all repositories under the specified URL prefix.
+# See: https://argo-cd.readthedocs.io/en/stable/user-guide/private-repositories/#github-app-credentials
+#
+# NOTE: This template is only rendered when NOT using External Secrets.
+# When External Secrets is enabled, the secret is created by externalsecret-github-app.yaml instead.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: {{ $secretName }}
+  namespace: {{ .Values.namespaces.argocd | default "argocd" }}
+  labels:
+    app.kubernetes.io/name: github-app-repo-creds
+    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/component: argocd
+    argocd.argoproj.io/secret-type: repo-creds
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+type: Opaque
+stringData:
+  # Repository URL prefix (e.g., https://github.com/your-org)
+  url: {{ .Values.githubApp.repoCreds.url | quote }}
+  # Git repository type
+  type: "git"
+  # GitHub App authentication fields
+  {{- if .Values.githubApp.appId }}
+  githubAppID: {{ .Values.githubApp.appId | quote }}
+  {{- end }}
+  {{- if .Values.githubApp.installationId }}
+  githubAppInstallationID: {{ .Values.githubApp.installationId | quote }}
+  {{- end }}
+  # NOTE: When using this template (without External Secrets), the private key
+  # must be provided via --set-file or by referencing an existing secret.
+  # For production use, External Secrets with Vault is recommended.
+{{- end }}
+{{- end }}
+{{- end }}

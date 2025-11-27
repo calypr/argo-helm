@@ -172,6 +172,68 @@ argo-cd:
       # server.secretkey: "<?= replace with output of: openssl rand -hex 32 ?>"
 
 # ============================================================================
+# GitHub App Authentication for Argo CD
+# ============================================================================
+# Use GitHub App instead of PAT/SSH for secure, auditable repository access.
+# This enables short-lived installation tokens and per-repository permissions.
+#
+# Benefits:
+# - No long-lived PATs or SSH keys
+# - Per-repository installation control via GitHub UI
+# - Automatic token rotation (60-minute tokens)
+# - Auditable access logs
+# - Multi-tenant support with separate app installations
+#
+# See docs/github-app-setup.md for complete setup instructions.
+
+githubApp:
+  # Enable GitHub App authentication for Argo CD repositories
+  enabled: false
+  
+  # GitHub App ID (from GitHub App settings page)
+  # Required when enabled=true
+  appId: ""
+  
+  # GitHub App Installation ID (from organization/repo App installation)
+  # Required when enabled=true
+  installationId: ""
+  
+  # Secret configuration for the GitHub App private key
+  privateKey:
+    # Option 1: Reference an existing Kubernetes Secret
+    # Use this when you've created the secret manually or via external-secrets
+    existingSecretName: ""
+    existingSecretKey: "privateKey"
+    
+    # Option 2: Use External Secrets to fetch from Vault
+    # Only used when externalSecrets.enabled=true and existingSecretName is empty
+    externalSecrets:
+      # Enable External Secrets integration for GitHub App credentials
+      enabled: true
+      # Path in Vault (relative to externalSecrets.vault.kv.defaultPathPrefix)
+      # Expected keys: appId, installationId, privateKey
+      path: "argo/argocd/github-app"
+  
+  # Repository credentials template
+  # When enabled, creates a repo-creds secret that applies to all repos under the URL
+  repoCreds:
+    # Enable automatic repo-creds creation
+    enabled: true
+    # URL prefix for repositories using this GitHub App
+    # Example: "https://github.com/your-org" applies to all repos in that org
+    url: ""
+    # Secret name for the repo-creds
+    secretName: "argocd-github-app-repo-creds"
+  
+  # Individual repository configurations (optional)
+  # Use this to configure specific repositories with different settings
+  # Most users should use repoCreds instead for org-wide access
+  repositories: []
+    # Example:
+    # - name: "my-repo"
+    #   url: "https://github.com/my-org/my-repo"
+
+# ============================================================================
 # Authorization Adapter Settings (Arborist Integration)
 # ============================================================================
 
