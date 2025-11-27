@@ -205,7 +205,12 @@ githubApp:
     existingSecretName: ""
     existingSecretKey: "privateKey"
     
-    # Option 2: Use External Secrets to fetch from Vault
+    # Option 2: Provide the private key value directly (for non-ESO deployments)
+    # WARNING: Do not commit secrets to Git! Use --set-file at deploy time:
+    #   helm upgrade --set-file 'githubApp.privateKey.value=/path/to/key.pem' ...
+    value: ""
+    
+    # Option 3: Use External Secrets to fetch from Vault (recommended)
     # Only used when externalSecrets.enabled=true and existingSecretName is empty
     externalSecrets:
       # Enable External Secrets integration for GitHub App credentials

@@ -15,6 +15,8 @@ import shutil
 from pathlib import Path
 from typing import List, Dict, Any
 
+import pytest
+
 
 class TestGitHubAppRendering:
     """Test suite for GitHub App template rendering."""
@@ -202,6 +204,8 @@ class TestGitHubAppRendering:
         assert string_data['type'] == 'git', "Incorrect type"
         assert string_data['githubAppID'] == '123456', "Incorrect appId"
         assert string_data['githubAppInstallationID'] == '12345678', "Incorrect installationId"
+        # Verify private key field exists (even if empty when not provided)
+        assert 'githubAppPrivateKey' in string_data, "Missing githubAppPrivateKey field"
         
         print("✅ GitHub App Secret created correctly (without ESO)")
 
@@ -284,8 +288,6 @@ class TestGitHubAppRendering:
 
 def main():
     """Run all tests and report results."""
-    import pytest
-    
     exit_code = pytest.main([
         __file__,
         '-v',

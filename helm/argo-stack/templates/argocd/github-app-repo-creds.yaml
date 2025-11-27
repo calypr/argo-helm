@@ -11,6 +11,10 @@
 #
 # NOTE: This template is only rendered when NOT using External Secrets.
 # When External Secrets is enabled, the secret is created by externalsecret-github-app.yaml instead.
+#
+# IMPORTANT: The private key must be provided at deploy time using:
+#   --set-file 'githubApp.privateKey.value=/path/to/private-key.pem'
+# For production use, External Secrets with Vault is recommended.
 apiVersion: v1
 kind: Secret
 metadata:
@@ -38,9 +42,15 @@ stringData:
   {{- if .Values.githubApp.installationId }}
   githubAppInstallationID: {{ .Values.githubApp.installationId | quote }}
   {{- end }}
-  # NOTE: When using this template (without External Secrets), the private key
-  # must be provided via --set-file or by referencing an existing secret.
-  # For production use, External Secrets with Vault is recommended.
+  # GitHub App Private Key (PEM format)
+  # Must be provided via --set-file 'githubApp.privateKey.value=/path/to/key.pem'
+  {{- if .Values.githubApp.privateKey.value }}
+  githubAppPrivateKey: {{ .Values.githubApp.privateKey.value | quote }}
+  {{- else }}
+  # WARNING: Private key not provided. This secret will not work until the key is set.
+  # Use: helm upgrade --set-file 'githubApp.privateKey.value=/path/to/private-key.pem' ...
+  githubAppPrivateKey: ""
+  {{- end }}
 {{- end }}
 {{- end }}
 {{- end }}
