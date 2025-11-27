@@ -140,23 +140,9 @@ data:
       triggers:
         - on-health-degraded
     {{- end }}
-{{- /*
-Note: The argocd-notifications-secret is NOT created by this template.
-The GitHub App private key is managed by the ExternalSecret (externalsecret-github-app.yaml)
-which creates the secret {{ .Values.githubApp.privateKeySecretName }}.
-
-The notifications controller will read the private key from that secret.
-The ConfigMap above references it via $github-privateKey which maps to the 
-'github-privateKey' key in argocd-notifications-secret.
-
-To use GitHub App notifications, you need to either:
-1. Create argocd-notifications-secret manually with github-privateKey
-2. Or configure the notifications controller to read from the GitHub App secret
-
-For production, we recommend copying the private key from the GitHub App secret:
-  kubectl get secret {{ .Values.githubApp.privateKeySecretName }} -n {{ .Values.namespaces.argocd }} -o jsonpath='{.data.privateKey}' | \
-    kubectl create secret generic argocd-notifications-secret -n {{ .Values.namespaces.argocd }} \
-      --from-literal=github-privateKey="$(base64 -d)"
+{{- /* 
+  Note: The argocd-notifications-secret is created by externalsecret-notifications.yaml 
+  when vault integration is enabled. For manual setup, see docs/github-app-setup.md 
 */ -}}
 {{- end }}
 {{- end }}

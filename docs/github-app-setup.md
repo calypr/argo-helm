@@ -178,7 +178,7 @@ helm upgrade --install argo-stack helm/argo-stack \
 ### Check the repo-creds Secret
 
 ```bash
-kubectl get secret github-app-repo-creds-with-key -n argocd -o yaml
+kubectl get secret github-app-repo-creds -n argocd -o yaml
 ```
 
 ### Test Repository Connection
