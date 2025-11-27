@@ -10,6 +10,7 @@
 #     --set ingressAuthzOverlay.enabled=true
 # ============================================================================
 
+
 ingressAuthzOverlay:
   # Enable or disable the overlay
   enabled: true
@@ -102,7 +103,7 @@ ingressAuthzOverlay:
       # Only the primary route gets the cert-manager.io/cluster-issuer annotation
       primary: true
       # Namespace where the ingress will be created
-      namespace: argo-stack
+      namespace: argo-workflows
       # Service name to route to
       service: argo-stack-argo-workflows-server
       # Namespace where the actual service exists (for cross-namespace routing)
@@ -118,7 +119,7 @@ ingressAuthzOverlay:
     # Argo CD Applications UI
     applications:
       enabled: true
-      namespace: argo-stack
+      namespace: argocd
       service: argo-stack-argocd-server
       # ArgoCD server is in argocd namespace
       serviceNamespace: argocd
@@ -126,11 +127,13 @@ ingressAuthzOverlay:
       pathPrefix: /applications
       useRegex: true
       rewriteTarget: /$2
+      # ArgoCD server uses HTTPS by default
+      backendProtocol: HTTPS
 
     # GitHub Repository Registrations EventSource
     registrations:
       enabled: true
-      namespace: argo-stack
+      namespace: argo-events
       service: github-repo-registrations-eventsource-svc
       # EventSource is in argo-events namespace
       serviceNamespace: argo-events

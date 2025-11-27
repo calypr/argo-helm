@@ -8,7 +8,8 @@ in its original namespace. This enables NGINX Ingress to route traffic correctly
 {{- $root := . }}
 {{- $config := .Values.ingressAuthzOverlay }}
 {{- range $routeName, $route := $config.routes }}
-{{- if $route.enabled }}
+{{- $routeEnabled := $route.enabled | default true }}
+{{- if $routeEnabled }}
 {{- $serviceNamespace := $route.serviceNamespace | default $route.namespace }}
 {{- if ne $route.namespace $serviceNamespace }}
 ---

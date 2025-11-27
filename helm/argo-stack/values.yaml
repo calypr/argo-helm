@@ -241,6 +241,8 @@ ingressAuthzOverlay:
       service: argo-stack-argocd-server
       port: 8080
       pathPrefix: /applications
+      # ArgoCD server uses HTTPS by default
+      backendProtocol: HTTPS
     registrations:
       namespace: argo-stack
       service: github-repo-registrations-eventsource-svc

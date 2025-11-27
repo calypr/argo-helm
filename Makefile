@@ -171,7 +171,13 @@ ports:
 	sudo cp /etc/letsencrypt/live/calypr-demo.ddns.net/fullchain.pem /tmp/
 	sudo cp /etc/letsencrypt/live/calypr-demo.ddns.net/privkey.pem /tmp/
 	sudo chmod 644 /tmp/fullchain.pem /tmp/privkey.pem
-	kubectl create secret tls ${TLS_SECRET_NAME}  -n default --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME}  -n default        --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME}  -n argocd         --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME}  -n argo-workflows --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME}  -n argo-events    --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME}  -n argo-stack     --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME}  -n calypr-api     --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
+	kubectl create secret tls ${TLS_SECRET_NAME}  -n calypr-tenants --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
 	sudo rm /tmp/fullchain.pem /tmp/privkey.pem
 	# install ingress
 	helm upgrade --install ingress-authz-overlay \
@@ -184,14 +190,16 @@ ports:
 	helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx \
   	-n ingress-nginx --create-namespace \
   	--set controller.service.type=NodePort \
-	--set controller.extraArgs.default-ssl-certificate=default/${TLS_SECRET_NAME} 
+	--set controller.extraArgs.default-ssl-certificate=default/${TLS_SECRET_NAME} \
+	--set controller.watchIngressWithoutClass=true \
+	-f helm/argo-stack/overlays/ingress-authz-overlay/values-ingress-nginx.yaml
 	# Assign external address (only if PUBLIC_IP is set)
-	@if [ -n "${PUBLIC_IP}" ]; then \
-		echo "➡️  Assigning external IP: ${PUBLIC_IP}"; \
-		kubectl patch svc ingress-nginx-controller -n ingress-nginx -p "{\"spec\": {\"type\": \"NodePort\", \"externalIPs\": [\"${PUBLIC_IP}\"]}}"; \
-	else \
-		echo "⚠️  PUBLIC_IP not set, skipping external IP assignment"; \
-	fi
+	# @if [ -n "${PUBLIC_IP}" ]; then \
+	# 	echo "➡️  Assigning external IP: ${PUBLIC_IP}"; \
+	# 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p "{\"spec\": {\"type\": \"NodePort\", \"externalIPs\": [\"${PUBLIC_IP}\"]}}"; \
+	# else \
+	# 	echo "⚠️  PUBLIC_IP not set, skipping external IP assignment"; \
+	# fi
 	# Solution - Use NodePort instead of LoadBalancer in kind
 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"NodePort","ports":[{"port":80,"nodePort":30080},{"port":443,"nodePort":30443}]}}'
 

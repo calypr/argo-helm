@@ -117,6 +117,40 @@ ingressAuthzOverlay:
     clusterIssuer: letsencrypt-prod
 ```
 
+### Route Configuration Options
+
+Each route supports the following options:
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `enabled` | Enable/disable this route | `true` |
+| `namespace` | Namespace where the ingress is created | Required |
+| `service` | Backend service name | Required |
+| `serviceNamespace` | Namespace of the actual service (for cross-namespace routing) | Same as `namespace` |
+| `port` | Backend service port | Required |
+| `pathPrefix` | URL path prefix for this route | Required |
+| `useRegex` | Enable regex path matching | `false` |
+| `rewriteTarget` | Path rewrite target (when `useRegex` is true) | `/$2` |
+| `backendProtocol` | Backend protocol (`HTTP`, `HTTPS`, `GRPC`, `GRPCS`) | `HTTP` |
+| `proxyConnectTimeout` | NGINX proxy connect timeout | - |
+| `proxyReadTimeout` | NGINX proxy read timeout | - |
+| `proxySendTimeout` | NGINX proxy send timeout | - |
+
+### Backend Protocol
+
+Some services use HTTPS or gRPC internally. Use the `backendProtocol` option to specify the correct protocol:
+
+```yaml
+ingressAuthzOverlay:
+  routes:
+    applications:
+      # ArgoCD server uses HTTPS by default
+      backendProtocol: HTTPS
+    grpc-service:
+      # For gRPC services
+      backendProtocol: GRPC
+```
+
 ## Documentation
 
 - [User Guide](docs/authz-ingress-user-guide.md) - Complete installation and configuration guide
