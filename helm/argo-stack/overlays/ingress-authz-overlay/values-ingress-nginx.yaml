@@ -1,0 +1,4 @@
+controller:
+  config:
+    allow-snippet-annotations: "true"
+    annotations-risk-level: Critical   # allow Critical-risk annotations like auth-snippet    

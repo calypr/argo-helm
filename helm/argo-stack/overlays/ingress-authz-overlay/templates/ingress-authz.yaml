@@ -70,7 +70,7 @@ metadata:
     nginx.ingress.kubernetes.io/proxy-send-timeout: {{ $route.proxySendTimeout | quote }}
     {{- end }}
 spec:
-  ingressClassName: {{ $config.ingressClassName | default "nginx" | quote }}
+  ingressClassName: "nginx"
   {{- if $config.tls.enabled }}
   tls:
     - hosts:
