@@ -306,18 +306,18 @@ vault-seed:
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/events/github \
 		token="$(GITHUB_PAT)" 
 	@echo "➡️  Creating per-app S3 credentials..."
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello/s3 \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-project/s3 \
 		accessKey="minioadmin" \
 		secretKey="minioadmin"
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-2/s3 \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-2/s3 \
 		accessKey="app2-access-key" \
 		secretKey="app2-secret-key"
 	@echo "➡️  Seeding Vault with secrets from my-values.yaml repoRegistrations..."
 	@# nextflow-hello-project GitHub credentials
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-project/github \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-project/github \
 		token="$(GITHUB_PAT)"
 	@# nextflow-hello-project S3 artifact credentials
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-project/s3/artifacts \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-project/s3/artifacts \
 		AWS_ACCESS_KEY_ID="minioadmin" \
 		AWS_SECRET_ACCESS_KEY="minioadmin"
 	@# genomics-variant-calling GitHub credentials
@@ -354,8 +354,8 @@ vault-seed:
 	@echo "   kv/argo/authz                                   - AuthZ adapter OIDC secret"
 	@echo "   kv/argo/events/github                           - GitHub webhook token"
 	@echo "   kv/argo/apps/*/s3                               - Per-app S3 credentials (legacy)"
-	@echo "   kv/argo/apps/nextflow-hello-project/github      - nextflow-hello-project GitHub token"
-	@echo "   kv/argo/apps/nextflow-hello-project/s3/artifacts - nextflow-hello-project S3 credentials"
+	@echo "   kv/argo/apps/bwalsh/nextflow-hello-project/github      - nextflow-hello-project GitHub token"
+	@echo "   kv/argo/apps/bwalsh/nextflow-hello-project/s3/artifacts - nextflow-hello-project S3 credentials"
 	@echo "   kv/argo/apps/genomics/github                    - genomics-variant-calling GitHub token"
 	@echo "   kv/argo/apps/genomics/s3/artifacts              - genomics-variant-calling S3 artifact credentials"
 	@echo "   kv/argo/apps/genomics/s3/data                   - genomics-variant-calling S3 data credentials"
