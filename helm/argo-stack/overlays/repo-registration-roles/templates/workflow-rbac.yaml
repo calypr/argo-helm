@@ -1,0 +1,79 @@
+{{- $wfPrefix := .Values.workflowNamespacePrefix -}}
+{{- $adminGroup := .Values.adminGroup -}}
+{{- range $r := .Values.repoRegistrations }}
+{{- $repoUrl := required "repoRegistrations[].repoUrl is required" $r.repoUrl }}
+{{- $trimmed := $repoUrl | trimPrefix "https://github.com/" | trimSuffix ".git" }}
+{{- $parts := splitList "/" $trimmed }}
+{{- $org := index $parts 0 }}
+{{- $repo := index $parts 1 }}
+{{- $ns := printf "%s%s-%s" $wfPrefix $org $repo }}
+{{- $writerGroup := printf "wf-%s-%s-writers" $org $repo }}
+{{- $readerGroup := printf "wf-%s-%s-readers" $org $repo }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wf-{{ $org }}-{{ $repo }}-writer
+  namespace: {{ $ns }}
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows", "workflowtemplates", "cronworkflows"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wf-{{ $org }}-{{ $repo }}-reader
+  namespace: {{ $ns }}
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["workflows", "workflowtemplates", "cronworkflows"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["pods", "pods/log"]
+    verbs: ["get", "list", "watch"]
+  - apiGroups: [""]
+    resources: ["configmaps", "secrets"]
+    verbs: ["get", "list", "watch"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wf-{{ $org }}-{{ $repo }}-writer-binding
+  namespace: {{ $ns }}
+subjects:
+  - kind: Group
+    name: {{ $writerGroup }}
+    apiGroup: rbac.authorization.k8s.io
+  - kind: Group
+    name: {{ $adminGroup }}
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wf-{{ $org }}-{{ $repo }}-writer
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wf-{{ $org }}-{{ $repo }}-reader-binding
+  namespace: {{ $ns }}
+subjects:
+  - kind: Group
+    name: {{ $readerGroup }}
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wf-{{ $org }}-{{ $repo }}-reader
+{{- end }}
