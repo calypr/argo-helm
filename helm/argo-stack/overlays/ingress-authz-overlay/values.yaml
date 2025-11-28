@@ -128,7 +128,7 @@ ingressAuthzOverlay:
       useRegex: true
       rewriteTarget: /$2
       # ArgoCD server uses HTTPS by default
-      backendProtocol: HTTPS
+      # backendProtocol: HTTPS
 
     # GitHub Repository Registrations EventSource
     registrations:

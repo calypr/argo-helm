@@ -143,6 +143,8 @@ argo-workflows:
     namespaced: true
     extraArgs:
       - --auth-mode=server
+    # UI/API lives under /workflows
+    baseHref: "/workflows/"
   controller:
     workflowNamespaces:
       - argo-workflows
@@ -165,11 +167,22 @@ argo-cd:
     secret:
       create: true
       # provide a strong random key (hex or base64 is fine)
-      extra: {}  # MUST be a map, not a string/boolean
+      extra: # MUST be a map, not a string/boolean
+        # any sufficiently random string; 32+ chars is nice
+        server.secretkey: "some-long-random-string-change-me"
       # Never commit your real token in a Git repo. instead, override it at deploy time using:
       # export ARGO_CD_SECRET=replace with output of: openssl rand -hex 32
       # helm upgrade --install ... argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}"
       # server.secretkey: "<?= replace with output of: openssl rand -hex 32 ?>"
+    cm:
+      # External URL including the sub-path
+      url: https://calypr-demo.ddns.net/applications
+    params:
+      # Argo CD is behind ingress that terminates TLS
+      server.insecure: true
+      # Tell ArgoCD UI/API it’s under /applications
+      server.basehref: "/applications"
+      # server.rootpath: "/applications"
 
 # ============================================================================
 # Authorization Adapter Settings (Arborist Integration)
@@ -250,7 +263,7 @@ ingressAuthzOverlay:
       port: 8080
       pathPrefix: /applications
       # ArgoCD server uses HTTPS by default
-      backendProtocol: HTTPS
+      backendProtocol: HTTPS      
     registrations:
       namespace: argo-stack
       service: github-repo-registrations-eventsource-svc

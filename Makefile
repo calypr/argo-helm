@@ -193,13 +193,6 @@ ports:
 	--set controller.extraArgs.default-ssl-certificate=default/${TLS_SECRET_NAME} \
 	--set controller.watchIngressWithoutClass=true \
 	-f helm/argo-stack/overlays/ingress-authz-overlay/values-ingress-nginx.yaml
-	# Assign external address (only if PUBLIC_IP is set)
-	# @if [ -n "${PUBLIC_IP}" ]; then \
-	# 	echo "➡️  Assigning external IP: ${PUBLIC_IP}"; \
-	# 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p "{\"spec\": {\"type\": \"NodePort\", \"externalIPs\": [\"${PUBLIC_IP}\"]}}"; \
-	# else \
-	# 	echo "⚠️  PUBLIC_IP not set, skipping external IP assignment"; \
-	# fi
 	# Solution - Use NodePort instead of LoadBalancer in kind
 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"NodePort","ports":[{"port":80,"nodePort":30080},{"port":443,"nodePort":30443}]}}'
 
