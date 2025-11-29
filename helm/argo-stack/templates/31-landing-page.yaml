@@ -55,9 +55,9 @@ data:
                             content.innerHTML = DOMPurify.sanitize(html);
                             return;
                         }
-                    } catch (e) {}
+                    } catch (e) { /* Try next file */ }
                 }
-                content.innerHTML = '<div class="error">No content available. Please add an index.md or README.md file.</div>';
+                content.innerHTML = '<div class="error">No content available. Please add an index.md or README.md file to the docs directory.</div>';
             }
             loadMarkdown();
         </script>
@@ -68,12 +68,17 @@ data:
         listen 80;
         server_name localhost;
         root /usr/share/nginx/html;
+        add_header X-Content-Type-Options nosniff;
+        add_header X-Frame-Options DENY;
         location / {
             try_files $uri $uri/ /index.html;
         }
         location /docs/ {
             alias /docs/;
             autoindex off;
+            location ~ \.(md|png|jpg|jpeg|gif|svg)$ {
+                add_header X-Content-Type-Options nosniff;
+            }
         }
         location /healthz {
             access_log off;
