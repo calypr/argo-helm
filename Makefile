@@ -160,6 +160,7 @@ argo-stack:
 		--set-string s3.hostname=${S3_HOSTNAME} \
 		--set-string ingress.argoWorkflows.host=${ARGO_HOSTNAME} \
 		--set-string ingress.argocd.host=${ARGO_HOSTNAME} \
+		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
 deploy: init docker-install argo-stack ports
