@@ -228,6 +228,7 @@ landingPage:
   title: "Welcome"
   # Host path to mount for markdown content (optional)
   # If not set, shows a default "no content available" message
+  # SECURITY: Only expose a dedicated docs directory, not sensitive host paths
   # Example: "/var/www/docs"
   docsPath: ""
 
