@@ -216,6 +216,22 @@ authzAdapter:
   debugGroups: wf-admins
 
 # ============================================================================
+# Landing Page Configuration
+# ============================================================================
+# A simple static landing page that renders markdown files at the root path (/)
+# Content is sourced from a host-mounted directory containing markdown files.
+
+landingPage:
+  # Enable the landing page deployment
+  enabled: true
+  # Page title
+  title: "Welcome"
+  # Host path to mount for markdown content (optional)
+  # If not set, shows a default "no content available" message
+  # Example: "/var/www/docs"
+  docsPath: ""
+
+# ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )
 # ============================================================================
 
@@ -264,6 +280,11 @@ ingressAuthzOverlay:
     signinUrl: https://calypr-demo.ddns.net/tenants/login
     responseHeaders: X-User, X-Email, X-Groups
   routes:
+    landing:
+      namespace: security
+      service: landing-page
+      port: 80
+      pathPrefix: /
     workflows:
       namespace: argo-stack
       service: argo-stack-argo-workflows-server
