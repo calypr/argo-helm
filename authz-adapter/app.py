@@ -279,13 +279,18 @@ def is_safe_path(base_dir, requested_path):
     Returns:
         bool: True if the path is safe, False otherwise
     """
-    # Resolve both paths to their absolute, canonical form
-    base_resolved = os.path.realpath(base_dir)
-    requested_resolved = os.path.realpath(os.path.join(base_dir, requested_path))
+    from pathlib import Path
 
-    # Check that the resolved path starts with the base directory
-    return requested_resolved.startswith(base_resolved + os.sep) or \
-           requested_resolved == base_resolved
+    try:
+        # Resolve both paths to their absolute, canonical form
+        base_path = Path(base_dir).resolve()
+        requested_full = Path(base_dir).joinpath(requested_path).resolve()
+
+        # Check that the resolved path is within the base directory
+        # Using is_relative_to() for robust cross-platform path checking
+        return requested_full.is_relative_to(base_path)
+    except (ValueError, OSError):
+        return False
 
 
 @app.route("/", methods=["GET"])
@@ -355,17 +360,17 @@ def serve_content(filename):
         GET /content/README.md
         GET /content/images/diagram.png
     """
-    # Security: Prevent path traversal
+    # Security: Prevent path traversal using robust pathlib-based check
     if not is_safe_path(CONTENT_DIR, filename):
         return make_response("Not found", 404)
 
-    filepath = os.path.join(CONTENT_DIR, filename)
-    if not os.path.isfile(filepath):
-        return make_response("Not found", 404)
-
     # Use send_from_directory with trusted CONTENT_DIR as base
+    # Let Flask handle the file existence check and serving
     # The filename may include subdirectory paths (e.g., "images/logo.png")
-    return send_from_directory(CONTENT_DIR, filename)
+    try:
+        return send_from_directory(CONTENT_DIR, filename)
+    except FileNotFoundError:
+        return make_response("Not found", 404)
 
 
 if __name__ == "__main__":

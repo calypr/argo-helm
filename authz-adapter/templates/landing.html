@@ -4,12 +4,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js" 
-            integrity="sha384-XBk0FhF/qQ5cDV1gvlrYr9w4Q5pBPj8bMVQBxLRWMIxBKJfIYXvPYbYfIKRdTNBj" 
-            crossorigin="anonymous"></script>
-    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"
-            integrity="sha384-EUbMXEP9LRgvPlJPxn/Q+R4rKDZNR+K2kQv2dNbUSNVYH3C4LoqLI4JKnwrCUGJq"
-            crossorigin="anonymous"></script>
+    <!-- 
+        External libraries for markdown rendering and HTML sanitization.
+        For production deployments, consider:
+        1. Adding SRI hashes for integrity verification (use https://www.srihash.org/)
+        2. Self-hosting these libraries to avoid CDN dependency
+    -->
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js" crossorigin="anonymous"></script>
     <style>
         :root {
             --bg-color: #ffffff;
