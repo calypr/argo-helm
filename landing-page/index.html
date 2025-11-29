@@ -41,7 +41,8 @@
 </head>
 <body>
     <div id="content">Loading...</div>
-    <script src="https://cdn.jsdelivr.net/npm/marked@12.0.2/marked.min.js" integrity="sha384-ND2uoWEyNF0pNYQUzPxqGUplD2qp7kw7cJDNBJFJNjQnTqJfAyK1ygMBxBfMQe/J" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <script>
         const files = ['index.md', 'README.md'];
         
@@ -53,7 +54,8 @@
                     const response = await fetch('/docs/' + file);
                     if (response.ok) {
                         const text = await response.text();
-                        content.innerHTML = marked.parse(text);
+                        const html = marked.parse(text);
+                        content.innerHTML = DOMPurify.sanitize(html);
                         return;
                     }
                 } catch (e) {
