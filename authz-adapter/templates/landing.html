@@ -4,7 +4,12 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>{{ title }}</title>
-    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js" 
+            integrity="sha384-XBk0FhF/qQ5cDV1gvlrYr9w4Q5pBPj8bMVQBxLRWMIxBKJfIYXvPYbYfIKRdTNBj" 
+            crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"
+            integrity="sha384-EUbMXEP9LRgvPlJPxn/Q+R4rKDZNR+K2kQv2dNbUSNVYH3C4LoqLI4JKnwrCUGJq"
+            crossorigin="anonymous"></script>
     <style>
         :root {
             --bg-color: #ffffff;
@@ -184,13 +189,13 @@
             const errorMessage = '{{ error_message }}';
             
             if (!hasContent) {
-                contentDiv.innerHTML = `
+                contentDiv.innerHTML = DOMPurify.sanitize(`
                     <div class="error-container">
                         <h1>No Content Available</h1>
                         <p>${errorMessage || 'No markdown content found in the configured directory.'}</p>
                         <p>To add content, place an <code>index.md</code> or <code>README.md</code> file in the content directory.</p>
                     </div>
-                `;
+                `);
                 return;
             }
             
@@ -229,12 +234,16 @@
                         gfm: true,
                         breaks: false,
                         pedantic: false,
-                        sanitize: false,
                         smartLists: true,
                         smartypants: false
                     });
                     
-                    contentDiv.innerHTML = marked.parse(markdown);
+                    // Parse markdown and sanitize output to prevent XSS
+                    const rawHtml = marked.parse(markdown);
+                    contentDiv.innerHTML = DOMPurify.sanitize(rawHtml, {
+                        ADD_TAGS: ['iframe'],
+                        ADD_ATTR: ['allowfullscreen', 'frameborder', 'target']
+                    });
                     
                     // Update page title from first h1 if present
                     const firstH1 = contentDiv.querySelector('h1');
@@ -243,13 +252,13 @@
                     }
                 })
                 .catch(error => {
-                    contentDiv.innerHTML = `
+                    contentDiv.innerHTML = DOMPurify.sanitize(`
                         <div class="error-container">
                             <h1>Error Loading Content</h1>
                             <p>Unable to load the markdown content.</p>
                             <p><small>${error.message}</small></p>
                         </div>
-                    `;
+                    `);
                 });
         })();
     </script>

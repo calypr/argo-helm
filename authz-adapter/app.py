@@ -363,11 +363,9 @@ def serve_content(filename):
     if not os.path.isfile(filepath):
         return make_response("Not found", 404)
 
-    # Get the directory and filename for send_from_directory
-    directory = os.path.dirname(filepath)
-    basename = os.path.basename(filepath)
-
-    return send_from_directory(directory, basename)
+    # Use send_from_directory with trusted CONTENT_DIR as base
+    # The filename may include subdirectory paths (e.g., "images/logo.png")
+    return send_from_directory(CONTENT_DIR, filename)
 
 
 if __name__ == "__main__":
