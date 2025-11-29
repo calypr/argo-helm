@@ -108,7 +108,7 @@ Namespace: `wf-<org>-<repo>`
 
 ```bash
 helm upgrade --install repo-registration-roles \
-  ./helm/repo-registration-roles \
+  ./helm/argo-stack/overlays/repo-registration-roles \
   -n argocd \
   -f my-values.yaml
 ```

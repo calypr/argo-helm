@@ -450,3 +450,15 @@ repoRegistrations: []
   #     - admin@myorg.com
   #
   # See examples/repo-registrations-example.yaml and docs/repo-registration-guide.md
+
+
+# for roles
+# Namespace where Argo CD is installed
+argocdNamespace: argocd
+
+# Prefix for workflow namespaces. For a repoUrl https://github.com/<org>/<repo>.git,
+# the workflow namespace is assumed to be: <workflowNamespacePrefix><org>-<repo>
+workflowNamespacePrefix: wf-
+
+# Global group that should have full Argo CD admin privileges
+adminGroup: wf-admins
