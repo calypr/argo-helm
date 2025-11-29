@@ -224,6 +224,11 @@ authzAdapter:
 landingPage:
   # Enable the landing page deployment
   enabled: true
+  # Container image configuration
+  image:
+    repository: landing-page
+    tag: latest
+    pullPolicy: IfNotPresent
   # Page title
   title: "Welcome"
   # Host path to mount for markdown content (optional)

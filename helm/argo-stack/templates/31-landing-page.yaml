@@ -106,7 +106,8 @@ spec:
     spec:
       containers:
       - name: nginx
-        image: nginx:alpine
+        image: "{{ .Values.landingPage.image.repository }}:{{ .Values.landingPage.image.tag }}"
+        imagePullPolicy: {{ .Values.landingPage.image.pullPolicy }}
         ports:
         - containerPort: 80
         volumeMounts:
