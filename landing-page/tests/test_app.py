@@ -1,4 +1,4 @@
-"""Tests for landing page functionality."""
+"""Tests for landing page service."""
 
 import os
 import sys
@@ -268,6 +268,24 @@ class TestContentEndpoint:
                 client = app.app.test_client()
                 response = client.get('/content/test.png')
                 assert response.status_code == 200
+
+
+class TestHealthEndpoint:
+    """Test the /healthz endpoint."""
+
+    def setup_method(self):
+        """Reset app module before each test."""
+        if 'app' in sys.modules:
+            del sys.modules['app']
+
+    @pytest.mark.unit
+    def test_health_check(self):
+        """Test health check endpoint."""
+        import app
+        client = app.app.test_client()
+        response = client.get('/healthz')
+        assert response.status_code == 200
+        assert response.get_data(as_text=True) == 'ok'
 
 
 class TestMarkdownFilePriority:
