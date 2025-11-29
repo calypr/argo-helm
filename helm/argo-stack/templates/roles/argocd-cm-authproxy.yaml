@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Use Dex's "authproxy" connector to trust headers from the ingress/authz-adapter
+  dex.config: |
+    connectors:
+      - type: authproxy
+        id: authproxy
+        name: Auth Proxy
+        config:
+          # Header with the authenticated user's identity (email preferred)
+          userHeader: "X-Forwarded-User"
+
+          # Header listing all groups (comma-separated)
+          groupHeader: "X-Auth-Request-Groups"
+
+          # Optional: tells Dex not to enforce its own session login UI
+          # and fully rely on the header-based auth
+          # Default is fine without explicit fields here.
