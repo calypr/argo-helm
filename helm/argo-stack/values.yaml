@@ -163,6 +163,7 @@ argo-cd:
     enabled: true
     namespace: argocd                       # where Argo CD runs
   namespaceOverride: argocd
+  admin.enabled: "false"                    # turn off login screen
   configs:
     secret:
       create: true
@@ -177,6 +178,17 @@ argo-cd:
     cm:
       # External URL including the sub-path
       url: https://calypr-demo.ddns.net/applications
+      dex.config: |
+        enablePasswordDB: false
+        oauth2:
+          alwaysShowLoginScreen: false
+        connectors:
+          - type: authproxy
+            id: authproxy
+            name: Auth Proxy
+            config:
+              userHeader: "X-Auth-Request-User"
+              groupHeader: "X-Auth-Request-Groups"      
     params:
       # Argo CD is behind ingress that terminates TLS
       server.insecure: true
