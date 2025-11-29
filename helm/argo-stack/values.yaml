@@ -214,6 +214,27 @@ authzAdapter:
   debugEmail: brian@bwalsh.com
   # Comma-separated list of groups to assign to the debug user
   debugGroups: wf-admins
+  
+  # Landing page configuration
+  # Serves a customizable landing page at the root path (/)
+  # Content is sourced from markdown files in a mounted directory
+  landingPage:
+    # Enable/disable the landing page feature
+    enabled: false
+    # Directory where markdown content is mounted inside the container
+    contentDir: "/content"
+    # Use ONE of the following volume sources:
+    #
+    # Option 1: ConfigMap (recommended for simple content)
+    # configMap: "landing-page-content"
+    #
+    # Option 2: PersistentVolumeClaim (for dynamic content with persistence)
+    # persistentVolumeClaim: "landing-page-pvc"
+    #
+    # Option 3: HostPath (for development/testing only - NOT for production)
+    # hostPath: "/path/on/host/content"
+    #
+    # If none of the above are specified, an emptyDir volume is used (content resets on pod restart)
 
 # ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )

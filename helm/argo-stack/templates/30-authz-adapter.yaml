@@ -37,8 +37,38 @@ spec:
         - name: DEBUG_GROUPS
           value: {{ .Values.authzAdapter.debugGroups | quote }}
         {{- end }}
+        {{- if .Values.authzAdapter.landingPage.enabled }}
+        - name: CONTENT_DIR
+          value: {{ .Values.authzAdapter.landingPage.contentDir | quote }}
+        {{- end }}
         ports:
         - containerPort: 8080
+        {{- if .Values.authzAdapter.landingPage.enabled }}
+        volumeMounts:
+        - name: landing-page-content
+          mountPath: {{ .Values.authzAdapter.landingPage.contentDir }}
+          readOnly: true
+        {{- end }}
+      {{- if .Values.authzAdapter.landingPage.enabled }}
+      volumes:
+      {{- if .Values.authzAdapter.landingPage.configMap }}
+      - name: landing-page-content
+        configMap:
+          name: {{ .Values.authzAdapter.landingPage.configMap }}
+      {{- else if .Values.authzAdapter.landingPage.persistentVolumeClaim }}
+      - name: landing-page-content
+        persistentVolumeClaim:
+          claimName: {{ .Values.authzAdapter.landingPage.persistentVolumeClaim }}
+      {{- else if .Values.authzAdapter.landingPage.hostPath }}
+      - name: landing-page-content
+        hostPath:
+          path: {{ .Values.authzAdapter.landingPage.hostPath }}
+          type: Directory
+      {{- else }}
+      - name: landing-page-content
+        emptyDir: {}
+      {{- end }}
+      {{- end }}
 ---
 apiVersion: v1
 kind: Service
