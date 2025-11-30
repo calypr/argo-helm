@@ -54,10 +54,10 @@ sequenceDiagram
 
 2. Configure the App with these settings:
 
-   | Setting | Value |
-   |---------|-------|
-   | **GitHub App name** | `ArgoCD-<your-org>` (must be unique) |
-   | **Homepage URL** | Your Argo CD URL or organization URL |
+   | Setting | Value                                                      |
+   |---------|------------------------------------------------------------|
+   | **GitHub App name** | `XXX` (must be unique)   see Notes                         |
+   | **Homepage URL** | Your Argo CD URL or organization URL                       |
    | **Webhook** | Disable (uncheck "Active") unless needed for notifications |
 
 3. Set **Repository permissions** (minimum required):
@@ -374,3 +374,137 @@ And an Application is annotated to subscribe to on-sync-succeeded
 When the Application syncs successfully
 Then a commit status should appear on GitHub with state "success"
 ```
+
+## 📝 Notes
+
+### **Does the GitHub App name matter for Argo CD?**
+Short answer: **No. Argo CD does *not* impose any naming convention or significance on the GitHub App name.**
+You can name the GitHub App anything you want.
+
+---
+
+#### ✅ **Details**
+
+Argo CD’s integration with GitHub Apps is determined entirely by **credentials and configuration**, not by the GitHub App’s name.
+
+##### **Argo CD cares about:**
+
+* The GitHub App **ID**
+* The **installation ID**
+* The **private key** (PEM)
+* The **API endpoints** (GitHub.com or GHES)
+* Optional: specific repos/orgs allowed by the App
+
+##### **Argo CD does *not* care about:**
+
+* The GitHub App’s *display name*
+* The app’s logo
+* The app’s description
+* Anything cosmetic in the GitHub UI
+
+You can call it:
+
+* `argo-sync`
+* `calypr-ci`
+* `my-bioinformatics-publisher`
+* `xylophone-badger-42`
+
+Argo CD will work the same.
+
+---
+
+#### 🔍 **Why the name doesn’t matter**
+
+Argo CD authenticates by generating a **JWT signed with your GitHub App’s private key**, then exchanges it for an installation token.
+
+At no point does Argo CD:
+
+* Look up the GitHub App by name
+* Expect a naming pattern
+* Validate the name against anything
+
+It only cares about the **numeric identifiers** and the **secret**.
+
+---
+
+#### 📌 Practical Naming Guidance (optional, for humans)
+
+Even though Argo CD doesn’t care, clear naming helps collaboration:
+
+* Name the GitHub App to match its purpose
+  → e.g., `calypr-argocd-deployer`
+* Keep separate apps for per-tenant or per-environment isolation
+  → e.g., `calypr-tenant-a-sync`, `calypr-prod-deployer`
+* Document where the private key is stored (ESO/Vault) and who owns the App
+
+---
+
+#### 🧪 Verified by Argo CD behavior
+
+In Argo CD, the GitHub App config is typically:
+
+```yaml
+data:
+  repositories:
+    - url: https://github.com/calypr/demo-repo
+      githubAppPrivateKey: $secret:argocd/github-app#privateKey
+      githubAppId: 123456
+      githubAppInstallationId: 987654
+```
+
+Argo CD never references the App’s *name*.
+
+---
+
+#### 🧭 Final Answer
+
+**The GitHub App name has no technical significance. Argo CD does not require any naming convention and does not use the name for authentication or configuration.**
+
+
+## webapp registration "Identifying and authorizing users" 
+
+Short answer: **Not needed**—at least not for the typical Argo CD + GitHub App GitOps setup.
+
+Here’s the breakdown.
+
+### What that section is for
+
+The **“Identifying and authorizing users”** section on a GitHub App is for:
+
+* Running a **user OAuth flow** (redirect the user to GitHub, they authorize, you get an access token)
+* Letting *your web app* know **who** the user is on GitHub and act on their behalf
+
+That’s useful if you are:
+
+* Building your own UI that users log into with “Sign in with GitHub”
+* Needing per-user GitHub tokens to call the GitHub API as those users
+
+### What Argo CD actually needs
+
+For **Argo CD using a GitHub App to access repos**, Argo CD only cares about:
+
+* **Repository permissions** (read-only is typical for GitOps)
+* **Organization permissions** if needed
+* **Webhooks** if you want push-triggered sync rather than polling
+* The App’s **private key / App ID / Installation ID**
+
+Argo CD authenticates to GitHub **as the app installation**, not as individual users. There’s no browser-based user OAuth dance in that path, so:
+
+> Argo CD does **not** require the “Identifying and authorizing users” section to be configured for repo sync.
+
+### When you *would* configure it
+
+You only need to touch **“Identifying and authorizing users”** if:
+
+* You want to use GitHub as an **SSO provider** for some web UI you’re building, or
+* You explicitly want **per-user OAuth tokens** from GitHub for something outside of Argo CD’s normal GitOps pull model.
+
+If your goal is simply:
+
+* “Argo CD should sync from GitHub using a GitHub App”
+
+then:
+
+> ✅ You can safely **leave the “Identifying and authorizing users” section unconfigured.**
+
+
