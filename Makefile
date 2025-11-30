@@ -93,7 +93,7 @@ show-limits:
 
 kind:
 	kind delete cluster || true
-	kind create cluster --config kind-config.yaml
+	envsubst < kind-config.yaml | kind create cluster --config -
 
 minio:
 	@echo "🗄️ Installing MinIO in cluster..."
@@ -448,4 +448,8 @@ docker-install:
 	kind load docker-image authz-adapter:v0.0.1 --name kind
 	docker exec -it kind-control-plane crictl images | grep authz-adapter
 	@echo "✅ loaded docker authz-adapter"
+	cd landing-page ; docker build -t landing-page:latest -f Dockerfile .
+	kind load docker-image landing-page:latest --name kind
+	docker exec -it kind-control-plane crictl images | grep landing-page
+	@echo "✅ loaded docker landing-page"
 

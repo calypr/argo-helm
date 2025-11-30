@@ -216,6 +216,46 @@ authzAdapter:
   debugGroups: wf-admins
 
 # ============================================================================
+# Landing Page Configuration
+# ============================================================================
+# A simple static landing page that renders markdown files at the root path (/)
+# Content is sourced from a host-mounted directory containing markdown files.
+
+landingPage:
+  # Enable the landing page deployment
+  enabled: true
+  # Container image configuration
+  image:
+    repository: landing-page
+    tag: latest
+    pullPolicy: IfNotPresent
+  # Page title
+  title: "Welcome"
+  # --------------------------------------------------------------------------
+  # docsPath - Host path to mount for markdown content (optional)
+  # --------------------------------------------------------------------------
+  # This is a Kubernetes hostPath volume that mounts a directory from the
+  # node's filesystem into the landing-page container at /docs.
+  #
+  # For kind clusters:
+  #   - The path refers to a directory inside the kind-control-plane container
+  #   - To mount a host directory, use kind's extraMounts in kind-config.yaml:
+  #       extraMounts:
+  #         - hostPath: /path/on/your/host
+  #           containerPath: /var/www/docs
+  #   - Then set docsPath: "/var/www/docs"
+  #
+  # Content updates:
+  #   - Changes to markdown files are picked up on browser refresh (no restart needed)
+  #   - The page fetches markdown via JavaScript on each page load
+  #   - nginx serves files directly from the mounted directory
+  #
+  # If not set, shows a default "no content available" message.
+  # SECURITY: Only expose a dedicated docs directory, not sensitive host paths
+  # Example: "/var/www/docs"
+  docsPath: "/var/www/docs"
+
+# ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )
 # ============================================================================
 
@@ -264,6 +304,11 @@ ingressAuthzOverlay:
     signinUrl: https://calypr-demo.ddns.net/tenants/login
     responseHeaders: X-User, X-Email, X-Groups
   routes:
+    landing:
+      namespace: security
+      service: landing-page
+      port: 80
+      pathPrefix: /
     workflows:
       namespace: argo-stack
       service: argo-stack-argo-workflows-server
