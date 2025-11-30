@@ -35,7 +35,10 @@ landingPage:
 The `docsPath` is a Kubernetes **hostPath volume** that mounts a directory from the node's filesystem.
 
 **For kind clusters:**
-1. Add an `extraMounts` entry in your `kind-config.yaml`:
+
+Kind clusters must be configured with `extraMounts` at creation time (mounts cannot be added to running clusters).
+
+1. **Add extraMounts to kind-config.yaml:**
    ```yaml
    kind: Cluster
    apiVersion: kind.x-k8s.io/v1alpha4
@@ -44,8 +47,37 @@ The `docsPath` is a Kubernetes **hostPath volume** that mounts a directory from 
        extraMounts:
          - hostPath: /path/on/your/host
            containerPath: /var/www/docs
+       extraPortMappings:
+         - containerPort: 30080
+           hostPort: 80
+         - containerPort: 30443
+           hostPort: 443
    ```
-2. Set `docsPath: "/var/www/docs"` in values.yaml
+
+2. **Recreate the kind cluster with the new config:**
+   ```bash
+   # Delete existing cluster
+   kind delete cluster --name kind
+   
+   # Create new cluster with mount config
+   kind create cluster --config kind-config.yaml
+   
+   # Re-run setup (load images, install charts)
+   make docker-install
+   make install
+   ```
+
+3. **Set docsPath in values.yaml:**
+   ```yaml
+   landingPage:
+     docsPath: "/var/www/docs"
+   ```
+
+4. **Add your markdown content:**
+   ```bash
+   # On your host machine
+   echo "# Welcome" > /path/on/your/host/index.md
+   ```
 
 **Content updates:**
 - Changes to markdown files are picked up on browser refresh
