@@ -125,6 +125,10 @@ spec:
             echo "Action: {{`{{workflow.parameters.action}}`}}"
             echo "=========================================="
             
+            # Initialize status tracking
+            STATUS="success"
+            SUMMARY="All checks passed"
+            
             # Clone the repository at the PR commit
             echo "Cloning repository..."
             apk add --no-cache git 2>/dev/null || true
@@ -133,33 +137,52 @@ spec:
             mkdir -p $WORK_DIR
             cd $WORK_DIR
             
-            git clone --depth 1 {{`{{workflow.parameters.repo-url}}`}} repo 2>&1 | tee -a /tmp/stdout || true
-            cd repo
-            git fetch origin pull/{{`{{workflow.parameters.pr-number}}`}}/head:pr-{{`{{workflow.parameters.pr-number}}`}} 2>&1 | tee -a /tmp/stdout || true
-            git checkout {{`{{workflow.parameters.commit-sha}}`}} 2>&1 | tee -a /tmp/stdout || true
+            echo "Cloning {{`{{workflow.parameters.repo-url}}`}}..." | tee -a /tmp/stdout
+            if ! git clone --depth 50 {{`{{workflow.parameters.repo-url}}`}} repo 2>&1 | tee -a /tmp/stdout; then
+              STATUS="failure"
+              SUMMARY="Failed to clone repository"
+            fi
+            
+            if [ "$STATUS" = "success" ]; then
+              cd repo
+              echo "Fetching PR #{{`{{workflow.parameters.pr-number}}`}}..." | tee -a /tmp/stdout
+              if ! git fetch origin pull/{{`{{workflow.parameters.pr-number}}`}}/head:pr-{{`{{workflow.parameters.pr-number}}`}} 2>&1 | tee -a /tmp/stdout; then
+                STATUS="failure"
+                SUMMARY="Failed to fetch PR branch"
+              fi
+            fi
+            
+            if [ "$STATUS" = "success" ]; then
+              echo "Checking out commit {{`{{workflow.parameters.commit-sha}}`}}..." | tee -a /tmp/stdout
+              if ! git checkout {{`{{workflow.parameters.commit-sha}}`}} 2>&1 | tee -a /tmp/stdout; then
+                STATUS="failure"
+                SUMMARY="Failed to checkout commit"
+              fi
+            fi
             
             echo "" | tee -a /tmp/stdout
             echo "=========================================="  | tee -a /tmp/stdout
             echo "Running PR checks..."  | tee -a /tmp/stdout
             echo "=========================================="  | tee -a /tmp/stdout
             
-            # Run any checks or tests here
-            # This is where you would add your actual CI logic
-            # For now, we just show the files changed
-            echo "Files in repository:" | tee -a /tmp/stdout
-            ls -la | tee -a /tmp/stdout
-            
-            # Determine status based on workflow result
-            if [ $? -eq 0 ]; then
-              echo "success" > /tmp/status
-              echo "All checks passed" > /tmp/summary
-            else
-              echo "failure" > /tmp/status
-              echo "Checks failed - see workflow logs" > /tmp/summary
+            if [ "$STATUS" = "success" ]; then
+              # Run any checks or tests here
+              # This is where you would add your actual CI logic
+              # For now, we just show the files changed
+              echo "Files in repository:" | tee -a /tmp/stdout
+              ls -la | tee -a /tmp/stdout
+              
+              # Placeholder for actual checks - users should customize this
+              # Example: npm test, pytest, make test, etc.
+              echo "PR checks completed successfully" | tee -a /tmp/stdout
             fi
             
+            # Write final status
+            echo "$STATUS" > /tmp/status
+            echo "$SUMMARY" > /tmp/summary
+            
             echo "" | tee -a /tmp/stdout
-            echo "Workflow completed."  | tee -a /tmp/stdout
+            echo "Workflow completed with status: $STATUS"  | tee -a /tmp/stdout
         env:
           {{- if .Values.events.github.pullRequest.useGithubApp }}
           - name: GITHUB_APP_ID

@@ -90,21 +90,23 @@ spec:
                 name: {{ $reg.prWorkflowTemplateRef | default $reg.workflowTemplateRef | default "pr-status-workflow" }}
               arguments:
                 parameters:
-                  - name: repo-name
+                  # Static parameters (indices 0-3)
+                  - name: repo-name      # index 0
                     value: {{ $reg.name | quote }}
-                  - name: repo-url
+                  - name: repo-url       # index 1
                     value: {{ $reg.repoUrl | quote }}
-                  - name: owner
+                  - name: owner          # index 2
                     value: {{ $owner | quote }}
-                  - name: repo
+                  - name: repo           # index 3
                     value: {{ $repoName | quote }}
-                  # Parameters from the event payload
-                  - name: pr-number
-                  - name: commit-sha
-                  - name: head-ref
-                  - name: base-ref
-                  - name: action
+                  # Dynamic parameters from event payload (indices 4-8)
+                  - name: pr-number      # index 4 - from body.pull_request.number
+                  - name: commit-sha     # index 5 - from body.pull_request.head.sha
+                  - name: head-ref       # index 6 - from body.pull_request.head.ref
+                  - name: base-ref       # index 7 - from body.pull_request.base.ref
+                  - name: action         # index 8 - from body.action
                   {{- if $reg.artifactBucket }}
+                  # Artifact parameters (indices 9-11 when present)
                   - name: artifact-bucket
                     value: {{ $reg.artifactBucket.bucket | quote }}
                   - name: artifact-endpoint
@@ -113,27 +115,29 @@ spec:
                     value: {{ $reg.artifactBucket.region | quote }}
                   {{- end }}
         # Map event data to workflow parameters
+        # Note: Parameter indices must match the order defined above
+        # If you modify the parameter order, update these indices accordingly
         parameters:
           - src:
               dependencyName: {{ $eventName | quote }}
               dataKey: body.pull_request.number
-            dest: spec.arguments.parameters.4.value
+            dest: spec.arguments.parameters.4.value   # pr-number
           - src:
               dependencyName: {{ $eventName | quote }}
               dataKey: body.pull_request.head.sha
-            dest: spec.arguments.parameters.5.value
+            dest: spec.arguments.parameters.5.value   # commit-sha
           - src:
               dependencyName: {{ $eventName | quote }}
               dataKey: body.pull_request.head.ref
-            dest: spec.arguments.parameters.6.value
+            dest: spec.arguments.parameters.6.value   # head-ref
           - src:
               dependencyName: {{ $eventName | quote }}
               dataKey: body.pull_request.base.ref
-            dest: spec.arguments.parameters.7.value
+            dest: spec.arguments.parameters.7.value   # base-ref
           - src:
               dependencyName: {{ $eventName | quote }}
               dataKey: body.action
-            dest: spec.arguments.parameters.8.value
+            dest: spec.arguments.parameters.8.value   # action
   {{- end }}
   {{- end }}
 {{- end }}
