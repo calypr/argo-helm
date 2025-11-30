@@ -231,8 +231,26 @@ landingPage:
     pullPolicy: IfNotPresent
   # Page title
   title: "Welcome"
-  # Host path to mount for markdown content (optional)
-  # If not set, shows a default "no content available" message
+  # --------------------------------------------------------------------------
+  # docsPath - Host path to mount for markdown content (optional)
+  # --------------------------------------------------------------------------
+  # This is a Kubernetes hostPath volume that mounts a directory from the
+  # node's filesystem into the landing-page container at /docs.
+  #
+  # For kind clusters:
+  #   - The path refers to a directory inside the kind-control-plane container
+  #   - To mount a host directory, use kind's extraMounts in kind-config.yaml:
+  #       extraMounts:
+  #         - hostPath: /path/on/your/host
+  #           containerPath: /var/www/docs
+  #   - Then set docsPath: "/var/www/docs"
+  #
+  # Content updates:
+  #   - Changes to markdown files are picked up on browser refresh (no restart needed)
+  #   - The page fetches markdown via JavaScript on each page load
+  #   - nginx serves files directly from the mounted directory
+  #
+  # If not set, shows a default "no content available" message.
   # SECURITY: Only expose a dedicated docs directory, not sensitive host paths
   # Example: "/var/www/docs"
   docsPath: ""
