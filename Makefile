@@ -93,7 +93,7 @@ show-limits:
 
 kind:
 	kind delete cluster || true
-	kind create cluster --config kind-config.yaml
+	envsubst < kind-config.yaml | kind create cluster --config -
 
 minio:
 	@echo "🗄️ Installing MinIO in cluster..."
