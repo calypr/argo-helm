@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts test-secrets test-artifact-repository-ref all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup
+.PHONY: deps lint template validate kind ct adapter test-artifacts test-secrets test-artifact-repository-ref all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup vault-seed-github-app
 
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
@@ -32,9 +32,14 @@ check-vars:
 	@test -n "$(GITHUB_PAT)" || (echo "Error: GITHUB_PAT is undefined. Run 'export GITHUB_PAT=...' before installing" && exit 1)
 	@test -n "$(ARGOCD_SECRET_KEY)" || (echo "Error: ARGOCD_SECRET_KEY is undefined. Run 'export ARGOCD_SECRET_KEY=...' before installing" && exit 1)
 	@test -n "$(ARGO_HOSTNAME)" || (echo "Error: ARGO_HOSTNAME is undefined. Run 'export ARGO_HOSTNAME=...' before installing" && exit 1)
-	# @test -n "$(PUBLIC_IP)" || (echo "Error: PUBLIC_ID is undefined. Run 'export PUBLIC_ID=...' before installing" && exit 1)
-
-	@echo "✅ Environment validation passed."
+	@test -n "$(ARGO_HOSTNAME)" || (echo "Error: ARGO_HOSTNAME is undefined. Run 'export ARGO_HOSTNAME=...' before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_APP_ID)" || (echo "Error: GITHUBHAPP_APP_ID is undefined. Run 'export GITHUBHAPP_APP_ID=...' before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_CLIENT_ID)" || (echo "Error: GITHUBHAPP_CLIENT_ID is undefined. Run 'export GITHUBHAPP_CLIENT_ID=...' before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_PRIVATE_KEY_SECRET_NAME)" || (echo "Error: GITHUBHAPP_PRIVATE_KEY_SECRET_NAME is undefined. Run 'export GITHUBHAPP_PRIVATE_KEY_SECRET_NAME=...' before installing" && exit 1) 
+	@test -f "$(GITHUBHAPP_PRIVATE_KEY_FILE_PATH)" || (echo "Error: GITHUBHAPP_PRIVATE_KEY_FILE_PATH file '$(GITHUBHAPP_PRIVATE_KEY_FILE_PATH)' not found. Create the file before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_PRIVATE_KEY_VAULT_PATH)" || (echo "Error: GITHUBHAPP_PRIVATE_KEY_VAULT_PATH is undefined. Run 'export GITHUBHAPP_PRIVATE_KEY_VAULT_PATH=...' before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_INSTALLATION_ID)" || (echo "Error: GITHUBHAPP_INSTALLATION_ID is undefined. Run 'export GITHUBHAPP_INSTALLATION_ID=...' before installing" && exit 1)
+	@echo "✅ All GITHUBHAPP environment variables are set."
 
 
 deps:
@@ -54,12 +59,19 @@ template: check-vars deps
 		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
 		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
-		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000  \
+		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}/registrations \
 		--set-string s3.enabled=${S3_ENABLED} \
 		--set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
 		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
 		--set-string s3.bucket=${S3_BUCKET} \
+		--set-string githubApp.enabled=true \
+		--set-string githubApp.appId="${GITHUBHAPP_APP_ID}" \
+		--set-string githubApp.installationId="${GITHUBHAPP_INSTALLATION_ID}" \
+		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
+		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
+		--set ingress={} \
 		-f - \
+		-f helm/argo-stack/admin-values.yaml \
 		--namespace argocd > rendered.yaml
 
 validate:
@@ -160,6 +172,11 @@ argo-stack:
 		--set-string s3.hostname=${S3_HOSTNAME} \
 		--set-string ingress.argoWorkflows.host=${ARGO_HOSTNAME} \
 		--set-string ingress.argocd.host=${ARGO_HOSTNAME} \
+		--set-string githubApp.enabled=true \
+		--set-string githubApp.appId="${GITHUBHAPP_APP_ID}" \
+		--set-string githubApp.installationId="${GITHUBHAPP_INSTALLATION_ID}" \
+		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
+		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
 		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
@@ -282,6 +299,10 @@ vault-status:
 	@echo "🔍 Checking Vault status..."
 	@kubectl exec -n vault vault-0 -- vault status 2>/dev/null || echo "❌ Vault not running. Run 'make vault-dev' first."
 
+vault-seed-github-app:
+	@echo "➡️  Creating secrets for github app ..."
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/argocd/github-app privateKey=
+	
 vault-seed:
 	@echo "🌱 Seeding Vault with test secrets..."
 	@echo "➡️  Enabling KV v2 secrets engine..."

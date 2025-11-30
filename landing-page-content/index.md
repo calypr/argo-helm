@@ -11,7 +11,6 @@ When I push new analysis files or metadata updates to the repository, GitOps det
 ![Calypr GitHub High Level Diagram](./images/high-level-sequence-diagram.png)
 
 
-
 This guide covers:
 
 * **What the Calypr GitHub App does**
