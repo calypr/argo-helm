@@ -426,6 +426,39 @@ events:
   # See templates/events/sensor-github-push.yaml
   # ========================================================================
 
+    # ========================================================================
+    # Pull Request Event Handling
+    # ========================================================================
+    # Enable this to handle pull_request events (including synchronize).
+    # When enabled, workflows will be triggered on PR events and post
+    # status updates with workflow stdout back to GitHub.
+    #
+    # To use this feature:
+    # 1. Enable pullRequest.enabled
+    # 2. Add "pull_request" to the events list in repoRegistrations
+    # 3. Configure a GitHub App or PAT with commit status permissions
+    #
+    # Example repoRegistration:
+    #   - name: my-repo
+    #     repoUrl: https://github.com/org/repo.git
+    #     events:
+    #       - push
+    #       - pull_request
+    pullRequest:
+      # Enable pull request event handling
+      enabled: false
+      
+      # Sensor name for PR events
+      sensorName: run-workflow-on-pr
+      
+      # Use GitHub App for posting status (recommended)
+      # Falls back to PAT if disabled
+      useGithubApp: false
+      
+      # Container images used in PR workflow
+      workflowImage: alpine:3.20
+      statusImage: curlimages/curl:8.5.0
+
 # ============================================================================
 # Workflow Execution Configuration
 # ============================================================================

@@ -1,0 +1,140 @@
+{{- if and .Values.events.enabled .Values.repoRegistrations }}
+{{- if and (gt (len .Values.repoRegistrations) 0) .Values.events.github.pullRequest.enabled }}
+# ============================================================================
+# Sensor for GitHub Pull Request Events
+# ============================================================================
+# This sensor listens for pull_request events (including synchronize action)
+# and triggers workflows that post status updates back to GitHub with output.
+#
+# When a pull_request.synchronize event is received:
+# 1. A workflow is triggered for the specific repository
+# 2. The workflow runs and captures stdout
+# 3. The workflow posts status back to the PR commit
+apiVersion: argoproj.io/v1alpha1
+kind: Sensor
+metadata:
+  name: {{ .Values.events.github.pullRequest.sensorName | default "run-workflow-on-pr" }}
+  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  labels:
+    app.kubernetes.io/name: argo-events
+    app.kubernetes.io/part-of: argo-stack
+    source: repo-registration
+    event-type: pull-request
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "10"
+spec:
+  template:
+    serviceAccountName: {{ .Values.events.github.sensorServiceAccount | default "default" }}
+
+  # Dependencies - listen for pull_request events from each repository
+  dependencies:
+  {{- range $reg := .Values.repoRegistrations }}
+  {{- /* Only create dependencies for repos that have pull_request in their events */ -}}
+  {{- $events := $reg.events | default (list "push") }}
+  {{- if has "pull_request" $events }}
+  {{- $eventName := $reg.eventName | default (include "argo-stack.repoRegistration.eventName" $reg) }}
+  - name: {{ $eventName | quote }}
+    eventSourceName: {{ printf "%s-repo-registrations" ($.Values.events.github.name | default "github") | quote }}
+    eventName: {{ $eventName | quote }}
+    # Filter for pull_request.synchronize events
+    filters:
+      data:
+        - path: headers.X-Github-Event
+          type: string
+          value:
+            - "pull_request"
+        - path: body.action
+          type: string
+          value:
+            - "synchronize"
+            - "opened"
+            - "reopened"
+  {{- end }}
+  {{- end }}
+
+  # Triggers - fire workflow and post status to GitHub
+  triggers:
+  {{- range $reg := .Values.repoRegistrations }}
+  {{- /* Only create triggers for repos that have pull_request in their events */ -}}
+  {{- $events := $reg.events | default (list "push") }}
+  {{- if has "pull_request" $events }}
+  {{- /* Extract owner and repo from GitHub URL */ -}}
+  {{- $urlWithoutProtocol := regexReplaceAll "^https?://(www\\.)?github\\.com/" $reg.repoUrl "" }}
+  {{- $parts := splitList "/" $urlWithoutProtocol }}
+  {{- $repoName := last $parts | trimSuffix ".git" }}
+  {{- $owner := "" }}
+  {{- if ge (len $parts) 2 }}
+    {{- $owner = index $parts 0 }}
+  {{- end }}
+  {{- $eventName := $reg.eventName | default (include "argo-stack.repoRegistration.eventName" $reg) }}
+  {{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+  - template:
+      conditions: {{ $eventName }}
+      name: pr-workflow-{{ $repoName }}
+      argoWorkflow:
+        operation: submit
+        source:
+          resource:
+            apiVersion: argoproj.io/v1alpha1
+            kind: Workflow
+            metadata:
+              generateName: {{ printf "pr-%s-" $reg.name }}
+              namespace: {{ $namespace }}
+              labels:
+                event-type: pull-request
+                repo: {{ $repoName | quote }}
+            spec:
+              serviceAccountName: {{ $.Values.workflows.runnerServiceAccount | default "wf-runner" }}
+              workflowTemplateRef:
+                name: {{ $reg.prWorkflowTemplateRef | default $reg.workflowTemplateRef | default "pr-status-workflow" }}
+              arguments:
+                parameters:
+                  - name: repo-name
+                    value: {{ $reg.name | quote }}
+                  - name: repo-url
+                    value: {{ $reg.repoUrl | quote }}
+                  - name: owner
+                    value: {{ $owner | quote }}
+                  - name: repo
+                    value: {{ $repoName | quote }}
+                  # Parameters from the event payload
+                  - name: pr-number
+                  - name: commit-sha
+                  - name: head-ref
+                  - name: base-ref
+                  - name: action
+                  {{- if $reg.artifactBucket }}
+                  - name: artifact-bucket
+                    value: {{ $reg.artifactBucket.bucket | quote }}
+                  - name: artifact-endpoint
+                    value: {{ $reg.artifactBucket.hostname | quote }}
+                  - name: artifact-region
+                    value: {{ $reg.artifactBucket.region | quote }}
+                  {{- end }}
+        # Map event data to workflow parameters
+        parameters:
+          - src:
+              dependencyName: {{ $eventName | quote }}
+              dataKey: body.pull_request.number
+            dest: spec.arguments.parameters.4.value
+          - src:
+              dependencyName: {{ $eventName | quote }}
+              dataKey: body.pull_request.head.sha
+            dest: spec.arguments.parameters.5.value
+          - src:
+              dependencyName: {{ $eventName | quote }}
+              dataKey: body.pull_request.head.ref
+            dest: spec.arguments.parameters.6.value
+          - src:
+              dependencyName: {{ $eventName | quote }}
+              dataKey: body.pull_request.base.ref
+            dest: spec.arguments.parameters.7.value
+          - src:
+              dependencyName: {{ $eventName | quote }}
+              dataKey: body.action
+            dest: spec.arguments.parameters.8.value
+  {{- end }}
+  {{- end }}
+{{- end }}
+{{- end }}

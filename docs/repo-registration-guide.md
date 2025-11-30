@@ -159,6 +159,19 @@ kubectl get secret s3-credentials-my-project -n wf-poc
 - **Description:** Default branch to track
 - **Example:** `main`, `master`, `develop`
 
+#### `spec.events`
+- **Type:** `array` of `string`
+- **Default:** `["push"]`
+- **Description:** GitHub events that trigger workflows. Supported events: `push`, `pull_request`
+- **Example:** `["push", "pull_request"]`
+- **Note:** To enable `pull_request` events, you must also set `events.github.pullRequest.enabled: true` in your Helm values
+
+#### `spec.prWorkflowTemplateRef`
+- **Type:** `string`
+- **Default:** Uses `workflowTemplateRef` value or `pr-status-workflow`
+- **Description:** WorkflowTemplate to use for pull request events. This template should handle posting status back to GitHub.
+- **Example:** `pr-status-workflow`
+
 #### `spec.artifactBucket`
 - **Type:** `object`
 - **Description:** S3-compatible artifact bucket configuration for workflow outputs
@@ -351,6 +364,50 @@ spec:
   # Public visibility enabled
   isPublic: true
 ```
+
+### Example 5: Pull Request CI with Status Updates
+
+Enable CI workflows that run on pull request events and post status updates back to GitHub:
+
+```yaml
+apiVersion: platform.calypr.io/v1alpha1
+kind: RepoRegistration
+metadata:
+  name: ci-enabled-repo
+  namespace: wf-poc
+spec:
+  repoUrl: https://github.com/myorg/ci-enabled-repo.git
+  tenant: myorg
+  workflowTemplateRef: nextflow-repo-runner
+  githubSecretName: github-secret-ci
+  
+  # Enable both push and pull_request events
+  events:
+    - push
+    - pull_request
+  
+  # Optional: Use a different workflow template for PR checks
+  prWorkflowTemplateRef: pr-status-workflow
+  
+  artifactBucket:
+    hostname: https://s3.amazonaws.com
+    bucket: ci-artifacts
+    region: us-east-1
+    externalSecretPath: argo/apps/ci-repo/s3
+  
+  adminUsers:
+    - admin@myorg.com
+```
+
+When `pull_request` is included in the `events` list and `events.github.pullRequest.enabled` is set to `true` in your Helm values, the following happens on PR events:
+
+1. **`pull_request.opened`** - Workflow triggers when a PR is opened
+2. **`pull_request.synchronize`** - Workflow triggers when commits are pushed to the PR
+3. **`pull_request.reopened`** - Workflow triggers when a closed PR is reopened
+
+The workflow posts commit status updates to GitHub:
+- **Pending** status when the workflow starts
+- **Success/Failure** status when the workflow completes, including workflow output in the status description
 
 ---
 

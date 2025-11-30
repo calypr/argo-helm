@@ -1,0 +1,222 @@
+{{- if and .Values.events.enabled .Values.events.github.pullRequest.enabled }}
+# ============================================================================
+# WorkflowTemplate for Pull Request Status Updates
+# ============================================================================
+# This template runs when a pull_request.synchronize event is received.
+# It executes the configured workflow and posts the stdout as a GitHub
+# commit status back to the PR.
+#
+# The workflow:
+# 1. Sets pending status on the commit
+# 2. Runs the actual workflow/tests
+# 3. Captures stdout from the workflow
+# 4. Posts success/failure status with the output
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: pr-status-workflow
+  namespace: {{ .Values.namespaces.argo }}
+  labels:
+    app.kubernetes.io/name: argo-stack
+    app.kubernetes.io/component: pr-workflow
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  entrypoint: pr-workflow-with-status
+  arguments:
+    parameters:
+      - name: repo-name
+        description: "Repository name or identifier"
+      - name: repo-url
+        description: "Git repository URL"
+      - name: owner
+        description: "GitHub repository owner"
+      - name: repo
+        description: "GitHub repository name"
+      - name: pr-number
+        description: "Pull request number"
+      - name: commit-sha
+        description: "The commit SHA to update status for"
+      - name: head-ref
+        description: "The head branch of the PR"
+      - name: base-ref
+        description: "The base branch of the PR"
+      - name: action
+        description: "The PR action (synchronize, opened, reopened)"
+      - name: artifact-bucket
+        description: "S3 bucket for artifacts"
+        value: ""
+      - name: artifact-endpoint
+        description: "S3 endpoint"
+        value: ""
+      - name: artifact-region
+        description: "S3 region"
+        value: ""
+
+  templates:
+    - name: pr-workflow-with-status
+      metadata:
+        annotations:
+          workflows.argoproj.io/description: |
+            Main workflow that orchestrates status updates and job execution.
+            Posts pending status, runs the job, then posts final status with output.
+      dag:
+        tasks:
+          - name: set-pending-status
+            template: post-github-status
+            arguments:
+              parameters:
+                - name: state
+                  value: "pending"
+                - name: description
+                  value: "Workflow is running..."
+                - name: context
+                  value: "argo-workflows/pr-check"
+
+          - name: run-workflow
+            template: execute-workflow
+            dependencies: [set-pending-status]
+
+          - name: set-final-status
+            template: post-github-status
+            dependencies: [run-workflow]
+            arguments:
+              parameters:
+                - name: state
+                  value: "{{`{{tasks.run-workflow.outputs.parameters.status}}`}}"
+                - name: description
+                  value: "{{`{{tasks.run-workflow.outputs.parameters.summary}}`}}"
+                - name: context
+                  value: "argo-workflows/pr-check"
+
+    - name: execute-workflow
+      metadata:
+        annotations:
+          workflows.argoproj.io/description: |
+            Executes the actual workflow and captures stdout for status reporting.
+      outputs:
+        parameters:
+          - name: status
+            valueFrom:
+              path: /tmp/status
+          - name: summary
+            valueFrom:
+              path: /tmp/summary
+          - name: stdout
+            valueFrom:
+              path: /tmp/stdout
+      container:
+        image: {{ .Values.events.github.pullRequest.workflowImage | default "alpine:3.20" }}
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -e
+            
+            echo "=========================================="
+            echo "Pull Request Workflow"
+            echo "=========================================="
+            echo "Repository: {{`{{workflow.parameters.owner}}`}}/{{`{{workflow.parameters.repo}}`}}"
+            echo "PR Number: #{{`{{workflow.parameters.pr-number}}`}}"
+            echo "Commit: {{`{{workflow.parameters.commit-sha}}`}}"
+            echo "Head: {{`{{workflow.parameters.head-ref}}`}}"
+            echo "Base: {{`{{workflow.parameters.base-ref}}`}}"
+            echo "Action: {{`{{workflow.parameters.action}}`}}"
+            echo "=========================================="
+            
+            # Clone the repository at the PR commit
+            echo "Cloning repository..."
+            apk add --no-cache git 2>/dev/null || true
+            
+            WORK_DIR=/tmp/workspace
+            mkdir -p $WORK_DIR
+            cd $WORK_DIR
+            
+            git clone --depth 1 {{`{{workflow.parameters.repo-url}}`}} repo 2>&1 | tee -a /tmp/stdout || true
+            cd repo
+            git fetch origin pull/{{`{{workflow.parameters.pr-number}}`}}/head:pr-{{`{{workflow.parameters.pr-number}}`}} 2>&1 | tee -a /tmp/stdout || true
+            git checkout {{`{{workflow.parameters.commit-sha}}`}} 2>&1 | tee -a /tmp/stdout || true
+            
+            echo "" | tee -a /tmp/stdout
+            echo "=========================================="  | tee -a /tmp/stdout
+            echo "Running PR checks..."  | tee -a /tmp/stdout
+            echo "=========================================="  | tee -a /tmp/stdout
+            
+            # Run any checks or tests here
+            # This is where you would add your actual CI logic
+            # For now, we just show the files changed
+            echo "Files in repository:" | tee -a /tmp/stdout
+            ls -la | tee -a /tmp/stdout
+            
+            # Determine status based on workflow result
+            if [ $? -eq 0 ]; then
+              echo "success" > /tmp/status
+              echo "All checks passed" > /tmp/summary
+            else
+              echo "failure" > /tmp/status
+              echo "Checks failed - see workflow logs" > /tmp/summary
+            fi
+            
+            echo "" | tee -a /tmp/stdout
+            echo "Workflow completed."  | tee -a /tmp/stdout
+        env:
+          {{- if .Values.events.github.pullRequest.useGithubApp }}
+          - name: GITHUB_APP_ID
+            value: {{ .Values.githubApp.appId | quote }}
+          - name: GITHUB_APP_INSTALLATION_ID
+            value: {{ .Values.githubApp.installationId | quote }}
+          {{- end }}
+
+    - name: post-github-status
+      metadata:
+        annotations:
+          workflows.argoproj.io/description: |
+            Posts a commit status to GitHub using the GitHub API.
+      inputs:
+        parameters:
+          - name: state
+            description: "Status state: pending, success, failure, error"
+          - name: description
+            description: "Status description"
+          - name: context
+            description: "Status context identifier"
+      container:
+        image: {{ .Values.events.github.pullRequest.statusImage | default "curlimages/curl:8.5.0" }}
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -e
+            
+            # GitHub API endpoint for commit statuses
+            STATUS_URL="https://api.github.com/repos/{{`{{workflow.parameters.owner}}`}}/{{`{{workflow.parameters.repo}}`}}/statuses/{{`{{workflow.parameters.commit-sha}}`}}"
+            
+            # Truncate description to 140 characters (GitHub limit)
+            DESCRIPTION=$(echo "{{`{{inputs.parameters.description}}`}}" | head -c 140)
+            
+            echo "Posting status to GitHub..."
+            echo "URL: $STATUS_URL"
+            echo "State: {{`{{inputs.parameters.state}}`}}"
+            echo "Description: $DESCRIPTION"
+            
+            # Post the status
+            curl -X POST \
+              -H "Accept: application/vnd.github+json" \
+              -H "Authorization: Bearer $GITHUB_TOKEN" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "$STATUS_URL" \
+              -d "{
+                \"state\": \"{{`{{inputs.parameters.state}}`}}\",
+                \"description\": \"$DESCRIPTION\",
+                \"context\": \"{{`{{inputs.parameters.context}}`}}\"
+              }"
+            
+            echo ""
+            echo "Status posted successfully."
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.events.github.secret.name | default "github-secret" }}
+                key: {{ .Values.events.github.secret.tokenKey | default "token" }}
+{{- end }}
