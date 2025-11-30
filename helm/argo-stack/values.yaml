@@ -253,7 +253,7 @@ landingPage:
   # If not set, shows a default "no content available" message.
   # SECURITY: Only expose a dedicated docs directory, not sensitive host paths
   # Example: "/var/www/docs"
-  docsPath: ""
+  docsPath: "/var/www/docs"
 
 # ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )
