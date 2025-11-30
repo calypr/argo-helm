@@ -8,6 +8,9 @@
 
 When I push new analysis files or metadata updates to the repository, GitOps detects the commit and applies the corresponding updates to the data services and portal layers. This gives me a clear, auditable history of every modification, eliminates manual synchronization steps, and guarantees that the public or internal portal always reflects the current state of my work. By relying on version-controlled automation, I can focus on scientific analysis rather than operational glue, while maintaining reproducibility, traceability, and consistency across environments.
 
+![Calypr GitHub High Level Diagram](./images/high-level-sequence-diagram.png)
+
+
 
 This guide covers:
 
