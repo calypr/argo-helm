@@ -143,6 +143,8 @@ argo-workflows:
     namespaced: true
     extraArgs:
       - --auth-mode=server
+    # UI/API lives under /workflows
+    baseHref: "/workflows/"
   controller:
     workflowNamespaces:
       - argo-workflows
@@ -161,31 +163,97 @@ argo-cd:
     enabled: true
     namespace: argocd                       # where Argo CD runs
   namespaceOverride: argocd
+  admin.enabled: "false"                    # turn off login screen
   configs:
     secret:
       create: true
       # provide a strong random key (hex or base64 is fine)
-      extra: {}  # MUST be a map, not a string/boolean
+      extra: # MUST be a map, not a string/boolean
+        # any sufficiently random string; 32+ chars is nice
+        server.secretkey: "some-long-random-string-change-me"
       # Never commit your real token in a Git repo. instead, override it at deploy time using:
       # export ARGO_CD_SECRET=replace with output of: openssl rand -hex 32
       # helm upgrade --install ... argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}"
       # server.secretkey: "<?= replace with output of: openssl rand -hex 32 ?>"
+    cm:
+      # External URL including the sub-path
+      url: https://calypr-demo.ddns.net/applications
+      dex.config: |
+        enablePasswordDB: false
+        oauth2:
+          alwaysShowLoginScreen: false
+        connectors:
+          - type: authproxy
+            id: authproxy
+            name: Auth Proxy
+            config:
+              userHeader: "X-Auth-Request-User"
+              groupHeader: "X-Auth-Request-Groups"      
+    params:
+      # Argo CD is behind ingress that terminates TLS
+      server.insecure: true
+      # Tell ArgoCD UI/API it’s under /applications
+      server.basehref: "/applications"
+      # server.rootpath: "/applications"
 
 # ============================================================================
 # Authorization Adapter Settings (Arborist Integration)
 # ============================================================================
 
 authzAdapter:
-  image: ghcr.io/calypr/argo-helm:latest
+  image:
+    repository: authz-adapter
+    pullPolicy: IfNotPresent
+    tag: v0.0.1
   fenceBase: "https://calypr-dev.ohsu.edu/user"
   replicas: 2
   # Ensure adapter uses security namespace
   namespace: security
   # Debug mode settings (for development/testing only)
   # When debugEmail is set, enables debug mode and allows debug_email/debug_groups query params
-  debugEmail: null
+  debugEmail: brian@bwalsh.com
   # Comma-separated list of groups to assign to the debug user
-  debugGroups: null
+  debugGroups: wf-admins
+
+# ============================================================================
+# Landing Page Configuration
+# ============================================================================
+# A simple static landing page that renders markdown files at the root path (/)
+# Content is sourced from a host-mounted directory containing markdown files.
+
+landingPage:
+  # Enable the landing page deployment
+  enabled: true
+  # Container image configuration
+  image:
+    repository: landing-page
+    tag: latest
+    pullPolicy: IfNotPresent
+  # Page title
+  title: "Welcome"
+  # --------------------------------------------------------------------------
+  # docsPath - Host path to mount for markdown content (optional)
+  # --------------------------------------------------------------------------
+  # This is a Kubernetes hostPath volume that mounts a directory from the
+  # node's filesystem into the landing-page container at /docs.
+  #
+  # For kind clusters:
+  #   - The path refers to a directory inside the kind-control-plane container
+  #   - To mount a host directory, use kind's extraMounts in kind-config.yaml:
+  #       extraMounts:
+  #         - hostPath: /path/on/your/host
+  #           containerPath: /var/www/docs
+  #   - Then set docsPath: "/var/www/docs"
+  #
+  # Content updates:
+  #   - Changes to markdown files are picked up on browser refresh (no restart needed)
+  #   - The page fetches markdown via JavaScript on each page load
+  #   - nginx serves files directly from the mounted directory
+  #
+  # If not set, shows a default "no content available" message.
+  # SECURITY: Only expose a dedicated docs directory, not sensitive host paths
+  # Example: "/var/www/docs"
+  docsPath: "/var/www/docs"
 
 # ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )
@@ -236,6 +304,11 @@ ingressAuthzOverlay:
     signinUrl: https://calypr-demo.ddns.net/tenants/login
     responseHeaders: X-User, X-Email, X-Groups
   routes:
+    landing:
+      namespace: security
+      service: landing-page
+      port: 80
+      pathPrefix: /
     workflows:
       namespace: argo-stack
       service: argo-stack-argo-workflows-server
@@ -247,7 +320,7 @@ ingressAuthzOverlay:
       port: 8080
       pathPrefix: /applications
       # ArgoCD server uses HTTPS by default
-      backendProtocol: HTTPS
+      backendProtocol: HTTPS      
     registrations:
       namespace: argo-stack
       service: github-repo-registrations-eventsource-svc
@@ -434,3 +507,15 @@ repoRegistrations: []
   #     - admin@myorg.com
   #
   # See examples/repo-registrations-example.yaml and docs/repo-registration-guide.md
+
+
+# for roles
+# Namespace where Argo CD is installed
+argocdNamespace: argocd
+
+# Prefix for workflow namespaces. For a repoUrl https://github.com/<org>/<repo>.git,
+# the workflow namespace is assumed to be: <workflowNamespacePrefix><org>-<repo>
+workflowNamespacePrefix: wf-
+
+# Global group that should have full Argo CD admin privileges
+adminGroup: wf-admins

@@ -646,6 +646,12 @@ kubectl get configmaps -n argo | grep my-repo
 
 # 🌟 Using the Calypr GitHub App
 
+Issue tracking:
+
+See #108 #35
+
+This guide covers:
+
 * **What the Calypr GitHub App does**
 * **Why a user would install it**
 * **How to integrate it into their GitHub account**

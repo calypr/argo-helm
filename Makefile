@@ -93,7 +93,7 @@ show-limits:
 
 kind:
 	kind delete cluster || true
-	kind create cluster --config kind-config.yaml
+	envsubst < kind-config.yaml | kind create cluster --config -
 
 minio:
 	@echo "🗄️ Installing MinIO in cluster..."
@@ -149,7 +149,7 @@ argo-stack:
 	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
 	envsubst < my-values.yaml | helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
-		--wait --atomic \
+		--wait --atomic --timeout 10m0s \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
 		--set-string events.github.webhook.url=https://${ARGO_HOSTNAME}/registrations\
 		--set-string s3.enabled=${S3_ENABLED} \
@@ -160,9 +160,10 @@ argo-stack:
 		--set-string s3.hostname=${S3_HOSTNAME} \
 		--set-string ingress.argoWorkflows.host=${ARGO_HOSTNAME} \
 		--set-string ingress.argocd.host=${ARGO_HOSTNAME} \
+		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
-deploy: init argo-stack docker-install ports
+deploy: init docker-install argo-stack ports
 ports:	
 	# manual certificate
 	# If the secret already exists, delete it first:
@@ -193,13 +194,6 @@ ports:
 	--set controller.extraArgs.default-ssl-certificate=default/${TLS_SECRET_NAME} \
 	--set controller.watchIngressWithoutClass=true \
 	-f helm/argo-stack/overlays/ingress-authz-overlay/values-ingress-nginx.yaml
-	# Assign external address (only if PUBLIC_IP is set)
-	# @if [ -n "${PUBLIC_IP}" ]; then \
-	# 	echo "➡️  Assigning external IP: ${PUBLIC_IP}"; \
-	# 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p "{\"spec\": {\"type\": \"NodePort\", \"externalIPs\": [\"${PUBLIC_IP}\"]}}"; \
-	# else \
-	# 	echo "⚠️  PUBLIC_IP not set, skipping external IP assignment"; \
-	# fi
 	# Solution - Use NodePort instead of LoadBalancer in kind
 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"NodePort","ports":[{"port":80,"nodePort":30080},{"port":443,"nodePort":30443}]}}'
 
@@ -313,18 +307,18 @@ vault-seed:
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/events/github \
 		token="$(GITHUB_PAT)" 
 	@echo "➡️  Creating per-app S3 credentials..."
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello/s3 \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-project/s3 \
 		accessKey="minioadmin" \
 		secretKey="minioadmin"
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-2/s3 \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-2/s3 \
 		accessKey="app2-access-key" \
 		secretKey="app2-secret-key"
 	@echo "➡️  Seeding Vault with secrets from my-values.yaml repoRegistrations..."
 	@# nextflow-hello-project GitHub credentials
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-project/github \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-project/github \
 		token="$(GITHUB_PAT)"
 	@# nextflow-hello-project S3 artifact credentials
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-project/s3/artifacts \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-project/s3/artifacts \
 		AWS_ACCESS_KEY_ID="minioadmin" \
 		AWS_SECRET_ACCESS_KEY="minioadmin"
 	@# genomics-variant-calling GitHub credentials
@@ -361,8 +355,8 @@ vault-seed:
 	@echo "   kv/argo/authz                                   - AuthZ adapter OIDC secret"
 	@echo "   kv/argo/events/github                           - GitHub webhook token"
 	@echo "   kv/argo/apps/*/s3                               - Per-app S3 credentials (legacy)"
-	@echo "   kv/argo/apps/nextflow-hello-project/github      - nextflow-hello-project GitHub token"
-	@echo "   kv/argo/apps/nextflow-hello-project/s3/artifacts - nextflow-hello-project S3 credentials"
+	@echo "   kv/argo/apps/bwalsh/nextflow-hello-project/github      - nextflow-hello-project GitHub token"
+	@echo "   kv/argo/apps/bwalsh/nextflow-hello-project/s3/artifacts - nextflow-hello-project S3 credentials"
 	@echo "   kv/argo/apps/genomics/github                    - genomics-variant-calling GitHub token"
 	@echo "   kv/argo/apps/genomics/s3/artifacts              - genomics-variant-calling S3 artifact credentials"
 	@echo "   kv/argo/apps/genomics/s3/data                   - genomics-variant-calling S3 data credentials"
@@ -449,4 +443,13 @@ docker-install:
 	docker build -t nextflow-runner:latest -f nextflow-runner/Dockerfile .
 	kind load docker-image nextflow-runner:latest --name kind
 	docker exec -it kind-control-plane crictl images | grep nextflow-runner
+	@echo "✅ loaded docker nextflow-runner"
+	cd authz-adapter ; docker build -t authz-adapter:v0.0.1 -f Dockerfile .
+	kind load docker-image authz-adapter:v0.0.1 --name kind
+	docker exec -it kind-control-plane crictl images | grep authz-adapter
+	@echo "✅ loaded docker authz-adapter"
+	cd landing-page ; docker build -t landing-page:latest -f Dockerfile .
+	kind load docker-image landing-page:latest --name kind
+	docker exec -it kind-control-plane crictl images | grep landing-page
+	@echo "✅ loaded docker landing-page"
 
