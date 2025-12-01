@@ -166,6 +166,7 @@ spec:
 
           # Post status to GitHub (write response body to temp file for reliable parsing)
           TEMP_BODY=$(mktemp)
+          chmod 600 "$TEMP_BODY"
           HTTP_CODE=$(curl -s -o "$TEMP_BODY" -w '%{http_code}' -X POST \
             -H "Authorization: Bearer ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github+json" \
@@ -175,9 +176,9 @@ spec:
           BODY=$(cat "$TEMP_BODY")
           rm -f "$TEMP_BODY"
 
-          # Validate HTTP code is numeric and check for success (200-299)
+          # Check for success (GitHub returns 201 for created status)
           case "$HTTP_CODE" in
-            2[0-9][0-9])
+            200|201)
               echo "✅ Status posted successfully (HTTP $HTTP_CODE)"
               ;;
             *)
