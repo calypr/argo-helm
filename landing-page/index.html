@@ -38,6 +38,11 @@
         pre code { background: none; padding: 0; }
         img { max-width: 100%; }
     </style>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+    </script>
+
 </head>
 <body>
     <div id="content">Loading...</div>
@@ -48,23 +53,42 @@
         
         async function loadMarkdown() {
             const content = document.getElementById('content');
-            
+
             for (const file of files) {
                 try {
                     const response = await fetch('/docs/' + file);
                     if (response.ok) {
                         const text = await response.text();
                         const html = marked.parse(text);
-                        content.innerHTML = DOMPurify.sanitize(html);
+                        content.innerHTML = DOMPurify.sanitize(html, {
+                            ADD_TAGS: ['pre'],
+                            ADD_ATTR: ['class']
+                        });
+
+                        // Process mermaid diagrams
+                        const mermaidBlocks = content.querySelectorAll('pre code.language-mermaid');
+                        mermaidBlocks.forEach((block, index) => {
+                            const mermaidDiv = document.createElement('div');
+                            mermaidDiv.className = 'mermaid';
+                            mermaidDiv.textContent = block.textContent;
+                            block.parentElement.replaceWith(mermaidDiv);
+                        });
+
+                        // Re-render mermaid diagrams
+                        if (mermaidBlocks.length > 0) {
+                            await mermaid.run();
+                        }
+
                         return;
                     }
                 } catch (e) {
                     // Try next file
                 }
             }
-            
+
             content.innerHTML = '<div class="error">No content available. Please add an index.md or README.md file to the docs directory.</div>';
         }
+
         
         loadMarkdown();
     </script>
