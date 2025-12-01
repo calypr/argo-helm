@@ -159,4 +159,48 @@ For GitOps, status tends to feed back to **two places**:
 
 That keeps Git clean, keeps ops logs in the right place, and still gives you a single-click path from the commit to the full workflow history.
 
+---
+
+## Enabling GitHub Commit Status Updates
+
+This Helm chart supports automatic commit status posting. When enabled, workflows triggered by push events will post their status (✅ success / ❌ failure) back to the GitHub commit.
+
+### Configuration
+
+Enable commit status updates in your `values.yaml`:
+
+```yaml
+events:
+  github:
+    commitStatus:
+      enabled: true
+      # URL to your Argo Workflows server (for linking to workflow details)
+      argoServerUrl: "https://your-domain.com/workflows"
+      # Secret containing GitHub token with repo:status scope
+      secretName: "github-secret"
+      secretKey: "token"
+```
+
+### How It Works
+
+1. When a `push` event is received, the sensor extracts the commit SHA from `body.after`
+2. A workflow is triggered with the commit SHA passed as a parameter
+3. On workflow completion (success or failure), the exit handler posts status to GitHub
+4. The status includes a link to the workflow in the Argo Workflows UI
+
+### Required GitHub Token Permissions
+
+The GitHub token needs the following scope:
+- `repo:status` - Required for posting commit statuses
+- `repo` - Required if working with private repositories
+
+### Example Status Update
+
+When a workflow completes, GitHub will show:
+- ✅ **success** - "Workflow completed successfully" with link to Argo Workflows UI
+- ❌ **failure** - "Workflow failed" with link to Argo Workflows UI
+
+This provides immediate feedback on the commit page without needing to check the Argo Workflows UI.
+
+
 

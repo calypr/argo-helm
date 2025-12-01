@@ -11,6 +11,9 @@ metadata:
     helm.sh/hook-delete-policy: before-hook-creation
 spec:
   entrypoint: run-nextflow
+  {{- if .Values.events.github.commitStatus.enabled }}
+  onExit: exit-handler
+  {{- end }}
   arguments:
     parameters:
       - name: repo-name
@@ -32,6 +35,16 @@ spec:
         description: "Artifact S3 endpoint hostname/URL."
       - name: artifact-region
         description: "Artifact S3 region."
+      # GitHub event data for commit status updates
+      - name: github-owner
+        description: "GitHub repository owner (extracted from event)."
+        value: ""
+      - name: github-repo
+        description: "GitHub repository name (extracted from event)."
+        value: ""
+      - name: commit-sha
+        description: "Git commit SHA (extracted from push event)."
+        value: ""
 
   templates:
     - name: run-nextflow
@@ -76,3 +89,105 @@ spec:
               secretKeyRef:
                 name: s3-credentials-{{ "{{workflow.parameters.repo-name}}" }}
                 key: AWS_SECRET_ACCESS_KEY
+
+    {{- if .Values.events.github.commitStatus.enabled }}
+    # Exit handler to post commit status to GitHub
+    - name: exit-handler
+      metadata:
+        annotations:
+          workflows.argoproj.io/description: |
+            Post workflow status back to GitHub commit.
+            Runs on workflow completion (success or failure).
+      script:
+        image: {{ .Values.events.github.commitStatus.image | default "alpine/curl:latest" }}
+        command: ["/bin/sh"]
+        source: |
+          #!/bin/sh
+          set -e
+
+          # Get workflow status
+          WORKFLOW_STATUS="{{ "{{workflow.status}}" }}"
+          WORKFLOW_NAME="{{ "{{workflow.name}}" }}"
+          
+          # Get GitHub parameters
+          OWNER="{{ "{{workflow.parameters.github-owner}}" }}"
+          REPO="{{ "{{workflow.parameters.github-repo}}" }}"
+          SHA="{{ "{{workflow.parameters.commit-sha}}" }}"
+
+          # Skip if required parameters are missing
+          if [ -z "$OWNER" ] || [ -z "$REPO" ] || [ -z "$SHA" ]; then
+            echo "Skipping GitHub status update - missing parameters"
+            echo "Owner: $OWNER, Repo: $REPO, SHA: $SHA"
+            exit 0
+          fi
+
+          # Map Argo workflow status to GitHub status
+          case "$WORKFLOW_STATUS" in
+            Succeeded)
+              STATE="success"
+              DESCRIPTION="✅ Workflow completed successfully"
+              ;;
+            Failed|Error)
+              STATE="failure"
+              DESCRIPTION="❌ Workflow failed"
+              ;;
+            *)
+              STATE="error"
+              DESCRIPTION="⚠️ Workflow ended with status: $WORKFLOW_STATUS"
+              ;;
+          esac
+
+          # Build target URL (link to workflow in Argo UI)
+          ARGO_SERVER_URL="${ARGO_SERVER_URL:-}"
+          if [ -n "$ARGO_SERVER_URL" ]; then
+            TARGET_URL="${ARGO_SERVER_URL}/workflows/{{ "{{workflow.namespace}}" }}/${WORKFLOW_NAME}"
+          else
+            TARGET_URL=""
+          fi
+
+          # GitHub API endpoint
+          API_URL="https://api.github.com/repos/${OWNER}/${REPO}/statuses/${SHA}"
+
+          # Build JSON payload
+          if [ -n "$TARGET_URL" ]; then
+            PAYLOAD="{\"state\":\"${STATE}\",\"target_url\":\"${TARGET_URL}\",\"description\":\"${DESCRIPTION}\",\"context\":\"argo-workflows\"}"
+          else
+            PAYLOAD="{\"state\":\"${STATE}\",\"description\":\"${DESCRIPTION}\",\"context\":\"argo-workflows\"}"
+          fi
+
+          echo "Posting status to GitHub commit: ${SHA:0:7}"
+          echo "  State: $STATE"
+          echo "  Description: $DESCRIPTION"
+          if [ -n "$TARGET_URL" ]; then
+            echo "  Target URL: $TARGET_URL"
+          fi
+
+          # Post status to GitHub
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            -H "Authorization: Bearer ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github+json" \
+            -H "Content-Type: application/json" \
+            -d "$PAYLOAD" \
+            "$API_URL")
+
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | sed '$d')
+
+          if [ "$HTTP_CODE" -ge 200 ] && [ "$HTTP_CODE" -lt 300 ]; then
+            echo "✅ Status posted successfully (HTTP $HTTP_CODE)"
+          else
+            echo "❌ Failed to post status (HTTP $HTTP_CODE)"
+            echo "Response: $BODY"
+            # Don't fail the exit handler on status post failure
+          fi
+        env:
+          - name: GITHUB_TOKEN
+            valueFrom:
+              secretKeyRef:
+                name: {{ .Values.events.github.commitStatus.secretName | default "github-secret" }}
+                key: {{ .Values.events.github.commitStatus.secretKey | default "token" }}
+          {{- if .Values.events.github.commitStatus.argoServerUrl }}
+          - name: ARGO_SERVER_URL
+            value: {{ .Values.events.github.commitStatus.argoServerUrl | quote }}
+          {{- end }}
+    {{- end }}

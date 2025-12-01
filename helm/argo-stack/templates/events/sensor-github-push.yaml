@@ -60,9 +60,8 @@ spec:
                     value: {{ $reg.name | quote }}
                   - name: repo-url
                     value: {{ $reg.repoUrl | quote }}
-                  # TODO - read from event
-                  # - name: revision
-                  #  value: main
+                  - name: revision
+                    value: "main"
                   {{- if $reg.artifactBucket }}
                   - name: artifact-bucket
                     value: {{ $reg.artifactBucket.bucket | quote }}
@@ -71,6 +70,23 @@ spec:
                   - name: artifact-region
                     value: {{ $reg.artifactBucket.region | quote }}
                   {{- end }}
+                  # GitHub event data for commit status updates
+                  - name: github-owner
+                    value: {{ $owner | quote }}
+                  - name: github-repo
+                    value: {{ $repoName | quote }}
+                  - name: commit-sha
+                    value: ""
+        parameters:
+          # Extract commit SHA and ref from GitHub push event payload
+          - src:
+              dependencyName: {{ $eventName | quote }}
+              dataKey: body.after
+            dest: spec.arguments.parameters.#(name==commit-sha).value
+          - src:
+              dependencyName: {{ $eventName | quote }}
+              dataKey: body.ref
+            dest: spec.arguments.parameters.#(name==revision).value
   {{- end }}
 {{- end }}
 {{- end }}

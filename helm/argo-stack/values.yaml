@@ -420,6 +420,29 @@ events:
         hosts: []  # Add your public hostname to create Ingress, e.g., ["webhooks.example.com"]
         tls: []
 
+    # ========================================================================
+    # GitHub Commit Status Updates
+    # ========================================================================
+    # When enabled, workflows will post status (✅/❌) back to GitHub commits.
+    # This provides immediate feedback on push events showing workflow results.
+    #
+    # See docs/gitops-events.md for the GitOps pattern this implements.
+    commitStatus:
+      # Enable posting commit status to GitHub on workflow completion
+      enabled: false
+      
+      # Container image for the status posting step
+      image: "alpine/curl:latest"
+      
+      # Argo Workflows server URL for linking to workflow details
+      # Example: "https://your-domain.com/workflows"
+      argoServerUrl: ""
+      
+      # Secret containing GitHub API token for posting statuses
+      # This requires repo:status or repo scope for private repos
+      secretName: "github-secret"
+      secretKey: "token"
+
   # ========================================================================
   # Legacy sensor configuration has been removed.
   # Sensors are now automatically generated from repoRegistrations.
