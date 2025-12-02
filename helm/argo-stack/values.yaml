@@ -227,7 +227,7 @@ landingPage:
   # Container image configuration
   image:
     repository: landing-page
-    tag: latest
+    tag: v3
     pullPolicy: IfNotPresent
   # Page title
   title: "Welcome"

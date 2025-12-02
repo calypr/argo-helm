@@ -69,6 +69,7 @@ template: check-vars deps
 		--set-string githubApp.installationId="${GITHUBHAPP_INSTALLATION_ID}" \
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
+		--set-string landingPage.image.tag=v3 \
 		--set ingress={} \
 		-f - \
 		-f helm/argo-stack/admin-values.yaml \
@@ -177,6 +178,7 @@ argo-stack:
 		--set-string githubApp.installationId="${GITHUBHAPP_INSTALLATION_ID}" \
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
+		--set-string landingPage.image.tag=v3 \
 		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
@@ -469,8 +471,8 @@ docker-install:
 	kind load docker-image authz-adapter:v0.0.1 --name kind
 	docker exec -it kind-control-plane crictl images | grep authz-adapter
 	@echo "✅ loaded docker authz-adapter"
-	cd landing-page ; docker build -t landing-page:latest -f Dockerfile .
-	kind load docker-image landing-page:latest --name kind
+	cd landing-page ; docker build --no-cache  -t landing-page:v3 -f Dockerfile .
+	kind load docker-image landing-page:v3 --name kind
 	docker exec -it kind-control-plane crictl images | grep landing-page
 	@echo "✅ loaded docker landing-page"
 
