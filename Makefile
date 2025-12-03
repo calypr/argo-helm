@@ -12,6 +12,11 @@ S3_HOSTNAME          ?= minio.minio-system.svc.cluster.local:9000
 # Vault configuration for local development (in-cluster deployment)
 VAULT_TOKEN          ?= root
 
+# GitHub App configuration (optional)
+# Set these to seed the GitHub App private key into Vault
+GITHUBAPP_PRIVATE_KEY_FILE_PATH ?=
+GITHUBAPP_PRIVATE_KEY_VAULT_PATH ?= kv/argo/argocd/github-app
+
 # Ingress configuration - must be set for production deployments
 # ARGO_HOSTNAME: (REQUIRED) The domain name for your Argo services (e.g., argo.example.com)
 #                Must be set as environment variable: export ARGO_HOSTNAME=your-domain.com
@@ -300,6 +305,13 @@ vault-seed:
 		clientSecret="test-oidc-secret-argocd"
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/argocd/server \
 		secretKey="$$(openssl rand -hex 32)"
+	@echo "➡️  Creating secrets for GitHub App (if configured)..."
+	@if [ -n "$(GITHUBAPP_PRIVATE_KEY_FILE_PATH)" ] && [ -f "$(GITHUBAPP_PRIVATE_KEY_FILE_PATH)" ]; then \
+		echo "   Seeding GitHub App private key from $(GITHUBAPP_PRIVATE_KEY_FILE_PATH) to $(GITHUBAPP_PRIVATE_KEY_VAULT_PATH)"; \
+		cat "$(GITHUBAPP_PRIVATE_KEY_FILE_PATH)" | kubectl exec -i -n vault vault-0 -- vault kv put $(GITHUBAPP_PRIVATE_KEY_VAULT_PATH) privateKey=-; \
+	else \
+		echo "   (Skipping - GITHUBAPP_PRIVATE_KEY_FILE_PATH not set or file not found)"; \
+	fi
 	@echo "➡️  Creating secrets for Argo Workflows..."
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/workflows/artifacts \
 		accessKey="minioadmin" \
@@ -356,6 +368,7 @@ vault-seed:
 	@echo "   kv/argo/argocd/admin                            - Argo CD admin credentials"
 	@echo "   kv/argo/argocd/oidc                             - Argo CD OIDC client secret"
 	@echo "   kv/argo/argocd/server                           - Argo CD server secret key"
+	@echo "   kv/argo/argocd/github-app                       - GitHub App private key (if configured)"
 	@echo "   kv/argo/workflows/artifacts                     - Workflow artifact storage credentials"
 	@echo "   kv/argo/workflows/oidc                          - Workflow OIDC client secret"
 	@echo "   kv/argo/authz                                   - AuthZ adapter OIDC secret"

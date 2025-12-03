@@ -115,8 +115,18 @@ If you're using HashiCorp Vault with External Secrets Operator:
 ```yaml
 # values.yaml
 
-# Store the private key in Vault first:
+# Store the private key in Vault first using one of these methods:
+#
+# Method 1: Using vault CLI directly:
 # vault kv put kv/argo/argocd/github-app privateKey=@/path/to/private-key.pem
+#
+# Method 2: Using the Makefile (local development):
+# export GITHUBAPP_PRIVATE_KEY_FILE_PATH=/path/to/private-key.pem
+# make vault-seed
+#
+# Method 3: Using kubectl exec:
+# cat /path/to/private-key.pem | kubectl exec -i -n vault vault-0 -- \
+#   vault kv put kv/argo/argocd/github-app privateKey=-
 
 githubApp:
   enabled: true
