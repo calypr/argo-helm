@@ -10,38 +10,25 @@ When I push new analysis files or metadata updates to the repository, GitOps det
 
 
 ```mermaid
-flowchart LR
-  subgraph GH["GitHub / IdP / Fence"]
-    REG["values.repoRegistrations[]"]
-    APP["Single GitHub App"]
-  end
+sequenceDiagram
+    autonumber
+    participant B as Bioinformatician
+    participant G as Git Repository
+    participant O as GitOps Controller<br/>(Argo CD / Flux)
+    participant S as Data Services<br/>(Indexd, Metadata APIs)
+    participant P as Portal Application
 
-  subgraph CL["Kubernetes Cluster"]
-    subgraph IN["Ingress + authz-adapter"]
-      NGINX["NGINX Ingress<br/>auth_request"]
-      AUTHZ["authz-adapter<br/>OIDC + repoRegistrations"]
-    end
+    B->>G: Commit new data<br/>and metadata updates
+    G-->>O: Trigger GitOps sync<br/>(webhook or polling)
 
-    subgraph AC["Namespace: argocd"]
-      ARGOCD["Argo CD Server"]
-      RBACCM["argocd-rbac-cm<br/>policies from repoRegistrations"]
-    end
+    O->>S: Apply updated configs<br/>and publish new data
+    S-->>O: Acknowledge deployment<br/>and updated records
 
-    subgraph WF["Namespaces: wf-&lt;org&gt;-&lt;repo&gt;"]
-      WFNS["Role / RoleBinding<br/>per tenant"]
-    end
-  end
+    O->>P: Update portal manifests<br/>and reload content
+    P-->>B: Portal reflects<br/>latest validated data
 
-  REG -->|Helm render| RBACCM
-  REG -->|Helm render| WFNS
+    Note over B,P: Git commits become the single source of truth,<br/>and all systems stay in sync automatically.
 
-  APP -->|webhooks / status| ARGOCD
-
-  U["User Browser / CLI"] -->|HTTPS| NGINX
-  NGINX -->|auth_request| AUTHZ
-  AUTHZ -->|"200 + X-Auth-Request-Groups:<br/>wf-<org>-<repo>-writers, wf-<org>-<repo>-readers"| NGINX
-  NGINX -->|authorized traffic + groups| ARGOCD
-  NGINX -->|authorized traffic + groups| WFNS
 ```
 
 This guide covers:

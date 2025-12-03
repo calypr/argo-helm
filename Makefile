@@ -19,6 +19,7 @@ VAULT_TOKEN          ?= root
 # EXTERNAL_IP: External IP address for ingress (leave empty to skip external IP assignment)
 TLS_SECRET_NAME      ?= calypr-demo-tls
 PUBLIC_IP            ?=
+LANDING_PAGE_IMAGE_TAG ?= v3
 
 check-vars:
 	@echo "🔍 Checking required environment variables..."
@@ -69,7 +70,7 @@ template: check-vars deps
 		--set-string githubApp.installationId="${GITHUBHAPP_INSTALLATION_ID}" \
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
-		--set-string landingPage.image.tag=v3 \
+		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
 		--set ingress={} \
 		-f - \
 		-f helm/argo-stack/admin-values.yaml \
@@ -178,7 +179,7 @@ argo-stack:
 		--set-string githubApp.installationId="${GITHUBHAPP_INSTALLATION_ID}" \
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
-		--set-string landingPage.image.tag=v3 \
+		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
 		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
@@ -471,8 +472,8 @@ docker-install:
 	kind load docker-image authz-adapter:v0.0.1 --name kind
 	docker exec -it kind-control-plane crictl images | grep authz-adapter
 	@echo "✅ loaded docker authz-adapter"
-	cd landing-page ; docker build --no-cache  -t landing-page:v3 -f Dockerfile .
-	kind load docker-image landing-page:v3 --name kind
+	cd landing-page ; docker build --no-cache  -t landing-page:${LANDING_PAGE_IMAGE_TAG} -f Dockerfile .
+	kind load docker-image landing-page:${LANDING_PAGE_IMAGE_TAG} --name kind
 	docker exec -it kind-control-plane crictl images | grep landing-page
 	@echo "✅ loaded docker landing-page"
 
