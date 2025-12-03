@@ -4,9 +4,18 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Welcome</title>
+
+    <!-- Mermaid: ESM import, global export, manual start -->
     <script type="module">
         import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
-        mermaid.initialize({ startOnLoad: true, theme: 'default' });
+
+        // Expose to non-module scripts
+        window.mermaid = mermaid;
+
+        mermaid.initialize({
+            startOnLoad: false, // we'll trigger rendering manually
+            theme: 'default'
+        });
     </script>
 
     <style>
@@ -116,18 +125,25 @@
         padding: 1rem;
         overflow: hidden;
     }
-</style>
-
+    </style>
 </head>
 <body>
     <div id="content">Loading...</div>
+
     <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
     <script>
         const files = ['index.md', 'README.md'];
-        
+
         async function loadMarkdown() {
             const content = document.getElementById('content');
+
+            // Make sure marked uses language- prefix (so ```mermaid -> language-mermaid)
+            if (window.marked && typeof marked.setOptions === 'function') {
+                marked.setOptions({
+                    langPrefix: 'language-'
+                });
+            }
 
             for (const file of files) {
                 try {
@@ -140,18 +156,26 @@
                             ADD_ATTR: ['class']
                         });
 
-                        // Process mermaid diagrams
-                        const mermaidBlocks = content.querySelectorAll('pre code.language-mermaid');
-                        mermaidBlocks.forEach((block, index) => {
+                        // Find Mermaid blocks (robust selector)
+                        const mermaidBlocks = content.querySelectorAll(
+                            'pre code.language-mermaid, pre code.mermaid, code.language-mermaid, code.mermaid'
+                        );
+
+                        // Replace code blocks with <div class="mermaid">...</div>
+                        mermaidBlocks.forEach((block) => {
                             const mermaidDiv = document.createElement('div');
                             mermaidDiv.className = 'mermaid';
                             mermaidDiv.textContent = block.textContent;
-                            block.parentElement.replaceWith(mermaidDiv);
+                            // Replace the <pre> parent if present, otherwise just the code block
+                            const container = block.parentElement.tagName.toLowerCase() === 'pre'
+                                ? block.parentElement
+                                : block;
+                            container.replaceWith(mermaidDiv);
                         });
 
-                        // Re-render mermaid diagrams
-                        if (mermaidBlocks.length > 0) {
-                            // await mermaid.run(); // TODO - is this necessary
+                        // Run Mermaid after blocks exist
+                        if (mermaidBlocks.length > 0 && window.mermaid && typeof window.mermaid.run === 'function') {
+                            await window.mermaid.run({ querySelector: '.mermaid' });
                         }
 
                         return;
@@ -164,8 +188,8 @@
             content.innerHTML = '<div class="error">No content available. Please add an index.md or README.md file to the docs directory.</div>';
         }
 
-        
         loadMarkdown();
     </script>
 </body>
 </html>
+

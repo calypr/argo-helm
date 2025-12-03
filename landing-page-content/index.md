@@ -12,20 +12,29 @@ When I push new analysis files or metadata updates to the repository, GitOps det
 ```mermaid
 sequenceDiagram
     autonumber
+
     participant B as Bioinformatician
     participant G as Git Repository
-    participant O as GitOps Controller<br/>(Argo CD / Flux)
-    participant S as Data Services<br/>(Indexd, Metadata APIs)
+    participant O as Calypr GitOps
+    participant S as Workflow Services
     participant P as Portal Application
 
+    rect rgba(200, 220, 255, 0.35)
+        Note over O,P: Calypr Platform
+    end
+
     B->>G: Commit new data<br/>and metadata updates
-    G-->>O: Trigger GitOps sync<br/>(webhook or polling)
+    G-->>O: Trigger GitOps sync
 
-    O->>S: Apply updated configs<br/>and publish new data
-    S-->>O: Acknowledge deployment<br/>and updated records
+    rect rgba(200, 220, 255, 0.12)
+        O->>S: Apply updated configs<br/>and publish new data
+        S-->>O: Acknowledge deployment<br/>and updated records
+        O-->>G: Updated Git status
 
-    O->>P: Update portal manifests<br/>and reload content
-    P-->>B: Portal reflects<br/>latest validated data
+        O->>P: Update portal manifests<br/>and reload content
+        P-->>B: Portal reflects<br/>latest validated data
+    end
+
 
     Note over B,P: Git commits become the single source of truth,<br/>and all systems stay in sync automatically.
 
