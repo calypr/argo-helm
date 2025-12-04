@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Welcome</title>
+
+    <!-- Mermaid: ESM import, global export, manual start -->
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+
+        // Expose to non-module scripts
+        window.mermaid = mermaid;
+
+        mermaid.initialize({
+            startOnLoad: false, // we'll trigger rendering manually
+            theme: 'default'
+        });
+    </script>
+
+    <style>
+    :root {
+        --bg: #fafafa;
+        --fg: #1a1a1a;
+        --accent: #0066cc;
+        --accent-light: #e7f3ff;
+        --border: #ddd;
+        --radius: 10px;
+        --shadow: 0 4px 12px rgba(0,0,0,0.08);
+    }
+
+    @media (prefers-color-scheme: dark) {
+        :root {
+            --bg: #121212;
+            --fg: #e6e6e6;
+            --accent: #4da3ff;
+            --accent-light: #1a2a40;
+            --border: #333;
+            --shadow: 0 4px 12px rgba(0,0,0,0.4);
+        }
+    }
+
+    body {
+        font-family: Inter, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+        line-height: 1.75;
+        max-width: 900px;
+        margin: 0 auto;
+        padding: 2.5rem 1.2rem;
+        background: var(--bg);
+        color: var(--fg);
+    }
+
+    #content {
+        background: var(--bg);
+        font-size: 1.05rem;
+    }
+
+    h1, h2, h3, h4 {
+        font-weight: 700;
+        line-height: 1.25;
+        margin-top: 2.2rem;
+        margin-bottom: 0.8rem;
+        color: var(--fg);
+    }
+
+    h1 { font-size: 2.2rem; }
+    h2 { font-size: 1.8rem; }
+    h3 { font-size: 1.4rem; }
+
+    p, ul, ol {
+        margin-bottom: 1.2rem;
+    }
+
+    a {
+        color: var(--accent);
+        text-decoration: none;
+        font-weight: 500;
+    }
+    a:hover {
+        text-decoration: underline;
+    }
+
+    code {
+        background: var(--accent-light);
+        padding: 0.25em 0.45em;
+        border-radius: 6px;
+        font-size: 0.95rem;
+    }
+
+    pre {
+        background: var(--accent-light);
+        padding: 1.2rem;
+        border-radius: var(--radius);
+        overflow-x: auto;
+        box-shadow: var(--shadow);
+        border: 1px solid var(--border);
+        margin-bottom: 1.5rem;
+    }
+    pre code {
+        background: none;
+        padding: 0;
+    }
+
+    .error {
+        background: #ffe5e5;
+        border: 1px solid #ff9999;
+        color: #b30000;
+        padding: 1.2rem;
+        border-radius: var(--radius);
+        margin-top: 2rem;
+        font-weight: 500;
+    }
+
+    img {
+        max-width: 100%;
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+    }
+
+    /* Smooth Mermaid integration */
+    .mermaid {
+        margin: 1.5rem 0;
+        background: var(--accent-light);
+        border-radius: var(--radius);
+        padding: 1rem;
+        overflow: hidden;
+    }
+    </style>
+</head>
+<body>
+    <div id="content">Loading...</div>
+
+    <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+    <script>
+        const files = ['index.md', 'README.md'];
+
+        async function loadMarkdown() {
+            const content = document.getElementById('content');
+
+            // Make sure marked uses language- prefix (so ```mermaid -> language-mermaid)
+            if (window.marked && typeof marked.setOptions === 'function') {
+                marked.setOptions({
+                    langPrefix: 'language-'
+                });
+            }
+
+            for (const file of files) {
+                try {
+                    const response = await fetch('/docs/' + file);
+                    if (response.ok) {
+                        const text = await response.text();
+                        const html = marked.parse(text);
+                        content.innerHTML = DOMPurify.sanitize(html, {
+                            ADD_TAGS: ['pre'],
+                            ADD_ATTR: ['class']
+                        });
+
+                        // Find Mermaid blocks (robust selector)
+                        const mermaidBlocks = content.querySelectorAll(
+                            'pre code.language-mermaid, pre code.mermaid, code.language-mermaid, code.mermaid'
+                        );
+
+                        // Replace code blocks with <div class="mermaid">...</div>
+                        mermaidBlocks.forEach((block) => {
+                            const mermaidDiv = document.createElement('div');
+                            mermaidDiv.className = 'mermaid';
+                            mermaidDiv.textContent = block.textContent;
+                            // Replace the <pre> parent if present, otherwise just the code block
+                            const container = block.parentElement.tagName.toLowerCase() === 'pre'
+                                ? block.parentElement
+                                : block;
+                            container.replaceWith(mermaidDiv);
+                        });
+
+                        // Run Mermaid after blocks exist
+                        if (mermaidBlocks.length > 0 && window.mermaid && typeof window.mermaid.run === 'function') {
+                            await window.mermaid.run({ querySelector: '.mermaid' });
+                        }
+
+                        return;
+                    }
+                } catch (e) {
+                    // Try next file
+                }
+            }
+
+            content.innerHTML = '<div class="error">No content available. Please add an index.md or README.md file to the docs directory.</div>';
+        }
+
+        loadMarkdown();
+    </script>
+</body>
+</html>
+

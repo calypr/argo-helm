@@ -1,6 +1,6 @@
 repoRegistrations:
   # Example 1: Basic Nextflow pipeline
-  - name: nextflow-hello-project
+  - name: bwalsh-nextflow-hello-project
     repoUrl: https://github.com/bwalsh/nextflow-hello-project.git
     defaultBranch: main
     tenant: research-team-1
@@ -13,14 +13,14 @@ repoRegistrations:
       region: $S3_REGION
       insecure: true
       pathStyle: true
-      keyPrefix: nextflow-hello-project-workflows/
+      keyPrefix: bwalsh-nextflow-hello-project-workflows/
       # Vault path for S3 credentials (relative to kv/)
-      externalSecretPath: argo/apps/nextflow-hello-project/s3/artifacts
+      externalSecretPath: argo/apps/bwalsh/nextflow-hello-project/s3/artifacts
     
     # GitHub credentials
-    githubSecretName: github-secret-nextflow-hello
+    githubSecretName: github-secret-bwalsh-nextflow-hello-project
     # Vault path for GitHub token
-    githubSecretPath: argo/apps/nextflow-hello-project/github
+    githubSecretPath: argo/apps/bwalsh/nextflow-hello-project/github
     
     # Access control (Fence-authenticated emails)
     adminUsers:

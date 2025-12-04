@@ -21,6 +21,20 @@ metadata:
     {{- if $reg.tenant }}
     repo-registration/tenant: {{ $reg.tenant | quote }}
     {{- end }}
+    {{- if and $.Values.notifications.enabled $.Values.notifications.github.enabled $.Values.notifications.defaultSubscriptions.autoSubscribe }}
+    {{- if $.Values.notifications.triggers.onSyncSucceeded }}
+    notifications.argoproj.io/subscribe.on-sync-succeeded.github: ""
+    {{- end }}
+    {{- if $.Values.notifications.triggers.onSyncFailed }}
+    notifications.argoproj.io/subscribe.on-sync-failed.github: ""
+    {{- end }}
+    {{- if $.Values.notifications.triggers.onSyncRunning }}
+    notifications.argoproj.io/subscribe.on-sync-running.github: ""
+    {{- end }}
+    {{- if $.Values.notifications.triggers.onHealthDegraded }}
+    notifications.argoproj.io/subscribe.on-health-degraded.github: ""
+    {{- end }}
+    {{- end }}    
 spec:
   project: {{ $reg.project | default "default" }}
   source:

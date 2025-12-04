@@ -1,0 +1,184 @@
+# ============================================================================
+# Ingress AuthZ Overlay Configuration
+# ============================================================================
+# This overlay provides a single host, path-based ingress layer for all
+# major UIs and APIs, protected by a centralized authz-adapter.
+#
+# Usage:
+#   helm upgrade --install ingress-authz-overlay \
+#     helm/argo-stack/overlays/ingress-authz-overlay \
+#     --set ingressAuthzOverlay.enabled=true
+# ============================================================================
+
+
+ingressAuthzOverlay:
+  # Enable or disable the overlay
+  enabled: true
+
+  # ============================================================================
+  # Host and TLS Configuration
+  # ============================================================================
+  # Single host for all path-based routes
+  host: calypr-demo.ddns.net
+
+  # TLS configuration using cert-manager
+  tls:
+    enabled: true
+    secretName: calypr-demo-tls
+
+  # ============================================================================
+  # Ingress Controller Configuration
+  # ============================================================================
+  ingressClassName: nginx
+
+  # ============================================================================
+  # AuthZ Adapter Configuration
+  # ============================================================================
+  authzAdapter:
+    # Enable deployment of authz-adapter (set to false if using centralized adapter)
+    # NOTE: By default, the main argo-stack chart deploys authz-adapter to the
+    # 'security' namespace. Set deploy: false to reuse that instance.
+    deploy: false
+
+    # Service discovery settings
+    # NOTE: When deploy: false, ensure these point to the existing authz-adapter
+    # deployed by the main argo-stack chart in the 'security' namespace.
+    serviceName: authz-adapter
+    namespace: security
+    port: 8080
+
+    # Auth endpoint path
+    path: /check
+
+    # Sign-in URL for unauthenticated requests
+    signinUrl: https://calypr-demo.ddns.net/tenants/login
+
+    # Headers to pass back from auth response
+    responseHeaders: "X-User,X-Email,X-Groups,X-Auth-Request-User,X-Auth-Request-Email,X-Auth-Request-Groups"
+
+    # Container image for authz-adapter
+    image: ghcr.io/calypr/argo-helm:latest
+
+    # Number of replicas
+    replicas: 2
+
+    # Environment configuration for the adapter
+    env:
+      # GitApp/Fence base URL for user info
+      fenceBase: "https://calypr-dev.ohsu.edu/user"
+      # Tenant login path
+      tenantLoginPath: "/tenants/login"
+      # HTTP timeout for auth calls
+      httpTimeout: "3.0"
+
+    # Resource limits and requests
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 200m
+        memory: 128Mi
+
+    # Pod security context
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+
+  # ============================================================================
+  # Route Definitions
+  # ============================================================================
+  # Each route creates a separate Ingress resource in the specified namespace.
+  # All routes share the same host and TLS configuration.
+  # All routes are protected by the authz-adapter via NGINX external auth.
+  #
+  # IMPORTANT: Only ONE route should have the cert-manager.io/cluster-issuer annotation
+  # to avoid "certificate resource is not owned by this object" errors.
+  # Set `primary: true` on exactly one route to designate it as the certificate owner.
+  routes:
+    # Landing Page - Root path (/)
+    landing:
+      enabled: true
+      namespace: security
+      service: landing-page
+      serviceNamespace: security
+      port: 80
+      pathPrefix: /
+      # Must be lower priority than other routes
+      # NGINX processes longer paths first, so /workflows takes precedence over /
+
+    # Argo Workflows UI (primary route - manages TLS certificate)
+    workflows:
+      enabled: true
+      # Set primary: true to designate this route as the certificate owner
+      # Only the primary route gets the cert-manager.io/cluster-issuer annotation
+      primary: true
+      # Namespace where the ingress will be created
+      namespace: argo-workflows
+      # Service name to route to
+      service: argo-stack-argo-workflows-server
+      # Namespace where the actual service exists (for cross-namespace routing)
+      # If different from namespace, an ExternalName service will be created
+      serviceNamespace: argo-workflows
+      port: 2746
+      pathPrefix: /workflows
+      # Use regex path matching for subpaths
+      useRegex: true
+      # Rewrite path to remove prefix
+      rewriteTarget: /$2
+
+    # Argo CD Applications UI
+    applications:
+      enabled: true
+      namespace: argocd
+      service: argo-stack-argocd-server
+      # ArgoCD server is in argocd namespace
+      serviceNamespace: argocd
+      port: 8080
+      pathPrefix: /applications
+      useRegex: true
+      rewriteTarget: /$2
+      # ArgoCD server uses HTTPS by default
+      # backendProtocol: HTTPS
+
+    # GitHub Repository Registrations EventSource
+    registrations:
+      enabled: true
+      namespace: argo-events
+      service: github-repo-registrations-eventsource-svc
+      # EventSource is in argo-events namespace
+      serviceNamespace: argo-events
+      port: 12000
+      pathPrefix: /registrations
+      useRegex: true
+      rewriteTarget: /$2
+
+    # Calypr API Service
+    api:
+      enabled: true
+      namespace: calypr-api
+      service: calypr-api
+      # Service is in same namespace as ingress
+      serviceNamespace: calypr-api
+      port: 3000
+      pathPrefix: /api
+      useRegex: true
+      rewriteTarget: /$2
+
+    # Calypr Tenants Service
+    tenants:
+      enabled: true
+      namespace: calypr-tenants
+      service: calypr-tenants
+      # Service is in same namespace as ingress
+      serviceNamespace: calypr-tenants
+      port: 3001
+      pathPrefix: /tenants
+      useRegex: true
+      rewriteTarget: /$2
+      # Optional: Allow public access to login endpoint
+      # Set to true to skip auth for /tenants/login
+      publicPaths:
+        - /tenants/login
+        - /tenants/logout
+        - /tenants/callback

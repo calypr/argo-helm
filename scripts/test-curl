@@ -1,0 +1,16 @@
+curl https://calypr-demo.ddns.net/workflows
+curl https://calypr-demo.ddns.net/applications
+curl https://calypr-demo.ddns.net/registrations
+curl https://calypr-demo.ddns.net/api
+curl https://calypr-demo.ddns.net/tenants
+
+
+# 1. Verify direct service access works
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://argo-stack-argo-workflows-server.argo-workflows:2746/
+# 2. Verify ExternalName proxy service resolves correctly
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never -- \
+  curl -v http://argo-stack-argo-workflows-server-proxy.argo-stack:2746/
+# 3. Check ingress configuration
+kubectl describe ingress ingress-authz-workflows -n argo-stack | grep -A5 "backend"
+

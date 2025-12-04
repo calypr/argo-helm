@@ -1,0 +1,98 @@
+{{/*
+Ingress resources for each route in the ingress-authz-overlay.
+Each route creates a separate Ingress resource in its respective namespace,
+all sharing the same host and TLS configuration.
+All routes are protected by the authz-adapter via NGINX external auth.
+
+NOTE: Only the route with primary: true should have the cert-manager.io/cluster-issuer
+annotation. Other routes just reference the TLS secret without the annotation to avoid
+cert-manager ownership conflicts. If no route has primary: true, no ingress will have
+the cluster-issuer annotation (the Certificate must be created manually or by another means).
+
+For cross-namespace routing (when serviceNamespace differs from namespace), we use
+an ExternalName service as a proxy. The ExternalName service is created in the
+externalname-services.yaml template.
+*/}}
+{{- if .Values.ingressAuthzOverlay.enabled }}
+{{- $root := . }}
+{{- $config := .Values.ingressAuthzOverlay }}
+{{- range $routeName, $route := $config.routes }}
+{{- $routeEnabled := $route.enabled | default true }}
+{{- if $routeEnabled }}
+{{- $serviceNamespace := $route.serviceNamespace | default $route.namespace }}
+{{- $isCrossNamespace := ne $route.namespace $serviceNamespace }}
+{{- $serviceName := ternary (printf "%s-proxy" $route.service) $route.service $isCrossNamespace }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress-authz-{{ $routeName }}
+  namespace: {{ $route.namespace }}
+  labels:
+    {{- include "ingress-authz-overlay.labels" $root | nindent 4 }}
+    app.kubernetes.io/component: ingress
+    ingress-authz-overlay.calypr.io/route: {{ $routeName | quote }}
+    {{- if $isCrossNamespace }}
+    ingress-authz-overlay.calypr.io/cross-namespace: "true"
+    ingress-authz-overlay.calypr.io/target-namespace: {{ $serviceNamespace | quote }}
+    {{- end }}
+  annotations:
+    # Helm release tracking
+    meta.helm.sh/release-name: {{ $root.Release.Name }}
+    meta.helm.sh/release-namespace: {{ $root.Release.Namespace }}
+    # NGINX external auth annotations
+    {{- include "ingress-authz-overlay.authAnnotations" $root | nindent 4 }}
+    # {{- if and $config.tls.enabled $route.primary }}
+    # # Let's Encrypt / cert-manager integration (only on primary route to avoid ownership conflicts)
+    # cert-manager.io/cluster-issuer: {{ $config.tls.clusterIssuer | quote }}
+    # {{- end }}
+    {{- if $route.backendProtocol }}
+    # Backend protocol for services using HTTPS/GRPC internally
+    # Valid values: HTTP, HTTPS, GRPC, GRPCS, AJP, FCGI
+    nginx.ingress.kubernetes.io/backend-protocol: {{ $route.backendProtocol | quote }}
+    {{- end }}
+    {{- if $route.useRegex }}
+    # Path rewriting for subpath support
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: {{ $route.rewriteTarget | default "/$2" }}
+    {{- end }}
+    {{- if $isCrossNamespace }}
+    # Cross-namespace routing via ExternalName service
+    nginx.ingress.kubernetes.io/upstream-vhost: {{ $route.service }}.{{ $serviceNamespace }}.svc.cluster.local
+    {{- end }}
+    {{- if $route.proxyConnectTimeout }}
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: {{ $route.proxyConnectTimeout | quote }}
+    {{- end }}
+    {{- if $route.proxyReadTimeout }}
+    nginx.ingress.kubernetes.io/proxy-read-timeout: {{ $route.proxyReadTimeout | quote }}
+    {{- end }}
+    {{- if $route.proxySendTimeout }}
+    nginx.ingress.kubernetes.io/proxy-send-timeout: {{ $route.proxySendTimeout | quote }}
+    {{- end }}
+spec:
+  ingressClassName: "nginx"
+  {{- if $config.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ $config.host | quote }}
+      secretName: {{ $config.tls.secretName | quote }}
+  {{- end }}
+  rules:
+    - host: {{ $config.host | quote }}
+      http:
+        paths:
+          {{- if $route.useRegex }}
+          - path: {{ $route.pathPrefix }}(/|$)(.*)
+            pathType: ImplementationSpecific
+          {{- else }}
+          - path: {{ $route.pathPrefix }}
+            pathType: Prefix
+          {{- end }}
+            backend:
+              service:
+                name: {{ $serviceName }}
+                port:
+                  number: {{ $route.port }}
+{{- end }}
+{{- end }}
+{{- end }}
