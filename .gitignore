@@ -4,4 +4,3 @@ __pycache__/
 github-status-proxy/github-status-proxy
 github-status-proxy/coverage.out
 github-status-proxy/coverage.html
-go.sum

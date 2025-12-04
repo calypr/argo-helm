@@ -1,0 +1,73 @@
+# Example values file for enabling GitHub Status Proxy
+# This demonstrates a complete setup with GitHub App integration
+
+# Enable GitHub Status Proxy for self-service commit status posting
+githubStatusProxy:
+  enabled: true
+  
+  # GitHub App ID - find this in your GitHub App settings
+  # Example: if your app URL is https://github.com/apps/my-app
+  # the App ID is shown on the app's settings page
+  githubAppId: "123456"  # REPLACE with your actual App ID
+  
+  # Number of replicas for high availability
+  replicas: 2
+  
+  # Docker image - update to use your registry if building custom image
+  image: ghcr.io/calypr/github-status-proxy:latest
+  
+  # Namespace where the proxy will run (should match argocd namespace)
+  namespace: argocd
+  
+  # Secret containing GitHub App private key
+  # Create with: kubectl create secret generic github-app-private-key \
+  #   --from-file=private-key.pem=/path/to/your/github-app-key.pem \
+  #   -n argocd
+  privateKeySecret:
+    name: github-app-private-key
+    key: private-key.pem
+
+# Standard Argo CD configuration
+argo-cd:
+  namespaceOverride: argocd
+  configs:
+    secret:
+      create: true
+      extra: {}
+
+# Argo Workflows configuration
+argo-workflows:
+  server:
+    enabled: true
+    secure: false
+  namespaceOverride: argo-workflows
+
+# Namespaces
+namespaces:
+  argo: argo-workflows
+  argocd: argocd
+  security: security
+
+# Authorization Adapter (optional)
+authzAdapter:
+  enabled: false
+
+# Example Application - demonstrates usage with GitHub repo
+applications:
+  - name: my-github-app
+    project: default
+    repoURL: https://github.com/myorg/myrepo  # REPLACE with your repo
+    targetRevision: main
+    path: "."
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: default
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+
+# After deploying with these values:
+# 1. Install the GitHub App on your repository (myorg/myrepo)
+# 2. Push a commit or trigger a sync
+# 3. Check the commit on GitHub - you should see a status from "argocd/my-github-app"
