@@ -567,12 +567,12 @@ githubApp:
 
 notifications:
   # Enable Argo CD Notifications controller
-  enabled: false
+  enabled: true
 
   # GitHub notification service configuration
   github:
     # Enable GitHub status updates
-    enabled: false
+    enabled: true
 
     # Use GitHub App for notifications (recommended)
     # When enabled, uses the same GitHub App as repository authentication

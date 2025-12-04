@@ -21,6 +21,12 @@ TLS_SECRET_NAME      ?= calypr-demo-tls
 PUBLIC_IP            ?=
 LANDING_PAGE_IMAGE_TAG ?= v3
 
+# GitHub App configuration (optional)
+# Set these to seed the GitHub App private key into Vault
+# GITHUBAPP_PRIVATE_KEY_FILE_PATH ?=
+GITHUBAPP_PRIVATE_KEY_VAULT_PATH ?= kv/argo/argocd/github-app
+
+
 check-vars:
 	@echo "🔍 Checking required environment variables..."
 	@test -n "$(S3_ENABLED)" || (echo "❌ ERROR: S3_ENABLED must be set (true/false)" && exit 1)
@@ -302,11 +308,13 @@ vault-status:
 	@echo "🔍 Checking Vault status..."
 	@kubectl exec -n vault vault-0 -- vault status 2>/dev/null || echo "❌ Vault not running. Run 'make vault-dev' first."
 
+vault-seed: vault-seed-etc vault-seed-github-app
+
 vault-seed-github-app:
 	@echo "➡️  Creating secrets for github app ..."
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/argocd/github-app privateKey=
+	cat "$(GITHUBHAPP_PRIVATE_KEY_FILE_PATH)" | kubectl exec -i -n vault vault-0 -- vault kv put $(GITHUBAPP_PRIVATE_KEY_VAULT_PATH) privateKey=-; \
 	
-vault-seed:
+vault-seed-etc:
 	@echo "🌱 Seeding Vault with test secrets..."
 	@echo "➡️  Enabling KV v2 secrets engine..."
 	@kubectl exec -n vault vault-0 -- vault secrets enable -version=2 -path=kv kv 2>/dev/null || echo "   (KV already enabled)"

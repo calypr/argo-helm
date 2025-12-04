@@ -1,8 +1,6 @@
 {{- if .Values.notifications.enabled }}
 {{- if .Values.notifications.github.enabled }}
 ---
-# ConfigMap for Argo CD Notifications
-# Contains GitHub notification service configuration, triggers, and templates
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -14,9 +12,9 @@ metadata:
     app.kubernetes.io/managed-by: {{ .Release.Service }}
     app.kubernetes.io/component: argocd-notifications
 data:
-  # ===========================================================================
+  # =========================================================
   # GitHub Notification Service Configuration
-  # ===========================================================================
+  # =========================================================
   service.github: |
     {{- if .Values.notifications.github.useGithubApp }}
     # Using GitHub App for notifications
@@ -25,56 +23,67 @@ data:
     privateKey: $github-privateKey
     {{- end }}
 
-  # ===========================================================================
+  # =========================================================
   # Notification Templates
-  # ===========================================================================
-  # Template for successful sync
+  # =========================================================
+
+  # Successful sync (commit status)
   template.app-sync-succeeded: |
     message: |
       Application {{`{{.app.metadata.name}}`}} has been successfully synced.
     github:
+      repoURLPath: "{{`{{.app.spec.source.repoURL}}`}}"
+      revisionPath: "{{`{{.app.status.sync.revision}}`}}"
       status:
         state: success
         label: "argocd/{{`{{.app.metadata.name}}`}}"
         targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
 
-  # Template for failed sync
+  # Failed sync (commit status)
   template.app-sync-failed: |
     message: |
       Application {{`{{.app.metadata.name}}`}} sync failed.
       Error: {{`{{.app.status.operationState.message}}`}}
     github:
+      repoURLPath: "{{`{{.app.spec.source.repoURL}}`}}"
+      revisionPath: "{{`{{.app.status.sync.revision}}`}}"
       status:
         state: failure
         label: "argocd/{{`{{.app.metadata.name}}`}}"
         targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
 
-  # Template for running sync
+  # Sync running (optional commit status)
   template.app-sync-running: |
     message: |
       Application {{`{{.app.metadata.name}}`}} sync is in progress.
     github:
+      repoURLPath: "{{`{{.app.spec.source.repoURL}}`}}"
+      revisionPath: "{{`{{.app.status.sync.revision}}`}}"
       status:
         state: pending
         label: "argocd/{{`{{.app.metadata.name}}`}}"
         targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
 
-  # Template for health degraded
+  # Health degraded (commit status)
   template.app-health-degraded: |
     message: |
       Application {{`{{.app.metadata.name}}`}} health has degraded.
     github:
+      repoURLPath: "{{`{{.app.spec.source.repoURL}}`}}"
+      revisionPath: "{{`{{.app.status.sync.revision}}`}}"
       status:
         state: failure
         label: "argocd/health/{{`{{.app.metadata.name}}`}}"
         targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
 
-  # Template for deployment notification
+  # Deployment notification (GitHub deployment API)
   template.app-deployed: |
     message: |
       Application {{`{{.app.metadata.name}}`}} has been deployed to {{`{{.app.spec.destination.namespace}}`}}.
       Revision: {{`{{.app.status.sync.revision}}`}}
     github:
+      repoURLPath: "{{`{{.app.spec.source.repoURL}}`}}"
+      revisionPath: "{{`{{.app.status.sync.revision}}`}}"
       deployment:
         state: success
         environment: "{{`{{.app.spec.destination.namespace}}`}}"
@@ -83,44 +92,43 @@ data:
         requiredContexts: []
         autoMerge: false
 
-  # ===========================================================================
+  # =========================================================
   # Notification Triggers
-  # ===========================================================================
+  # =========================================================
   {{- if .Values.notifications.triggers.onSyncSucceeded }}
-  # Trigger on successful sync
   trigger.on-sync-succeeded: |
-    - when: app.status.operationState.phase in ['Succeeded']
-      send: [app-sync-succeeded, app-deployed]
+    - description: Application syncing has succeeded
+      when: app.status.sync.status == 'Synced' && app.status.health.status == 'Healthy'
+      oncePer: app.status.sync.revision
+      send:
+        - app-sync-succeeded
+        - app-deployed
   {{- end }}
 
   {{- if .Values.notifications.triggers.onSyncFailed }}
-  # Trigger on failed sync
   trigger.on-sync-failed: |
-    - when: app.status.operationState.phase in ['Error', 'Failed']
-      send: [app-sync-failed]
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Error', 'Failed']
+      send:
+        - app-sync-failed
   {{- end }}
 
   {{- if .Values.notifications.triggers.onSyncRunning }}
-  # Trigger when sync is running
   trigger.on-sync-running: |
-    - when: app.status.operationState.phase in ['Running']
-      send: [app-sync-running]
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Running']
+      send:
+        - app-sync-running
   {{- end }}
 
   {{- if .Values.notifications.triggers.onHealthDegraded }}
-  # Trigger when health is degraded
   trigger.on-health-degraded: |
     - when: app.status.health.status == 'Degraded'
-      send: [app-health-degraded]
+      send:
+        - app-health-degraded
   {{- end }}
 
-  # ===========================================================================
+  # =========================================================
   # Default Subscriptions
-  # ===========================================================================
-  # These are the default subscriptions that can be applied to applications
-  # To subscribe an application, add the following annotation:
-  #   notifications.argoproj.io/subscribe.on-sync-succeeded.github: ""
-  #   notifications.argoproj.io/subscribe.on-sync-failed.github: ""
+  # =========================================================
   subscriptions: |
     {{- if .Values.notifications.triggers.onSyncSucceeded }}
     - recipients:
@@ -140,10 +148,7 @@ data:
       triggers:
         - on-health-degraded
     {{- end }}
-{{- /* 
-  Note: The argocd-notifications-secret is created by externalsecret-notifications.yaml 
-  when vault integration is enabled. For manual setup, see docs/github-app-setup.md 
-*/ -}}
 {{- end }}
 {{- end }}
+
 
