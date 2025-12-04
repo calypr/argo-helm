@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts test-secrets test-artifact-repository-ref all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup
+.PHONY: deps lint template validate kind ct adapter test-artifacts test-secrets test-artifact-repository-ref all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup vault-seed-github-app
 
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
@@ -19,6 +19,13 @@ VAULT_TOKEN          ?= root
 # EXTERNAL_IP: External IP address for ingress (leave empty to skip external IP assignment)
 TLS_SECRET_NAME      ?= calypr-demo-tls
 PUBLIC_IP            ?=
+LANDING_PAGE_IMAGE_TAG ?= v3
+
+# GitHub App configuration (optional)
+# Set these to seed the GitHub App private key into Vault
+# GITHUBAPP_PRIVATE_KEY_FILE_PATH ?=
+GITHUBAPP_PRIVATE_KEY_VAULT_PATH ?= kv/argo/argocd/github-app
+
 
 check-vars:
 	@echo "🔍 Checking required environment variables..."
@@ -32,9 +39,14 @@ check-vars:
 	@test -n "$(GITHUB_PAT)" || (echo "Error: GITHUB_PAT is undefined. Run 'export GITHUB_PAT=...' before installing" && exit 1)
 	@test -n "$(ARGOCD_SECRET_KEY)" || (echo "Error: ARGOCD_SECRET_KEY is undefined. Run 'export ARGOCD_SECRET_KEY=...' before installing" && exit 1)
 	@test -n "$(ARGO_HOSTNAME)" || (echo "Error: ARGO_HOSTNAME is undefined. Run 'export ARGO_HOSTNAME=...' before installing" && exit 1)
-	# @test -n "$(PUBLIC_IP)" || (echo "Error: PUBLIC_ID is undefined. Run 'export PUBLIC_ID=...' before installing" && exit 1)
-
-	@echo "✅ Environment validation passed."
+	@test -n "$(ARGO_HOSTNAME)" || (echo "Error: ARGO_HOSTNAME is undefined. Run 'export ARGO_HOSTNAME=...' before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_APP_ID)" || (echo "Error: GITHUBHAPP_APP_ID is undefined. Run 'export GITHUBHAPP_APP_ID=...' before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_CLIENT_ID)" || (echo "Error: GITHUBHAPP_CLIENT_ID is undefined. Run 'export GITHUBHAPP_CLIENT_ID=...' before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_PRIVATE_KEY_SECRET_NAME)" || (echo "Error: GITHUBHAPP_PRIVATE_KEY_SECRET_NAME is undefined. Run 'export GITHUBHAPP_PRIVATE_KEY_SECRET_NAME=...' before installing" && exit 1) 
+	@test -f "$(GITHUBHAPP_PRIVATE_KEY_FILE_PATH)" || (echo "Error: GITHUBHAPP_PRIVATE_KEY_FILE_PATH file '$(GITHUBHAPP_PRIVATE_KEY_FILE_PATH)' not found. Create the file before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_PRIVATE_KEY_VAULT_PATH)" || (echo "Error: GITHUBHAPP_PRIVATE_KEY_VAULT_PATH is undefined. Run 'export GITHUBHAPP_PRIVATE_KEY_VAULT_PATH=...' before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_INSTALLATION_ID)" || (echo "Error: GITHUBHAPP_INSTALLATION_ID is undefined. Run 'export GITHUBHAPP_INSTALLATION_ID=...' before installing" && exit 1)
+	@echo "✅ All GITHUBHAPP environment variables are set."
 
 
 deps:
@@ -54,12 +66,20 @@ template: check-vars deps
 		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
 		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
-		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}:12000  \
+		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}/registrations \
 		--set-string s3.enabled=${S3_ENABLED} \
 		--set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
 		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
 		--set-string s3.bucket=${S3_BUCKET} \
+		--set-string githubApp.enabled=true \
+		--set-string githubApp.appId="${GITHUBHAPP_APP_ID}" \
+		--set-string githubApp.installationId="${GITHUBHAPP_INSTALLATION_ID}" \
+		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
+		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
+		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
+		--set ingress={} \
 		-f - \
+		-f helm/argo-stack/admin-values.yaml \
 		--namespace argocd > rendered.yaml
 
 validate:
@@ -93,7 +113,7 @@ show-limits:
 
 kind:
 	kind delete cluster || true
-	kind create cluster --config kind-config.yaml
+	envsubst < kind-config.yaml | kind create cluster --config -
 
 minio:
 	@echo "🗄️ Installing MinIO in cluster..."
@@ -149,9 +169,9 @@ argo-stack:
 	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
 	envsubst < my-values.yaml | helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
-		--wait --atomic \
+		--wait --atomic --timeout 10m0s \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
-		--set-string events.github.webhook.url=https://${ARGO_HOSTNAME}/registrations\
+		--set-string events.github.webhook.url=https://${ARGO_HOSTNAME}/events\
 		--set-string s3.enabled=${S3_ENABLED} \
 		--set-string s3.bucket=${S3_BUCKET} \
 		--set-string s3.pathStyle=true \
@@ -160,9 +180,16 @@ argo-stack:
 		--set-string s3.hostname=${S3_HOSTNAME} \
 		--set-string ingress.argoWorkflows.host=${ARGO_HOSTNAME} \
 		--set-string ingress.argocd.host=${ARGO_HOSTNAME} \
+		--set-string githubApp.enabled=true \
+		--set-string githubApp.appId="${GITHUBHAPP_APP_ID}" \
+		--set-string githubApp.installationId="${GITHUBHAPP_INSTALLATION_ID}" \
+		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
+		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
+		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
+		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
-deploy: init argo-stack docker-install ports
+deploy: init docker-install argo-stack ports
 ports:	
 	# manual certificate
 	# If the secret already exists, delete it first:
@@ -193,13 +220,6 @@ ports:
 	--set controller.extraArgs.default-ssl-certificate=default/${TLS_SECRET_NAME} \
 	--set controller.watchIngressWithoutClass=true \
 	-f helm/argo-stack/overlays/ingress-authz-overlay/values-ingress-nginx.yaml
-	# Assign external address (only if PUBLIC_IP is set)
-	# @if [ -n "${PUBLIC_IP}" ]; then \
-	# 	echo "➡️  Assigning external IP: ${PUBLIC_IP}"; \
-	# 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p "{\"spec\": {\"type\": \"NodePort\", \"externalIPs\": [\"${PUBLIC_IP}\"]}}"; \
-	# else \
-	# 	echo "⚠️  PUBLIC_IP not set, skipping external IP assignment"; \
-	# fi
 	# Solution - Use NodePort instead of LoadBalancer in kind
 	kubectl patch svc ingress-nginx-controller -n ingress-nginx -p '{"spec":{"type":"NodePort","ports":[{"port":80,"nodePort":30080},{"port":443,"nodePort":30443}]}}'
 
@@ -288,7 +308,13 @@ vault-status:
 	@echo "🔍 Checking Vault status..."
 	@kubectl exec -n vault vault-0 -- vault status 2>/dev/null || echo "❌ Vault not running. Run 'make vault-dev' first."
 
-vault-seed:
+vault-seed: vault-seed-etc vault-seed-github-app
+
+vault-seed-github-app:
+	@echo "➡️  Creating secrets for github app ..."
+	cat "$(GITHUBHAPP_PRIVATE_KEY_FILE_PATH)" | kubectl exec -i -n vault vault-0 -- vault kv put $(GITHUBAPP_PRIVATE_KEY_VAULT_PATH) privateKey=-; \
+	
+vault-seed-etc:
 	@echo "🌱 Seeding Vault with test secrets..."
 	@echo "➡️  Enabling KV v2 secrets engine..."
 	@kubectl exec -n vault vault-0 -- vault secrets enable -version=2 -path=kv kv 2>/dev/null || echo "   (KV already enabled)"
@@ -313,18 +339,18 @@ vault-seed:
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/events/github \
 		token="$(GITHUB_PAT)" 
 	@echo "➡️  Creating per-app S3 credentials..."
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello/s3 \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-project/s3 \
 		accessKey="minioadmin" \
 		secretKey="minioadmin"
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-2/s3 \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-2/s3 \
 		accessKey="app2-access-key" \
 		secretKey="app2-secret-key"
 	@echo "➡️  Seeding Vault with secrets from my-values.yaml repoRegistrations..."
 	@# nextflow-hello-project GitHub credentials
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-project/github \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-project/github \
 		token="$(GITHUB_PAT)"
 	@# nextflow-hello-project S3 artifact credentials
-	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/nextflow-hello-project/s3/artifacts \
+	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-project/s3/artifacts \
 		AWS_ACCESS_KEY_ID="minioadmin" \
 		AWS_SECRET_ACCESS_KEY="minioadmin"
 	@# genomics-variant-calling GitHub credentials
@@ -361,8 +387,8 @@ vault-seed:
 	@echo "   kv/argo/authz                                   - AuthZ adapter OIDC secret"
 	@echo "   kv/argo/events/github                           - GitHub webhook token"
 	@echo "   kv/argo/apps/*/s3                               - Per-app S3 credentials (legacy)"
-	@echo "   kv/argo/apps/nextflow-hello-project/github      - nextflow-hello-project GitHub token"
-	@echo "   kv/argo/apps/nextflow-hello-project/s3/artifacts - nextflow-hello-project S3 credentials"
+	@echo "   kv/argo/apps/bwalsh/nextflow-hello-project/github      - nextflow-hello-project GitHub token"
+	@echo "   kv/argo/apps/bwalsh/nextflow-hello-project/s3/artifacts - nextflow-hello-project S3 credentials"
 	@echo "   kv/argo/apps/genomics/github                    - genomics-variant-calling GitHub token"
 	@echo "   kv/argo/apps/genomics/s3/artifacts              - genomics-variant-calling S3 artifact credentials"
 	@echo "   kv/argo/apps/genomics/s3/data                   - genomics-variant-calling S3 data credentials"
@@ -449,4 +475,13 @@ docker-install:
 	docker build -t nextflow-runner:latest -f nextflow-runner/Dockerfile .
 	kind load docker-image nextflow-runner:latest --name kind
 	docker exec -it kind-control-plane crictl images | grep nextflow-runner
+	@echo "✅ loaded docker nextflow-runner"
+	cd authz-adapter ; docker build -t authz-adapter:v0.0.1 -f Dockerfile .
+	kind load docker-image authz-adapter:v0.0.1 --name kind
+	docker exec -it kind-control-plane crictl images | grep authz-adapter
+	@echo "✅ loaded docker authz-adapter"
+	cd landing-page ; docker build --no-cache  -t landing-page:${LANDING_PAGE_IMAGE_TAG} -f Dockerfile .
+	kind load docker-image landing-page:${LANDING_PAGE_IMAGE_TAG} --name kind
+	docker exec -it kind-control-plane crictl images | grep landing-page
+	@echo "✅ loaded docker landing-page"
 

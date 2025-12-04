@@ -18,6 +18,8 @@ metadata:
   namespace: {{ .Values.namespaces.argocd }}
   annotations:
     "helm.sh/hook": post-install,post-upgrade     # <---- Annotations added here  
+    notifications.argoproj.io/subscribe.on-deploy-succeeded.github: ""
+    notifications.argoproj.io/subscribe.on-deploy-failed.github: ""    
 spec:
   project: {{ .Values.argocdApplication.project }}
   source:

@@ -1,0 +1,9 @@
+argo-cd:
+  configs:
+    rbac:
+      # Full Argo CD admin role
+      policy.csv: |
+        p, role:admin, *, *, *, allow
+        g, wf-admins, role:admin
+
+      policy.default: role:readonly

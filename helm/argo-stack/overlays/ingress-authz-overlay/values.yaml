@@ -96,6 +96,17 @@ ingressAuthzOverlay:
   # to avoid "certificate resource is not owned by this object" errors.
   # Set `primary: true` on exactly one route to designate it as the certificate owner.
   routes:
+    # Landing Page - Root path (/)
+    landing:
+      enabled: true
+      namespace: security
+      service: landing-page
+      serviceNamespace: security
+      port: 80
+      pathPrefix: /
+      # Must be lower priority than other routes
+      # NGINX processes longer paths first, so /workflows takes precedence over /
+
     # Argo Workflows UI (primary route - manages TLS certificate)
     workflows:
       enabled: true
@@ -128,7 +139,7 @@ ingressAuthzOverlay:
       useRegex: true
       rewriteTarget: /$2
       # ArgoCD server uses HTTPS by default
-      backendProtocol: HTTPS
+      # backendProtocol: HTTPS
 
     # GitHub Repository Registrations EventSource
     registrations:

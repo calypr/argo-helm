@@ -24,7 +24,8 @@ spec:
     spec:
       containers:
       - name: authz-adapter
-        image: {{ .Values.authzAdapter.image }}
+        image: "{{ .Values.authzAdapter.image.repository }}:{{ .Values.authzAdapter.image.tag }}"
+        imagePullPolicy: "{{ .Values.authzAdapter.image.pullPolicy }}"
         env:
         - name: FENCE_BASE
           value: {{ .Values.authzAdapter.fenceBase | quote }}

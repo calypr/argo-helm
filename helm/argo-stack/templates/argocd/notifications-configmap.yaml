@@ -1,0 +1,158 @@
+{{- if .Values.notifications.enabled }}
+{{- if .Values.notifications.github.enabled }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: {{ .Values.namespaces.argocd }}
+  labels:
+    app.kubernetes.io/name: {{ .Chart.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+    app.kubernetes.io/component: argocd-notifications
+data:
+  # =========================================================
+  # GitHub Notification Service Configuration
+  # =========================================================
+  service.github: |
+    {{- if .Values.notifications.github.useGithubApp }}
+    # Using GitHub App for notifications
+    appID: {{ .Values.notifications.github.appId | default .Values.githubApp.appId }}
+    installationID: {{ .Values.notifications.github.installationId | default .Values.githubApp.installationId }}
+    privateKey: $github-privateKey
+    {{- end }}
+
+  {{- /* derive base URL once */ -}}
+  {{- $argocdUrl := .Values.notifications.argocdUrl | default "https://calypr-demo.ddns.net/applications" }}
+    
+
+  # =========================================================
+  # Notification Templates
+  # =========================================================
+
+  # Successful sync (commit status)
+  template.app-sync-succeeded: |
+    message: |
+      Application {{`{{.app.metadata.name}}`}} has been successfully synced.
+    github:
+      repoURLPath: "{{`{{.app.spec.source.repoURL}}`}}"
+      revisionPath: "{{`{{.app.status.sync.revision}}`}}"
+      status:
+        state: success
+        label: "argocd/{{`{{.app.metadata.name}}`}}"
+        targetURL: "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}"
+
+  # Failed sync (commit status)
+  template.app-sync-failed: |
+    message: |
+      Application {{`{{.app.metadata.name}}`}} sync failed.
+      Error: {{`{{.app.status.operationState.message}}`}}
+    github:
+      repoURLPath: "{{`{{.app.spec.source.repoURL}}`}}"
+      revisionPath: "{{`{{.app.status.sync.revision}}`}}"
+      status:
+        state: failure
+        label: "argocd/{{`{{.app.metadata.name}}`}}"
+        targetURL: "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}"
+
+  # Sync running (optional commit status)
+  template.app-sync-running: |
+    message: |
+      Application {{`{{.app.metadata.name}}`}} sync is in progress.
+    github:
+      repoURLPath: "{{`{{.app.spec.source.repoURL}}`}}"
+      revisionPath: "{{`{{.app.status.sync.revision}}`}}"
+      status:
+        state: pending
+        label: "argocd/{{`{{.app.metadata.name}}`}}"
+        targetURL: "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}"
+
+  # Health degraded (commit status)
+  template.app-health-degraded: |
+    message: |
+      Application {{`{{.app.metadata.name}}`}} health has degraded.
+    github:
+      repoURLPath: "{{`{{.app.spec.source.repoURL}}`}}"
+      revisionPath: "{{`{{.app.status.sync.revision}}`}}"
+      status:
+        state: failure
+        label: "argocd/health/{{`{{.app.metadata.name}}`}}"
+        targetURL: "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}"
+
+  # Deployment notification (GitHub deployment API)
+  template.app-deployed: |
+    message: |
+      Application {{`{{.app.metadata.name}}`}} has been deployed to {{`{{.app.spec.destination.namespace}}`}}.
+      Revision: {{`{{.app.status.sync.revision}}`}}
+    github:
+      repoURLPath: "{{`{{.app.spec.source.repoURL}}`}}"
+      revisionPath: "{{`{{.app.status.sync.revision}}`}}"
+      deployment:
+        state: success
+        environment: "{{`{{.app.spec.destination.namespace}}`}}"
+        environmentURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
+        logURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}?view=log"
+        requiredContexts: []
+        autoMerge: false
+
+  # =========================================================
+  # Notification Triggers
+  # =========================================================
+  {{- if .Values.notifications.triggers.onSyncSucceeded }}
+  trigger.on-sync-succeeded: |
+    - description: Application syncing has succeeded
+      when: app.status.sync.status == 'Synced' && app.status.health.status == 'Healthy'
+      oncePer: app.status.sync.revision
+      send:
+        - app-sync-succeeded
+        - app-deployed
+  {{- end }}
+
+  {{- if .Values.notifications.triggers.onSyncFailed }}
+  trigger.on-sync-failed: |
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Error', 'Failed']
+      send:
+        - app-sync-failed
+  {{- end }}
+
+  {{- if .Values.notifications.triggers.onSyncRunning }}
+  trigger.on-sync-running: |
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Running']
+      send:
+        - app-sync-running
+  {{- end }}
+
+  {{- if .Values.notifications.triggers.onHealthDegraded }}
+  trigger.on-health-degraded: |
+    - when: app.status.health.status == 'Degraded'
+      send:
+        - app-health-degraded
+  {{- end }}
+
+  # =========================================================
+  # Default Subscriptions
+  # =========================================================
+  subscriptions: |
+    {{- if .Values.notifications.triggers.onSyncSucceeded }}
+    - recipients:
+        - github
+      triggers:
+        - on-sync-succeeded
+    {{- end }}
+    {{- if .Values.notifications.triggers.onSyncFailed }}
+    - recipients:
+        - github
+      triggers:
+        - on-sync-failed
+    {{- end }}
+    {{- if .Values.notifications.triggers.onHealthDegraded }}
+    - recipients:
+        - github
+      triggers:
+        - on-health-degraded
+    {{- end }}
+{{- end }}
+{{- end }}
+
+
