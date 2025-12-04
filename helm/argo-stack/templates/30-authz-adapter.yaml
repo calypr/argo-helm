@@ -24,10 +24,19 @@ spec:
     spec:
       containers:
       - name: authz-adapter
-        image: {{ .Values.authzAdapter.image }}
+        image: "{{ .Values.authzAdapter.image.repository }}:{{ .Values.authzAdapter.image.tag }}"
+        imagePullPolicy: "{{ .Values.authzAdapter.image.pullPolicy }}"
         env:
         - name: FENCE_BASE
           value: {{ .Values.authzAdapter.fenceBase | quote }}
+        {{- if .Values.authzAdapter.debugEmail }}
+        - name: DEBUG_EMAIL
+          value: {{ .Values.authzAdapter.debugEmail | quote }}
+        {{- end }}
+        {{- if .Values.authzAdapter.debugGroups }}
+        - name: DEBUG_GROUPS
+          value: {{ .Values.authzAdapter.debugGroups | quote }}
+        {{- end }}
         ports:
         - containerPort: 8080
 ---
