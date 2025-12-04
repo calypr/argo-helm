@@ -37,6 +37,7 @@ data:
         state: success
         label: "argocd/{{`{{.app.metadata.name}}`}}"
         targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
+        description: "Application synced successfully"
 
   # Template for failed sync
   template.app-sync-failed: |
@@ -48,6 +49,7 @@ data:
         state: failure
         label: "argocd/{{`{{.app.metadata.name}}`}}"
         targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
+        description: "Application sync failed"
 
   # Template for running sync
   template.app-sync-running: |
@@ -58,6 +60,7 @@ data:
         state: pending
         label: "argocd/{{`{{.app.metadata.name}}`}}"
         targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
+        description: "Application sync in progress"
 
   # Template for health degraded
   template.app-health-degraded: |
@@ -68,6 +71,7 @@ data:
         state: failure
         label: "argocd/health/{{`{{.app.metadata.name}}`}}"
         targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
+        description: "Application health degraded"
 
   # Template for deployment notification
   template.app-deployed: |
