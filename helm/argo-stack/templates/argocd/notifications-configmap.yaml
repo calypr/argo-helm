@@ -23,6 +23,10 @@ data:
     privateKey: $github-privateKey
     {{- end }}
 
+  {{- /* derive base URL once */ -}}
+  {{- $argocdUrl := .Values.notifications.argocdUrl | default "https://calypr-demo.ddns.net/applications" }}
+    
+
   # =========================================================
   # Notification Templates
   # =========================================================
@@ -37,7 +41,7 @@ data:
       status:
         state: success
         label: "argocd/{{`{{.app.metadata.name}}`}}"
-        targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
+        targetURL: "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}"
 
   # Failed sync (commit status)
   template.app-sync-failed: |
@@ -50,7 +54,7 @@ data:
       status:
         state: failure
         label: "argocd/{{`{{.app.metadata.name}}`}}"
-        targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
+        targetURL: "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}"
 
   # Sync running (optional commit status)
   template.app-sync-running: |
@@ -62,7 +66,7 @@ data:
       status:
         state: pending
         label: "argocd/{{`{{.app.metadata.name}}`}}"
-        targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
+        targetURL: "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}"
 
   # Health degraded (commit status)
   template.app-health-degraded: |
@@ -74,7 +78,7 @@ data:
       status:
         state: failure
         label: "argocd/health/{{`{{.app.metadata.name}}`}}"
-        targetURL: "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}"
+        targetURL: "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}"
 
   # Deployment notification (GitHub deployment API)
   template.app-deployed: |

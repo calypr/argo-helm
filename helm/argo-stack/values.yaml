@@ -195,6 +195,8 @@ argo-cd:
       # Tell ArgoCD UI/API it’s under /applications
       server.basehref: "/applications"
       # server.rootpath: "/applications"
+  notifications:
+    enabled: true
 
 # ============================================================================
 # Authorization Adapter Settings (Arborist Integration)
@@ -568,7 +570,17 @@ githubApp:
 notifications:
   # Enable Argo CD Notifications controller
   enabled: true
-
+  # for status templates
+  argocdUrl: https://calypr-demo.ddns.net/applications
+  # turn on debugging
+  # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/templates/argocd-notifications/deployment.yaml#L76-L77
+  logLevel: debug
+  # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/templates/argocd-notifications/deployment.yaml#L86-L88
+  extraEnv:
+    - name: ARGOCD_NOTIFICATIONS_HTTP_DEBUG
+      value: "true"
+    - name: GODEBUG
+      value: "http2debug=2"
   # GitHub notification service configuration
   github:
     # Enable GitHub status updates
