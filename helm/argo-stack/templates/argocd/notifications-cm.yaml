@@ -79,7 +79,7 @@ data:
         body: |
           {
             "repo_url": "{{`{{.app.spec.source.repoURL}}`}}",
-            "sha": "{{`{{.app.status.sync.revision}}`}}",
+            "sha": "{{`{{.app.status.operationState.operation.sync.revision}}`}}",
             "state": "success",
             "context": "argocd/{{`{{.app.metadata.name}}`}}/deployed",
             "target_url": "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}",
@@ -109,6 +109,8 @@ data:
   # Default Subscriptions
   # ============================================================================
   # Apply these triggers to all applications by default
+  # Note: on-sync-running may be noisy for long-running syncs.
+  # Remove it from defaultTriggers if you want to reduce notification volume.
   defaultTriggers: |
     - on-sync-succeeded
     - on-sync-failed

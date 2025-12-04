@@ -5,6 +5,7 @@ import (
 	"crypto/rsa"
 	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -104,6 +105,9 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}
+
+	// Limit request body size to prevent DoS attacks (1MB max)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
 	// Parse request body
 	var req StatusRequest
@@ -228,8 +232,10 @@ func createGitHubAppJWT() (string, error) {
 }
 
 func getInstallationID(appJWT, owner, repo string) (int64, error) {
-	url := fmt.Sprintf("https://api.github.com/repos/%s/%s/installation", owner, repo)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, url, nil)
+	// URL encode owner and repo to prevent path injection
+	apiURL := fmt.Sprintf("https://api.github.com/repos/%s/%s/installation",
+		url.PathEscape(owner), url.PathEscape(repo))
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodGet, apiURL, nil)
 	if err != nil {
 		return 0, err
 	}
@@ -248,10 +254,12 @@ func getInstallationID(appJWT, owner, repo string) (int64, error) {
 		return 0, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
 	}
 
+	// Limit response body size to prevent DoS (1MB max)
+	limitedReader := io.LimitReader(resp.Body, 1<<20)
 	var installation struct {
 		ID int64 `json:"id"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&installation); err != nil {
+	if err := json.NewDecoder(limitedReader).Decode(&installation); err != nil {
 		return 0, err
 	}
 
@@ -259,8 +267,8 @@ func getInstallationID(appJWT, owner, repo string) (int64, error) {
 }
 
 func getInstallationToken(appJWT string, installationID int64) (string, error) {
-	url := fmt.Sprintf("https://api.github.com/app/installations/%d/access_tokens", installationID)
-	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, url, nil)
+	apiURL := fmt.Sprintf("https://api.github.com/app/installations/%d/access_tokens", installationID)
+	req, err := http.NewRequestWithContext(context.Background(), http.MethodPost, apiURL, nil)
 	if err != nil {
 		return "", err
 	}
@@ -279,10 +287,12 @@ func getInstallationToken(appJWT string, installationID int64) (string, error) {
 		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
 	}
 
+	// Limit response body size to prevent DoS (1MB max)
+	limitedReader := io.LimitReader(resp.Body, 1<<20)
 	var tokenResp struct {
 		Token string `json:"token"`
 	}
-	if err := json.NewDecoder(resp.Body).Decode(&tokenResp); err != nil {
+	if err := json.NewDecoder(limitedReader).Decode(&tokenResp); err != nil {
 		return "", err
 	}
 
