@@ -64,6 +64,24 @@ authzAdapter:
   namespace: security
 
 # ============================================================================
+# GitHub Status Proxy Settings
+# ============================================================================
+
+githubStatusProxy:
+  enabled: false
+  image: ghcr.io/calypr/github-status-proxy:latest
+  replicas: 2
+  namespace: argocd
+  # GitHub App configuration
+  # The App ID can be found in your GitHub App settings
+  githubAppId: ""
+  # Reference to a secret containing the GitHub App private key
+  # The secret should have a key named "private-key.pem"
+  privateKeySecret:
+    name: github-app-private-key
+    key: private-key.pem
+
+# ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )
 # ============================================================================
 

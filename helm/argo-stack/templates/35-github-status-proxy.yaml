@@ -1,0 +1,82 @@
+{{- if .Values.githubStatusProxy.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: github-status-proxy
+  namespace: {{ .Values.githubStatusProxy.namespace | default .Values.namespaces.argocd }}
+  labels:
+    app: github-status-proxy
+    app.kubernetes.io/name: github-status-proxy
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.githubStatusProxy.replicas | default 2 }}
+  selector:
+    matchLabels:
+      app: github-status-proxy
+  template:
+    metadata:
+      labels:
+        app: github-status-proxy
+    spec:
+      containers:
+      - name: github-status-proxy
+        image: {{ .Values.githubStatusProxy.image }}
+        env:
+        - name: GITHUB_APP_ID
+          value: {{ .Values.githubStatusProxy.githubAppId | quote }}
+        - name: GITHUB_APP_PRIVATE_KEY_PATH
+          value: /etc/github/private-key.pem
+        - name: PORT
+          value: "8080"
+        ports:
+        - containerPort: 8080
+          name: http
+        volumeMounts:
+        - name: github-app-key
+          mountPath: /etc/github
+          readOnly: true
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 10
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+      volumes:
+      - name: github-app-key
+        secret:
+          secretName: {{ .Values.githubStatusProxy.privateKeySecret.name }}
+          items:
+          - key: {{ .Values.githubStatusProxy.privateKeySecret.key }}
+            path: private-key.pem
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: github-status-proxy
+  namespace: {{ .Values.githubStatusProxy.namespace | default .Values.namespaces.argocd }}
+  labels:
+    app: github-status-proxy
+    app.kubernetes.io/name: github-status-proxy
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: github-status-proxy
+  ports:
+  - port: 8080
+    targetPort: 8080
+    name: http
+{{- end }}

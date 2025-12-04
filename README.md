@@ -65,6 +65,7 @@ See [README-use-cases.md](./README-use-cases.md)
 - **Argo Workflows** (v0.41.7) - Container-native workflow execution
 - **Argo CD** (v7.6.12) - GitOps continuous delivery
 - **Custom AuthZ Adapter** - Flask-based authorization service
+- **GitHub Status Proxy** - Self-service GitHub App integration for commit statuses
 - **Multi-tenant RBAC** - Namespace isolation and role-based access
 
 ### 🔒 Security Features

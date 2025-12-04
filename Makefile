@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts all minio minio-ls
+.PHONY: deps lint template validate kind ct adapter github-status-proxy test-artifacts all minio minio-ls
 
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
@@ -148,6 +148,9 @@ deploy: check-vars kind bump-limits deps minio
 adapter:
 	cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q
 
+github-status-proxy:
+	cd github-status-proxy && go test -v ./...
+
 test-artifacts:
 	./test-per-app-artifacts.sh
 
@@ -158,4 +161,4 @@ password:
 login:
 	argocd login localhost:8080 --skip-test-tls --insecure --name admin --password `kubectl get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"  -n argocd | base64 -d`
 
-all: lint template validate kind ct adapter test-artifacts
+all: lint template validate kind ct adapter github-status-proxy test-artifacts
