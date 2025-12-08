@@ -15,7 +15,10 @@ The service:
 
 import os
 import re
-from flask import Flask, request, render_template, jsonify
+import sqlite3
+import json
+from pathlib import Path
+from flask import Flask, request, render_template, jsonify, redirect, url_for
 import logging
 
 # Configure logging
@@ -29,6 +32,99 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-producti
 
 # Configuration
 GITHUB_APP_NAME = os.environ.get("GITHUB_APP_NAME", "calypr-workflows")
+
+# Default to /tmp in development/test, /var/registrations in production
+DEFAULT_DB_PATH = "/tmp/registrations.sqlite" if os.environ.get("FLASK_ENV") == "development" or os.environ.get("TESTING") else "/var/registrations/registrations.sqlite"
+DB_PATH = os.environ.get("DB_PATH", DEFAULT_DB_PATH)
+
+
+def init_db():
+    """
+    Initialize the SQLite database.
+    
+    Creates the registrations table if it doesn't exist.
+    Table schema:
+        - installation_id: TEXT PRIMARY KEY
+        - data: TEXT (JSON serialized RepoRegistration)
+        - created_at: TIMESTAMP
+        - updated_at: TIMESTAMP
+    """
+    # Ensure directory exists
+    db_dir = Path(DB_PATH).parent
+    db_dir.mkdir(parents=True, exist_ok=True)
+    
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute("""
+        CREATE TABLE IF NOT EXISTS registrations (
+            installation_id TEXT PRIMARY KEY,
+            data TEXT NOT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        )
+    """)
+    
+    conn.commit()
+    conn.close()
+    logger.info(f"Database initialized at {DB_PATH}")
+
+
+def get_registration(installation_id):
+    """
+    Get a registration from the database.
+    
+    Args:
+        installation_id: The GitHub installation ID
+        
+    Returns:
+        dict: The registration data or None if not found
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    cursor.execute(
+        "SELECT data FROM registrations WHERE installation_id = ?",
+        (installation_id,)
+    )
+    
+    row = cursor.fetchone()
+    conn.close()
+    
+    if row:
+        return json.loads(row[0])
+    return None
+
+
+def save_registration(installation_id, registration_data):
+    """
+    Save or update a registration in the database.
+    
+    Args:
+        installation_id: The GitHub installation ID
+        registration_data: The RepoRegistration configuration dict
+    """
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
+    
+    data_json = json.dumps(registration_data)
+    
+    cursor.execute("""
+        INSERT INTO registrations (installation_id, data, created_at, updated_at)
+        VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(installation_id) 
+        DO UPDATE SET 
+            data = excluded.data,
+            updated_at = CURRENT_TIMESTAMP
+    """, (installation_id, data_json))
+    
+    conn.commit()
+    conn.close()
+    logger.info(f"Registration saved for installation_id={installation_id}")
+
+
+# Initialize database on startup
+init_db()
 
 
 @app.route("/healthz", methods=["GET"])
@@ -83,10 +179,57 @@ def registrations_form():
         f"action={safe_setup_action}"
     )
 
+    # Check if registration exists
+    existing_registration = get_registration(installation_id)
+    
+    # Handle install action
+    if setup_action == "install":
+        if existing_registration:
+            # Installation already exists, warn user and redirect to update
+            logger.warning(
+                f"Installation {safe_installation_id} already exists, redirecting to update"
+            )
+            return render_template(
+                "error.html",
+                error_message=(
+                    f"Installation {installation_id} is already registered. "
+                    "Redirecting you to update the existing registration..."
+                ),
+                redirect_url=url_for(
+                    "registrations_form",
+                    installation_id=installation_id,
+                    setup_action="update"
+                ),
+                github_app_name=GITHUB_APP_NAME,
+            )
+    
+    # Handle update action
+    elif setup_action == "update":
+        if not existing_registration:
+            # No existing registration for update
+            logger.error(
+                f"Installation {safe_installation_id} not found for update"
+            )
+            return (
+                render_template(
+                    "error.html",
+                    error_message=(
+                        f"Installation {installation_id} not found. "
+                        "Please install the GitHub App first."
+                    ),
+                    github_app_name=GITHUB_APP_NAME,
+                ),
+                404,
+            )
+
+    # Load existing data for update mode
+    initial_data = existing_registration if setup_action == "update" else None
+
     return render_template(
         "registration_form.html",
         installation_id=installation_id,
         setup_action=setup_action,
+        initial_data=initial_data,
         github_app_name=GITHUB_APP_NAME,
     )
 
@@ -211,10 +354,10 @@ def registrations_submit():
             "readUsers": read_users,
         }
 
-        logger.info(f"Repository registration submitted: {registration_config}")
+        logger.info(f"Repository registration submitted: installation_id={installation_id}")
 
-        # TODO: Save configuration to Kubernetes CRD or storage
-        # For now, we'll just log it and return success
+        # Save configuration to database
+        save_registration(installation_id, registration_config)
 
         # Return success response
         if request.headers.get("Accept") == "application/json":

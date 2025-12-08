@@ -280,6 +280,16 @@ gitappCallback:
   secretKey: "REPLACE_ME_WITH_SECURE_RANDOM_VALUE"
   # GitHub App name (displayed in the UI)
   githubAppName: "calypr-workflows"
+  # Persistence configuration for registration database
+  persistence:
+    # Enable persistent storage for SQLite database
+    enabled: false
+    # Use an existing PVC (if not specified, a new one will be created)
+    existingClaim: ""
+    # Storage class for PVC (if empty, uses cluster default)
+    storageClass: ""
+    # Storage size
+    size: "1Gi"
 
 # ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )

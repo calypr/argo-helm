@@ -31,8 +31,13 @@ spec:
           value: {{ .Values.gitappCallback.secretKey | quote }}
         - name: GITHUB_APP_NAME
           value: {{ .Values.gitappCallback.githubAppName | quote }}
+        - name: DB_PATH
+          value: "/var/registrations/registrations.sqlite"
         ports:
         - containerPort: 8080
+        volumeMounts:
+        - name: registrations-data
+          mountPath: /var/registrations
         livenessProbe:
           httpGet:
             path: /healthz
@@ -45,6 +50,14 @@ spec:
             port: 8080
           initialDelaySeconds: 2
           periodSeconds: 5
+      volumes:
+      - name: registrations-data
+        {{- if .Values.gitappCallback.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ .Values.gitappCallback.persistence.existingClaim | default "gitapp-callback-data" }}
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -65,4 +78,25 @@ spec:
   ports:
   - port: 8080
     targetPort: 8080
+---
+{{- if and .Values.gitappCallback.persistence.enabled (not .Values.gitappCallback.persistence.existingClaim) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitapp-callback-data
+  namespace: {{ .Values.namespaces.security }}
+  labels:
+    app: gitapp-callback
+    app.kubernetes.io/name: gitapp-callback
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.gitappCallback.persistence.size | default "1Gi" }}
+  {{- if .Values.gitappCallback.persistence.storageClass }}
+  storageClassName: {{ .Values.gitappCallback.persistence.storageClass }}
+  {{- end }}
+{{- end }}
 {{- end }}

@@ -329,7 +329,7 @@
                             type="text"
                             id="defaultBranch"
                             name="defaultBranch"
-                            value="main"
+                            value="{{ initial_data.defaultBranch if initial_data else 'main' }}"
                             placeholder="main"
                         >
                         <p class="help-text">The default branch to use for workflows (e.g., main, master, develop)</p>
@@ -349,6 +349,7 @@
                             id="dataBucket_bucket"
                             name="dataBucket_bucket"
                             placeholder="my-data-bucket"
+                            value="{{ initial_data.dataBucket.bucket if initial_data and initial_data.dataBucket else '' }}"
                         >
                     </div>
 
@@ -363,6 +364,7 @@
                                     id="dataBucket_accessKey"
                                     name="dataBucket_accessKey"
                                     placeholder="AKIAIOSFODNN7EXAMPLE"
+                                    value="{{ initial_data.dataBucket.accessKey if initial_data and initial_data.dataBucket else '' }}"
                                 >
                                 <button type="button" class="toggle-password" data-target="dataBucket_accessKey">
                                     <span class="show-text">Show</span>
@@ -381,6 +383,7 @@
                                     id="dataBucket_secretKey"
                                     name="dataBucket_secretKey"
                                     placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                                    value="{{ initial_data.dataBucket.secretKey if initial_data and initial_data.dataBucket else '' }}"
                                 >
                                 <button type="button" class="toggle-password" data-target="dataBucket_secretKey">
                                     <span class="show-text">Show</span>
@@ -395,7 +398,7 @@
                                     type="checkbox"
                                     id="dataBucket_is_aws"
                                     name="dataBucket_is_aws"
-                                    checked
+                                    {% if not initial_data or not initial_data.dataBucket or initial_data.dataBucket.is_aws %}checked{% endif %}
                                 >
                                 Is AWS S3
                             </label>
@@ -412,6 +415,7 @@
                                     id="dataBucket_hostname"
                                     name="dataBucket_hostname"
                                     placeholder="https://minio.example.org:9000"
+                                    value="{{ initial_data.dataBucket.hostname if initial_data and initial_data.dataBucket else '' }}"
                                 >
                                 <p class="help-text">S3 endpoint URL (must start with https://)</p>
                             </div>
@@ -425,6 +429,7 @@
                                     id="dataBucket_region"
                                     name="dataBucket_region"
                                     placeholder="us-west-2"
+                                    value="{{ initial_data.dataBucket.region if initial_data and initial_data.dataBucket else '' }}"
                                 >
                             </div>
 
@@ -434,6 +439,7 @@
                                         type="checkbox"
                                         id="dataBucket_pathStyle"
                                         name="dataBucket_pathStyle"
+                                        {% if initial_data and initial_data.dataBucket and initial_data.dataBucket.pathStyle %}checked{% endif %}
                                     >
                                     Use Path-Style Requests
                                 </label>
@@ -456,6 +462,7 @@
                             id="artifactBucket_bucket"
                             name="artifactBucket_bucket"
                             placeholder="my-artifact-bucket"
+                            value="{{ initial_data.artifactBucket.bucket if initial_data and initial_data.artifactBucket else '' }}"
                         >
                     </div>
 
@@ -470,6 +477,7 @@
                                     id="artifactBucket_accessKey"
                                     name="artifactBucket_accessKey"
                                     placeholder="AKIAIOSFODNN7EXAMPLE"
+                                    value="{{ initial_data.artifactBucket.accessKey if initial_data and initial_data.artifactBucket else '' }}"
                                 >
                                 <button type="button" class="toggle-password" data-target="artifactBucket_accessKey">
                                     <span class="show-text">Show</span>
@@ -488,6 +496,7 @@
                                     id="artifactBucket_secretKey"
                                     name="artifactBucket_secretKey"
                                     placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                                    value="{{ initial_data.artifactBucket.secretKey if initial_data and initial_data.artifactBucket else '' }}"
                                 >
                                 <button type="button" class="toggle-password" data-target="artifactBucket_secretKey">
                                     <span class="show-text">Show</span>
@@ -502,7 +511,7 @@
                                     type="checkbox"
                                     id="artifactBucket_is_aws"
                                     name="artifactBucket_is_aws"
-                                    checked
+                                    {% if not initial_data or not initial_data.artifactBucket or initial_data.artifactBucket.is_aws %}checked{% endif %}
                                 >
                                 Is AWS S3
                             </label>
@@ -519,6 +528,7 @@
                                     id="artifactBucket_hostname"
                                     name="artifactBucket_hostname"
                                     placeholder="https://minio.example.org:9000"
+                                    value="{{ initial_data.artifactBucket.hostname if initial_data and initial_data.artifactBucket else '' }}"
                                 >
                                 <p class="help-text">S3 endpoint URL (must start with https://)</p>
                             </div>
@@ -532,6 +542,7 @@
                                     id="artifactBucket_region"
                                     name="artifactBucket_region"
                                     placeholder="us-west-2"
+                                    value="{{ initial_data.artifactBucket.region if initial_data and initial_data.artifactBucket else '' }}"
                                 >
                             </div>
 
@@ -541,6 +552,7 @@
                                         type="checkbox"
                                         id="artifactBucket_pathStyle"
                                         name="artifactBucket_pathStyle"
+                                        {% if initial_data and initial_data.artifactBucket and initial_data.artifactBucket.pathStyle %}checked{% endif %}
                                     >
                                     Use Path-Style Requests
                                 </label>
@@ -562,7 +574,7 @@
                             name="adminUsers"
                             placeholder="admin@example.com, lead@example.com"
                             required
-                        ></textarea>
+                        >{{ initial_data.adminUsers|join(', ') if initial_data and initial_data.adminUsers else '' }}</textarea>
                         <p class="help-text">Comma-separated list of admin user email addresses (at least one required)</p>
                     </div>
 
@@ -574,7 +586,7 @@
                             id="readUsers"
                             name="readUsers"
                             placeholder="viewer@example.com, analyst@example.com"
-                        ></textarea>
+                        >{{ initial_data.readUsers|join(', ') if initial_data and initial_data.readUsers else '' }}</textarea>
                         <p class="help-text">Comma-separated list of read-only user email addresses (optional)</p>
                     </div>
                 </div>
@@ -638,6 +650,27 @@
 
         setupBucketFieldToggle('dataBucket');
         setupBucketFieldToggle('artifactBucket');
+
+        // Initialize bucket field visibility for existing data
+        function initializeBucketFields(bucketPrefix) {
+            const bucketInput = document.getElementById(`${bucketPrefix}_bucket`);
+            const fieldsContainer = document.getElementById(`${bucketPrefix}Fields`);
+            const isAwsCheckbox = document.getElementById(`${bucketPrefix}_is_aws`);
+            const nonAwsFields = document.getElementById(`${bucketPrefix}NonAwsFields`);
+            
+            // Show fields if bucket name exists
+            if (bucketInput.value.trim()) {
+                fieldsContainer.style.display = 'block';
+            }
+            
+            // Show non-AWS fields if not AWS
+            if (!isAwsCheckbox.checked) {
+                nonAwsFields.style.display = 'block';
+            }
+        }
+        
+        initializeBucketFields('dataBucket');
+        initializeBucketFields('artifactBucket');
 
         // Form submission handling
         document.getElementById('registrationForm').addEventListener('submit', async function(e) {

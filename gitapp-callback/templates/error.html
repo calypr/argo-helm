@@ -185,12 +185,27 @@
                 </div>
 
                 <div>
+                    {% if redirect_url %}
+                    <a href="{{ redirect_url }}" class="btn btn-primary">
+                        Update Existing Registration
+                    </a>
+                    <a href="https://github.com" class="btn btn-secondary">
+                        Return to GitHub
+                    </a>
+                    <script>
+                        // Auto-redirect after 3 seconds
+                        setTimeout(function() {
+                            window.location.href = "{{ redirect_url }}";
+                        }, 3000);
+                    </script>
+                    {% else %}
                     <a href="https://github.com/apps/{{ github_app_name|urlencode }}/installations/new" class="btn btn-primary">
                         Reinstall GitHub App
                     </a>
                     <a href="https://github.com" class="btn btn-secondary">
                         Return to GitHub
                     </a>
+                    {% endif %}
                 </div>
             </div>
         </div>
