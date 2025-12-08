@@ -471,17 +471,22 @@ eso-cleanup:
 	@kubectl delete namespace external-secrets-system 2>/dev/null || true
 	@echo "✅ External Secrets Operator removed"
 
-docker-install:
+docker-runner:
 	docker build -t nextflow-runner:latest -f nextflow-runner/Dockerfile .
 	kind load docker-image nextflow-runner:latest --name kind
 	docker exec -it kind-control-plane crictl images | grep nextflow-runner
 	@echo "✅ loaded docker nextflow-runner"
+
+docker-authz:
 	cd authz-adapter ; docker build -t authz-adapter:v0.0.1 -f Dockerfile .
 	kind load docker-image authz-adapter:v0.0.1 --name kind
 	docker exec -it kind-control-plane crictl images | grep authz-adapter
 	@echo "✅ loaded docker authz-adapter"
+
+docker-landing-page:
 	cd landing-page ; docker build --no-cache  -t landing-page:${LANDING_PAGE_IMAGE_TAG} -f Dockerfile .
 	kind load docker-image landing-page:${LANDING_PAGE_IMAGE_TAG} --name kind
 	docker exec -it kind-control-plane crictl images | grep landing-page
 	@echo "✅ loaded docker landing-page"
 
+docker-install: docker-runner docker-authz docker-landing-page
