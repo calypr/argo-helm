@@ -7,7 +7,6 @@ metadata:
   annotations:
     # GitHub App callback doesn't need authentication
     # This is a public endpoint that receives callbacks from GitHub
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
 spec:
   ingressClassName: nginx
   {{- if .Values.ingress.gitappCallback.tls.enabled }}
@@ -19,8 +18,8 @@ spec:
     - host: {{ .Values.ingress.gitappCallback.host | quote }}
       http:
         paths:
-          - path: /registrations(/|$)(.*)
-            pathType: ImplementationSpecific
+          - path: /registrations
+            pathType: Prefix
             backend:
               service:
                 name: gitapp-callback

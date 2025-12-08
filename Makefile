@@ -77,10 +77,7 @@ template: check-vars deps
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
 		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
-		--set-string ingress.gitappCallback.enabled=true \
-		--set-string ingress.gitappCallback.host=${ARGO_HOSTNAME} \
-		--set ingress.argoWorkflows={} \
-		--set ingress.argocd={} \
+		--set ingress={} \
 		-f - \
 		-f helm/argo-stack/admin-values.yaml \
 		--namespace argocd > rendered.yaml

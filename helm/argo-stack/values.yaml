@@ -274,8 +274,10 @@ gitappCallback:
   # Number of replicas
   replicas: 2
   # Flask secret key for session management
-  # IMPORTANT: Change this in production
-  secretKey: "change-me-in-production-use-vault"
+  # IMPORTANT: Override this in production with a secure random value
+  # Recommended: Use Vault with External Secrets Operator
+  # Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'
+  secretKey: "REPLACE_ME_WITH_SECURE_RANDOM_VALUE"
   # GitHub App name (displayed in the UI)
   githubAppName: "calypr-workflows"
 
