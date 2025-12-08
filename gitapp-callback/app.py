@@ -14,6 +14,7 @@ The service:
 """
 
 import os
+import re
 from flask import Flask, request, render_template, jsonify
 import logging
 
@@ -138,8 +139,6 @@ def registrations_submit():
             )
 
         # Basic email validation
-        import re
-
         email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
         for email in admin_users + read_users:
             if not re.match(email_pattern, email):
