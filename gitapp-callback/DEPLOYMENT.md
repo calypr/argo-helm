@@ -152,6 +152,62 @@ GitHub will automatically append query parameters:
 https://your-domain.com/registrations?installation_id=12345678&setup_action=install
 ```
 
+### Database Persistence
+
+The service stores registration data in a SQLite database at `/var/registrations/registrations.sqlite`.
+
+**Persistence Options:**
+
+1. **Host-Mounted Volumes (kind clusters with extraMounts)**
+   ```yaml
+   gitappCallback:
+     persistence:
+       enabled: true
+       useExtraMounts: true
+       registrationsPath: "/var/registrations"
+   ```
+   
+   This requires matching configuration in `kind-config.yaml`:
+   ```yaml
+   extraMounts:
+     - hostPath: $PWD/registrations
+       containerPath: /var/registrations
+   ```
+   
+   The `registrationsPath` value must match the `containerPath` in kind-config.yaml.
+
+2. **PersistentVolumeClaim (production clusters)**
+   ```yaml
+   gitappCallback:
+     persistence:
+       enabled: true
+       useExtraMounts: false  # Disable host mounts
+       storageClass: "standard"
+       size: "1Gi"
+   ```
+   
+   A PVC named `gitapp-callback-data` will be automatically created.
+
+3. **Existing PVC**
+   ```yaml
+   gitappCallback:
+     persistence:
+       enabled: true
+       existingClaim: "my-existing-pvc"
+   ```
+
+4. **emptyDir (no persistence, data lost on pod restart)**
+   ```yaml
+   gitappCallback:
+     persistence:
+       enabled: false
+       useExtraMounts: false
+   ```
+
+**Default Configuration:**
+
+By default, the service uses `useExtraMounts: true` with `registrationsPath: "/var/registrations"` to work with kind clusters that have the extraMounts configured.
+
 ## Architecture
 
 ```

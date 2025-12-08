@@ -284,8 +284,16 @@ gitappCallback:
   persistence:
     # Enable persistent storage for SQLite database
     enabled: true
-    # assume host volume mounts for persistence
+    # Use host-mounted volumes for persistence (for kind clusters with extraMounts)
+    # When true, uses hostPath volume instead of PVC or emptyDir
+    # Must match the extraMounts configuration in kind-config.yaml:
+    #   - hostPath: $PWD/registrations
+    #     containerPath: /var/registrations
     useExtraMounts: true
+    # Host path to mount for registrations data (when useExtraMounts is true)
+    # This should match the containerPath in kind-config.yaml extraMounts
+    # Example: "/var/registrations"
+    registrationsPath: "/var/registrations"
     # Use an existing PVC (if not specified, a new one will be created)
     existingClaim: ""
     # Storage class for PVC (if empty, uses cluster default)

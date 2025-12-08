@@ -55,10 +55,14 @@ spec:
         {{- if .Values.gitappCallback.persistence.enabled }}
         persistentVolumeClaim:
           claimName: {{ .Values.gitappCallback.persistence.existingClaim | default "gitapp-callback-data" }}
+        {{- else if .Values.gitappCallback.persistence.useExtraMounts }}
+        # Note: hostPath is used per design requirements to allow host-mounted content.
+        # Ensure the path matches the kind extraMounts configuration.
+        hostPath:
+          path: {{ .Values.gitappCallback.persistence.registrationsPath | default "/var/registrations" }}
+          type: DirectoryOrCreate
         {{- else }}
-        {{- if not .Values.gitappCallback.persistence.useExtraMounts }}
         emptyDir: {}
-        {{- end }}
         {{- end }}
 ---
 apiVersion: v1
@@ -81,7 +85,7 @@ spec:
   - port: 8080
     targetPort: 8080
 ---
-{{- if and .Values.gitappCallback.persistence.enabled (not .Values.gitappCallback.persistence.existingClaim) }}
+{{- if and .Values.gitappCallback.persistence.enabled (not .Values.gitappCallback.persistence.existingClaim) (not .Values.gitappCallback.persistence.useExtraMounts) }}
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
