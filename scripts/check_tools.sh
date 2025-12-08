@@ -74,6 +74,9 @@ check_tool() {
             "openssl")
                 echo "  Version: $(openssl version 2>/dev/null)"
                 ;;
+            "sqlite3")
+                echo "  Version: $(sqlite3 --version 2>/dev/null | head -1)"
+                ;;		
             *)
                 version_output=$($tool --version 2>/dev/null | head -1)
                 if [ -n "$version_output" ]; then
@@ -138,6 +141,7 @@ check_apt_history() {
         ["gcc"]="gcc build-essential"
         ["curl"]="curl"
         ["openssl"]="openssl libssl-dev"
+        ["sqlite3"]="sqlite"
     )
     
     echo -e "${CYAN}Searching APT history for tool installations:${NC}"
@@ -203,7 +207,7 @@ check_installed_packages() {
         echo -e "${CYAN}Checking for tool-related packages currently installed:${NC}"
         
         # List of package patterns to search for
-        patterns=("docker" "git" "python3" "jq" "kubectl" "helm" "kind" "k9s" "stern" "pytest" "gettext" "certbot" "golang" "gcc" "curl" "openssl")
+        patterns=("docker" "git" "python3" "jq" "kubectl" "helm" "kind" "k9s" "stern" "pytest" "gettext" "certbot" "golang" "gcc" "curl" "openssl" "sqlite")
         
         for pattern in "${patterns[@]}"; do
             installed_packages=$(dpkg -l | grep -i "$pattern" | awk '{print $2, $3}' 2>/dev/null)
@@ -289,6 +293,7 @@ tools=(
     "gcc"
     "curl"
     "openssl"
+    "sqlite3"
 )
 
 # Check each tool
