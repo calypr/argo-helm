@@ -154,7 +154,7 @@ The Calypr GitHub App typically requests:
 * **Read-only access to code and files**
 * **Read and write access to commit statuses, deployments, and pull requests**
 
-The app **cannot** modify your repository.
+The app **cannot** modify your repository code or files.
 
 ### **Step 5 — Finish Installation**
 
