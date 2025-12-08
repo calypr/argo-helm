@@ -52,15 +52,15 @@ spec:
           periodSeconds: 5
       volumes:
       - name: registrations-data
-        {{- if .Values.gitappCallback.persistence.enabled }}
-        persistentVolumeClaim:
-          claimName: {{ .Values.gitappCallback.persistence.existingClaim | default "gitapp-callback-data" }}
-        {{- else if .Values.gitappCallback.persistence.useExtraMounts }}
+        {{- if and .Values.gitappCallback.persistence.enabled .Values.gitappCallback.persistence.useExtraMounts }}
         # Note: hostPath is used per design requirements to allow host-mounted content.
         # Ensure the path matches the kind extraMounts configuration.
         hostPath:
           path: {{ .Values.gitappCallback.persistence.registrationsPath | default "/var/registrations" }}
           type: DirectoryOrCreate
+        {{- else if .Values.gitappCallback.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ .Values.gitappCallback.persistence.existingClaim | default "gitapp-callback-data" }}
         {{- else }}
         emptyDir: {}
         {{- end }}

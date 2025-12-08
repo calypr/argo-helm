@@ -175,38 +175,48 @@ The service stores registration data in a SQLite database at `/var/registrations
    ```
    
    The `registrationsPath` value must match the `containerPath` in kind-config.yaml.
+   
+   **When to use:** Local development with kind clusters that have extraMounts configured.
 
 2. **PersistentVolumeClaim (production clusters)**
    ```yaml
    gitappCallback:
      persistence:
        enabled: true
-       useExtraMounts: false  # Disable host mounts
+       useExtraMounts: false  # Disable host mounts to use PVC
        storageClass: "standard"
        size: "1Gi"
    ```
    
    A PVC named `gitapp-callback-data` will be automatically created.
+   
+   **When to use:** Production deployments or any cluster with dynamic PVC provisioning.
 
 3. **Existing PVC**
    ```yaml
    gitappCallback:
      persistence:
        enabled: true
+       useExtraMounts: false
        existingClaim: "my-existing-pvc"
    ```
+   
+   **When to use:** When you have pre-provisioned storage or specific PVC requirements.
 
 4. **emptyDir (no persistence, data lost on pod restart)**
    ```yaml
    gitappCallback:
      persistence:
        enabled: false
-       useExtraMounts: false
    ```
+   
+   **When to use:** Testing only - all data is lost when pods restart.
 
 **Default Configuration:**
 
 By default, the service uses `useExtraMounts: true` with `registrationsPath: "/var/registrations"` to work with kind clusters that have the extraMounts configured.
+
+**Priority:** When both `enabled=true` and `useExtraMounts=true`, hostPath takes priority over PVC.
 
 ## Architecture
 

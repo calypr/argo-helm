@@ -282,10 +282,10 @@ gitappCallback:
   githubAppName: "calypr-workflows"
   # Persistence configuration for registration database
   persistence:
-    # Enable persistent storage for SQLite database
+    # Enable persistent storage for SQLite database (uses PVC or host mount based on useExtraMounts)
     enabled: true
     # Use host-mounted volumes for persistence (for kind clusters with extraMounts)
-    # When true, uses hostPath volume instead of PVC or emptyDir
+    # When true, uses hostPath volume. When false and enabled=true, uses PVC.
     # Must match the extraMounts configuration in kind-config.yaml:
     #   - hostPath: $PWD/registrations
     #     containerPath: /var/registrations
@@ -294,7 +294,7 @@ gitappCallback:
     # This should match the containerPath in kind-config.yaml extraMounts
     # Example: "/var/registrations"
     registrationsPath: "/var/registrations"
-    # Use an existing PVC (if not specified, a new one will be created)
+    # Use an existing PVC (if not specified and useExtraMounts=false, a new one will be created)
     existingClaim: ""
     # Storage class for PVC (if empty, uses cluster default)
     storageClass: ""
