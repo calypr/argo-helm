@@ -77,9 +77,7 @@ def registrations_form():
     safe_installation_id = "".join(
         c for c in (installation_id or "")[:50] if c.isalnum() or c in "-_"
     )
-    safe_setup_action = "".join(
-        c for c in (setup_action or "")[:20] if c.isalnum() or c in "-_"
-    )
+    safe_setup_action = "".join(c for c in (setup_action or "")[:20] if c.isalnum() or c in "-_")
     logger.info(
         f"Registration form requested: installation_id={safe_installation_id}, "
         f"action={safe_setup_action}"
@@ -104,8 +102,8 @@ def registrations_submit():
     Form Fields:
         installation_id: GitHub installation ID (required)
         defaultBranch: Default branch name (default: main)
-        dataBucket: Data bucket name (optional)
-        artifactBucket: Artifact bucket name (optional)
+        dataBucket_*: Data bucket configuration fields (optional)
+        artifactBucket_*: Artifact bucket configuration fields (optional)
         adminUsers: Comma-separated list of admin email addresses (required)
         readUsers: Comma-separated list of read-only email addresses (optional)
 
@@ -116,8 +114,6 @@ def registrations_submit():
         # Extract form data
         installation_id = request.form.get("installation_id", "").strip()
         default_branch = request.form.get("defaultBranch", "main").strip()
-        data_bucket = request.form.get("dataBucket", "").strip()
-        artifact_bucket = request.form.get("artifactBucket", "").strip()
         admin_users_raw = request.form.get("adminUsers", "").strip()
         read_users_raw = request.form.get("readUsers", "").strip()
 
@@ -152,12 +148,65 @@ def registrations_submit():
             if not re.match(email_pattern, email):
                 return jsonify({"success": False, "error": f"Invalid email address: {email}"}), 400
 
+        # Parse bucket configurations
+        def parse_bucket_config(prefix):
+            """Parse S3 bucket configuration from form data."""
+            bucket_name = request.form.get(f"{prefix}_bucket", "").strip()
+            if not bucket_name:
+                return None
+
+            access_key = request.form.get(f"{prefix}_accessKey", "").strip()
+            secret_key = request.form.get(f"{prefix}_secretKey", "").strip()
+
+            # If bucket is set, accessKey and secretKey must exist
+            if not access_key or not secret_key:
+                raise ValueError(
+                    f"{prefix.replace('_', ' ').title()} requires both access key and secret key"
+                )
+
+            is_aws = request.form.get(f"{prefix}_is_aws") == "on"
+
+            config = {
+                "bucket": bucket_name,
+                "accessKey": access_key,
+                "secretKey": secret_key,
+                "is_aws": is_aws,
+            }
+
+            # If not AWS, hostname, region, and pathStyle should be complete
+            if not is_aws:
+                hostname = request.form.get(f"{prefix}_hostname", "").strip()
+                region = request.form.get(f"{prefix}_region", "").strip()
+                path_style = request.form.get(f"{prefix}_pathStyle") == "on"
+
+                if not hostname or not region:
+                    raise ValueError(
+                        f"{prefix.replace('_', ' ').title()} (non-AWS) requires hostname and region"
+                    )
+
+                if not hostname.startswith("https://"):
+                    raise ValueError(
+                        f"{prefix.replace('_', ' ').title()} hostname must start with https://"
+                    )
+
+                config["hostname"] = hostname
+                config["region"] = region
+                config["pathStyle"] = path_style
+
+            return config
+
+        try:
+            data_bucket = parse_bucket_config("dataBucket")
+            artifact_bucket = parse_bucket_config("artifactBucket")
+        except ValueError as e:
+            return jsonify({"success": False, "error": str(e)}), 400
+
         # Create registration configuration
         registration_config = {
             "installation_id": installation_id,
             "defaultBranch": default_branch,
-            "dataBucket": data_bucket if data_bucket else None,
-            "artifactBucket": artifact_bucket if artifact_bucket else None,
+            "dataBucket": data_bucket,
+            "artifactBucket": artifact_bucket,
             "adminUsers": admin_users,
             "readUsers": read_users,
         }

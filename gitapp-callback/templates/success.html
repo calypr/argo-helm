@@ -235,14 +235,28 @@
                     {% if config.dataBucket %}
                     <div class="config-item">
                         <span class="config-label">Data Bucket:</span>
-                        <span class="config-value"><code>{{ config.dataBucket }}</code></span>
+                        <span class="config-value">
+                            <code>{{ config.dataBucket.bucket }}</code>
+                            {% if config.dataBucket.is_aws %}
+                            (AWS S3)
+                            {% else %}
+                            ({{ config.dataBucket.hostname }})
+                            {% endif %}
+                        </span>
                     </div>
                     {% endif %}
 
                     {% if config.artifactBucket %}
                     <div class="config-item">
                         <span class="config-label">Artifact Bucket:</span>
-                        <span class="config-value"><code>{{ config.artifactBucket }}</code></span>
+                        <span class="config-value">
+                            <code>{{ config.artifactBucket.bucket }}</code>
+                            {% if config.artifactBucket.is_aws %}
+                            (AWS S3)
+                            {% else %}
+                            ({{ config.artifactBucket.hostname }})
+                            {% endif %}
+                        </span>
                     </div>
                     {% endif %}
 

@@ -197,6 +197,34 @@
             background-color: #cbd5e1;
         }
 
+        /* Password Field */
+        .password-field {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-field input {
+            flex: 1;
+            padding-right: 4rem;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 0.75rem;
+            background: none;
+            border: none;
+            color: #3b82f6;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .toggle-password:hover {
+            text-decoration: underline;
+        }
+
         /* Alert Messages */
         .alert {
             padding: 1rem;
@@ -309,32 +337,216 @@
                 </div>
 
                 <div class="card">
-                    <h3>Storage Configuration</h3>
+                    <h3>Data Bucket Configuration</h3>
+                    <p class="help-text" style="margin-bottom: 1.5rem;">S3-compatible bucket for storing workflow data (optional)</p>
 
                     <div class="form-group">
-                        <label for="dataBucket">
-                            Data Bucket
+                        <label for="dataBucket_bucket">
+                            Bucket Name
                         </label>
                         <input
                             type="text"
-                            id="dataBucket"
-                            name="dataBucket"
+                            id="dataBucket_bucket"
+                            name="dataBucket_bucket"
                             placeholder="my-data-bucket"
                         >
-                        <p class="help-text">S3 bucket for storing workflow data (optional)</p>
                     </div>
 
+                    <div id="dataBucketFields" style="display: none;">
+                        <div class="form-group">
+                            <label for="dataBucket_accessKey">
+                                Access Key <span class="required">*</span>
+                            </label>
+                            <div class="password-field">
+                                <input
+                                    type="password"
+                                    id="dataBucket_accessKey"
+                                    name="dataBucket_accessKey"
+                                    placeholder="AKIAIOSFODNN7EXAMPLE"
+                                >
+                                <button type="button" class="toggle-password" data-target="dataBucket_accessKey">
+                                    <span class="show-text">Show</span>
+                                    <span class="hide-text" style="display: none;">Hide</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dataBucket_secretKey">
+                                Secret Key <span class="required">*</span>
+                            </label>
+                            <div class="password-field">
+                                <input
+                                    type="password"
+                                    id="dataBucket_secretKey"
+                                    name="dataBucket_secretKey"
+                                    placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                                >
+                                <button type="button" class="toggle-password" data-target="dataBucket_secretKey">
+                                    <span class="show-text">Show</span>
+                                    <span class="hide-text" style="display: none;">Hide</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    id="dataBucket_is_aws"
+                                    name="dataBucket_is_aws"
+                                    checked
+                                >
+                                Is AWS S3
+                            </label>
+                            <p class="help-text">Uncheck if using a non-AWS S3-compatible service (e.g., MinIO)</p>
+                        </div>
+
+                        <div id="dataBucketNonAwsFields" style="display: none;">
+                            <div class="form-group">
+                                <label for="dataBucket_hostname">
+                                    Hostname <span class="required">*</span>
+                                </label>
+                                <input
+                                    type="url"
+                                    id="dataBucket_hostname"
+                                    name="dataBucket_hostname"
+                                    placeholder="https://minio.example.org:9000"
+                                >
+                                <p class="help-text">S3 endpoint URL (must start with https://)</p>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="dataBucket_region">
+                                    Region <span class="required">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    id="dataBucket_region"
+                                    name="dataBucket_region"
+                                    placeholder="us-west-2"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        id="dataBucket_pathStyle"
+                                        name="dataBucket_pathStyle"
+                                    >
+                                    Use Path-Style Requests
+                                </label>
+                                <p class="help-text">Forces path-style requests (e.g., s3.amazonaws.com/bucket)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Artifact Bucket Configuration</h3>
+                    <p class="help-text" style="margin-bottom: 1.5rem;">S3-compatible bucket for storing workflow artifacts (optional)</p>
+
                     <div class="form-group">
-                        <label for="artifactBucket">
-                            Artifact Bucket
+                        <label for="artifactBucket_bucket">
+                            Bucket Name
                         </label>
                         <input
                             type="text"
-                            id="artifactBucket"
-                            name="artifactBucket"
+                            id="artifactBucket_bucket"
+                            name="artifactBucket_bucket"
                             placeholder="my-artifact-bucket"
                         >
-                        <p class="help-text">S3 bucket for storing workflow artifacts (optional)</p>
+                    </div>
+
+                    <div id="artifactBucketFields" style="display: none;">
+                        <div class="form-group">
+                            <label for="artifactBucket_accessKey">
+                                Access Key <span class="required">*</span>
+                            </label>
+                            <div class="password-field">
+                                <input
+                                    type="password"
+                                    id="artifactBucket_accessKey"
+                                    name="artifactBucket_accessKey"
+                                    placeholder="AKIAIOSFODNN7EXAMPLE"
+                                >
+                                <button type="button" class="toggle-password" data-target="artifactBucket_accessKey">
+                                    <span class="show-text">Show</span>
+                                    <span class="hide-text" style="display: none;">Hide</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="artifactBucket_secretKey">
+                                Secret Key <span class="required">*</span>
+                            </label>
+                            <div class="password-field">
+                                <input
+                                    type="password"
+                                    id="artifactBucket_secretKey"
+                                    name="artifactBucket_secretKey"
+                                    placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                                >
+                                <button type="button" class="toggle-password" data-target="artifactBucket_secretKey">
+                                    <span class="show-text">Show</span>
+                                    <span class="hide-text" style="display: none;">Hide</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    id="artifactBucket_is_aws"
+                                    name="artifactBucket_is_aws"
+                                    checked
+                                >
+                                Is AWS S3
+                            </label>
+                            <p class="help-text">Uncheck if using a non-AWS S3-compatible service (e.g., MinIO)</p>
+                        </div>
+
+                        <div id="artifactBucketNonAwsFields" style="display: none;">
+                            <div class="form-group">
+                                <label for="artifactBucket_hostname">
+                                    Hostname <span class="required">*</span>
+                                </label>
+                                <input
+                                    type="url"
+                                    id="artifactBucket_hostname"
+                                    name="artifactBucket_hostname"
+                                    placeholder="https://minio.example.org:9000"
+                                >
+                                <p class="help-text">S3 endpoint URL (must start with https://)</p>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="artifactBucket_region">
+                                    Region <span class="required">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    id="artifactBucket_region"
+                                    name="artifactBucket_region"
+                                    placeholder="us-west-2"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        id="artifactBucket_pathStyle"
+                                        name="artifactBucket_pathStyle"
+                                    >
+                                    Use Path-Style Requests
+                                </label>
+                                <p class="help-text">Forces path-style requests (e.g., s3.amazonaws.com/bucket)</p>
+                            </div>
+                        </div>
                     </div>
                 </div>
 
@@ -380,6 +592,53 @@
     </main>
 
     <script>
+        // Password toggle functionality
+        document.querySelectorAll('.toggle-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                const showText = this.querySelector('.show-text');
+                const hideText = this.querySelector('.hide-text');
+                
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    showText.style.display = 'none';
+                    hideText.style.display = 'inline';
+                } else {
+                    input.type = 'password';
+                    showText.style.display = 'inline';
+                    hideText.style.display = 'none';
+                }
+            });
+        });
+
+        // Show/hide bucket credential fields when bucket name is entered
+        function setupBucketFieldToggle(bucketPrefix) {
+            const bucketInput = document.getElementById(`${bucketPrefix}_bucket`);
+            const fieldsContainer = document.getElementById(`${bucketPrefix}Fields`);
+            const isAwsCheckbox = document.getElementById(`${bucketPrefix}_is_aws`);
+            const nonAwsFields = document.getElementById(`${bucketPrefix}NonAwsFields`);
+            
+            bucketInput.addEventListener('input', function() {
+                if (this.value.trim()) {
+                    fieldsContainer.style.display = 'block';
+                } else {
+                    fieldsContainer.style.display = 'none';
+                }
+            });
+            
+            isAwsCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    nonAwsFields.style.display = 'none';
+                } else {
+                    nonAwsFields.style.display = 'block';
+                }
+            });
+        }
+
+        setupBucketFieldToggle('dataBucket');
+        setupBucketFieldToggle('artifactBucket');
+
         // Form submission handling
         document.getElementById('registrationForm').addEventListener('submit', async function(e) {
             e.preventDefault();
