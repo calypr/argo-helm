@@ -73,8 +73,16 @@ def registrations_form():
             400,
         )
 
+    # Sanitize values for logging (only alphanumeric and basic chars)
+    safe_installation_id = "".join(
+        c for c in (installation_id or "")[:50] if c.isalnum() or c in "-_"
+    )
+    safe_setup_action = "".join(
+        c for c in (setup_action or "")[:20] if c.isalnum() or c in "-_"
+    )
     logger.info(
-        f"Registration form requested: installation_id={installation_id}, action={setup_action}"
+        f"Registration form requested: installation_id={safe_installation_id}, "
+        f"action={safe_setup_action}"
     )
 
     return render_template(

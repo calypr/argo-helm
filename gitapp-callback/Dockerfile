@@ -8,6 +8,12 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
+# Install curl for health checks
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends curl && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/*
+
 # Install dependencies
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
@@ -18,7 +24,7 @@ COPY templates/ templates/
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
-    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8080/healthz').read()" || exit 1
+    CMD curl -f http://localhost:8080/healthz || exit 1
 
 # Run as non-root
 RUN useradd -m -u 1000 appuser && \
