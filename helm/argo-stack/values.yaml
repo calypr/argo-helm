@@ -283,13 +283,15 @@ gitappCallback:
   # Persistence configuration for registration database
   persistence:
     # Enable persistent storage for SQLite database
-    enabled: false
+    enabled: true
+    # assume host volume mounts for persistence
+    useExtraMounts: true
     # Use an existing PVC (if not specified, a new one will be created)
     existingClaim: ""
     # Storage class for PVC (if empty, uses cluster default)
     storageClass: ""
     # Storage size
-    size: "1Gi"
+    size: "10Mi" # Requests 10 Megabytes of storage
 
 # ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )
