@@ -152,8 +152,7 @@ Only use this if:
 The Calypr GitHub App typically requests:
 
 * **Read-only access to code and files**
-* **Read-only access to repo metadata (branch names, permissions)**
-* (Optional) permission to mark CI/check results, if Calypr is configured to do so
+* **Read and write access to commit statuses, deployments, and pull requests**
 
 The app **cannot** modify your repository.
 
