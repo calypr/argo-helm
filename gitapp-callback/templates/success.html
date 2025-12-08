@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Registration Complete - {{ github_app_name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f5f7fa;
+            color: #475569;
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* Left Navigation */
+        .sidebar {
+            width: 250px;
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 2rem 0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar h1 {
+            color: #ffffff;
+            font-size: 1.5rem;
+            padding: 0 1.5rem;
+            margin-bottom: 2rem;
+            font-weight: 600;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+        }
+
+        .sidebar nav li {
+            margin: 0.25rem 0;
+        }
+
+        .sidebar nav a {
+            display: block;
+            padding: 0.75rem 1.5rem;
+            color: #cbd5e1;
+            text-decoration: none;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .sidebar nav a:hover,
+        .sidebar nav a.active {
+            background-color: #334155;
+            color: #ffffff;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 250px;
+            flex: 1;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        /* Card */
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 3rem 2rem;
+            margin-bottom: 1.5rem;
+            text-align: center;
+        }
+
+        .success-icon {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 2rem;
+            background-color: #dcfce7;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .success-icon svg {
+            width: 48px;
+            height: 48px;
+            color: #16a34a;
+        }
+
+        .card h2 {
+            color: #1e293b;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 1rem;
+        }
+
+        .card p {
+            color: #64748b;
+            font-size: 1.125rem;
+            margin-bottom: 2rem;
+            line-height: 1.6;
+        }
+
+        .config-summary {
+            background-color: #f8fafc;
+            border: 1px solid #e2e8f0;
+            border-radius: 8px;
+            padding: 1.5rem;
+            text-align: left;
+            margin: 2rem 0;
+        }
+
+        .config-summary h3 {
+            color: #334155;
+            font-size: 1rem;
+            font-weight: 600;
+            margin-bottom: 1rem;
+        }
+
+        .config-item {
+            display: flex;
+            padding: 0.5rem 0;
+            border-bottom: 1px solid #e2e8f0;
+        }
+
+        .config-item:last-child {
+            border-bottom: none;
+        }
+
+        .config-label {
+            font-weight: 500;
+            color: #64748b;
+            width: 180px;
+            flex-shrink: 0;
+        }
+
+        .config-value {
+            color: #1e293b;
+            flex: 1;
+        }
+
+        .config-value code {
+            background-color: #e2e8f0;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+            margin: 0.5rem;
+        }
+
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #475569;
+        }
+
+        .btn-secondary:hover {
+            background-color: #cbd5e1;
+        }
+    </style>
+</head>
+<body>
+    <!-- Left Navigation -->
+    <aside class="sidebar">
+        <h1>{{ github_app_name }}</h1>
+        <nav>
+            <ul>
+                <li><a href="/registrations">Repository Registration</a></li>
+                <li><a href="#">My Repositories</a></li>
+                <li><a href="#">Settings</a></li>
+                <li><a href="#">Documentation</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="card">
+                <div class="success-icon">
+                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                </div>
+
+                <h2>Registration Complete!</h2>
+                <p>Your repository has been successfully registered with Argo Workflows.</p>
+
+                <div class="config-summary">
+                    <h3>Configuration Summary</h3>
+                    
+                    <div class="config-item">
+                        <span class="config-label">Installation ID:</span>
+                        <span class="config-value"><code>{{ config.installation_id }}</code></span>
+                    </div>
+
+                    <div class="config-item">
+                        <span class="config-label">Default Branch:</span>
+                        <span class="config-value"><code>{{ config.defaultBranch }}</code></span>
+                    </div>
+
+                    {% if config.dataBucket %}
+                    <div class="config-item">
+                        <span class="config-label">Data Bucket:</span>
+                        <span class="config-value"><code>{{ config.dataBucket }}</code></span>
+                    </div>
+                    {% endif %}
+
+                    {% if config.artifactBucket %}
+                    <div class="config-item">
+                        <span class="config-label">Artifact Bucket:</span>
+                        <span class="config-value"><code>{{ config.artifactBucket }}</code></span>
+                    </div>
+                    {% endif %}
+
+                    <div class="config-item">
+                        <span class="config-label">Admin Users:</span>
+                        <span class="config-value">{{ config.adminUsers | join(', ') }}</span>
+                    </div>
+
+                    {% if config.readUsers %}
+                    <div class="config-item">
+                        <span class="config-label">Read-Only Users:</span>
+                        <span class="config-value">{{ config.readUsers | join(', ') }}</span>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div>
+                    <a href="https://github.com" class="btn btn-primary">Go to GitHub</a>
+                    <a href="/registrations" class="btn btn-secondary">Register Another Repository</a>
+                </div>
+            </div>
+        </div>
+    </main>
+</body>
+</html>
