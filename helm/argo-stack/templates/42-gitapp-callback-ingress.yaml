@@ -1,0 +1,29 @@
+{{- if and .Values.gitappCallback.enabled .Values.ingress.gitappCallback.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: gitapp-callback
+  namespace: {{ .Values.namespaces.security }}
+  annotations:
+    # GitHub App callback doesn't need authentication
+    # This is a public endpoint that receives callbacks from GitHub
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+spec:
+  ingressClassName: nginx
+  {{- if .Values.ingress.gitappCallback.tls.enabled }}
+  tls:
+    - hosts: [{{ .Values.ingress.gitappCallback.host | quote }}]
+      secretName: {{ .Values.ingress.gitappCallback.tls.secretName | quote }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.gitappCallback.host | quote }}
+      http:
+        paths:
+          - path: /registrations(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: gitapp-callback
+                port:
+                  number: 8080
+{{- end }}

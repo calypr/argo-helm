@@ -77,7 +77,10 @@ template: check-vars deps
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
 		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
-		--set ingress={} \
+		--set-string ingress.gitappCallback.enabled=true \
+		--set-string ingress.gitappCallback.host=${ARGO_HOSTNAME} \
+		--set ingress.argoWorkflows={} \
+		--set ingress.argocd={} \
 		-f - \
 		-f helm/argo-stack/admin-values.yaml \
 		--namespace argocd > rendered.yaml
@@ -180,6 +183,8 @@ argo-stack:
 		--set-string s3.hostname=${S3_HOSTNAME} \
 		--set-string ingress.argoWorkflows.host=${ARGO_HOSTNAME} \
 		--set-string ingress.argocd.host=${ARGO_HOSTNAME} \
+		--set-string ingress.gitappCallback.enabled=true \
+		--set-string ingress.gitappCallback.host=${ARGO_HOSTNAME} \
 		--set-string githubApp.enabled=true \
 		--set-string githubApp.appId="${GITHUBHAPP_APP_ID}" \
 		--set-string githubApp.installationId="${GITHUBHAPP_INSTALLATION_ID}" \
@@ -489,4 +494,10 @@ docker-landing-page:
 	docker exec -it kind-control-plane crictl images | grep landing-page
 	@echo "✅ loaded docker landing-page"
 
-docker-install: docker-runner docker-authz docker-landing-page
+docker-gitapp-callback:
+	cd gitapp-callback ; docker build -t gitapp-callback:v1.0.0 -f Dockerfile .
+	kind load docker-image gitapp-callback:v1.0.0 --name kind
+	docker exec -it kind-control-plane crictl images | grep gitapp-callback
+	@echo "✅ loaded docker gitapp-callback"
+
+docker-install: docker-runner docker-authz docker-landing-page docker-gitapp-callback
