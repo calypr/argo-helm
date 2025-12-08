@@ -132,8 +132,29 @@
 
     <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/dompurify@3.0.6/dist/purify.min.js"></script>
+
     <script>
         const files = ['index.md', 'README.md'];
+
+        // Wait for window.mermaid to be ready (handles race with ESM import in <head>)
+        function waitForMermaid(timeoutMs = 5000, intervalMs = 50) {
+            return new Promise((resolve) => {
+                const start = Date.now();
+
+                function check() {
+                    if (window.mermaid && typeof window.mermaid.run === 'function') {
+                        return resolve(window.mermaid);
+                    }
+                    if (Date.now() - start >= timeoutMs) {
+                        // Give up after timeout; resolve null so page still works without diagrams
+                        return resolve(null);
+                    }
+                    setTimeout(check, intervalMs);
+                }
+
+                check();
+            });
+        }
 
         async function loadMarkdown() {
             const content = document.getElementById('content');
@@ -173,9 +194,11 @@
                             container.replaceWith(mermaidDiv);
                         });
 
-                        // Run Mermaid after blocks exist
-                        if (mermaidBlocks.length > 0 && window.mermaid && typeof window.mermaid.run === 'function') {
-                            await window.mermaid.run({ querySelector: '.mermaid' });
+                        // Ensure Mermaid is loaded before trying to render
+                        const mermaidApi = await waitForMermaid();
+
+                        if (mermaidBlocks.length > 0 && mermaidApi && typeof mermaidApi.run === 'function') {
+                            await mermaidApi.run({ querySelector: '.mermaid' });
                         }
 
                         return;
@@ -188,7 +211,8 @@
             content.innerHTML = '<div class="error">No content available. Please add an index.md or README.md file to the docs directory.</div>';
         }
 
-        loadMarkdown();
+        // Run after DOM is ready to avoid any subtle timing issues
+        window.addEventListener('DOMContentLoaded', loadMarkdown);
     </script>
 </body>
 </html>
