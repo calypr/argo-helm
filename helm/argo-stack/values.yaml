@@ -380,7 +380,7 @@ ingressAuthzOverlay:
       namespace: argo-stack
       service: github-repo-registrations-eventsource-svc
       port: 12000
-      pathPrefix: /registrations
+      pathPrefix: /events
     api:
       namespace: calypr-api
       service: calypr-api
