@@ -15,13 +15,33 @@ data:
   # =========================================================
   # GitHub Notification Service Configuration
   # =========================================================
+  {{- if .Values.notifications.github.useGithubApp }}
+  {{- /* Collect unique installation IDs from repoRegistrations */ -}}
+  {{- $installationIds := dict }}
+  {{- range $reg := .Values.repoRegistrations }}
+    {{- if $reg.installationId }}
+      {{- $_ := set $installationIds (toString $reg.installationId) true }}
+    {{- end }}
+  {{- end }}
+  
+  {{- /* If no repoRegistrations with installationId, use global config */ -}}
+  {{- if eq (len $installationIds) 0 }}
   service.github: |
-    {{- if .Values.notifications.github.useGithubApp }}
-    # Using GitHub App for notifications
+    # Using GitHub App for notifications (global configuration)
     appID: {{ .Values.notifications.github.appId | default .Values.githubApp.appId }}
     installationID: {{ .Values.notifications.github.installationId | default .Values.githubApp.installationId }}
     privateKey: $github-privateKey
-    {{- end }}
+  {{- else }}
+  {{- /* Generate one service.github-<installationId> for each unique installationId */ -}}
+  {{- range $installationId, $_ := $installationIds }}
+  service.github-{{ $installationId }}: |
+    # GitHub App notifications for installation {{ $installationId }}
+    appID: {{ $.Values.notifications.github.appId | default $.Values.githubApp.appId }}
+    installationID: {{ $installationId }}
+    privateKey: $github-privateKey
+  {{- end }}
+  {{- end }}
+  {{- end }}
 
   {{- /* derive base URL once */ -}}
   {{- $argocdUrl := .Values.notifications.argocdUrl | default "https://calypr-demo.ddns.net/applications" }}

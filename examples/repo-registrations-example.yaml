@@ -3,6 +3,19 @@
 # This file demonstrates how to create RepoRegistration custom resources
 # to onboard your Git repositories to the Argo platform.
 #
+# Multi-GitHub App Installation Support:
+# ---------------------------------------
+# The installationId field (REQUIRED) identifies which GitHub App installation
+# should be used for this repository. This enables:
+# - Multiple organizations to use separate GitHub Apps
+# - Independent notification configurations per installation
+# - Isolated credentials and permissions
+#
+# To find your installation ID:
+# 1. Navigate to your GitHub App settings page
+# 2. Go to "Install App" and select the installation
+# 3. The installation ID is in the URL: /settings/installations/{installation_id}
+#
 # Usage:
 #   1. Ensure the RepoRegistration CRD is installed:
 #      kubectl apply -f helm/argo-stack/crds/repo-registration-crd.yaml
@@ -34,6 +47,10 @@ spec:
   
   # Tenant identifier (REQUIRED)
   tenant: myorg
+  
+  # GitHub App installation ID (REQUIRED)
+  # Find this in your GitHub App installation URL
+  installationId: 12345678
   
   # WorkflowTemplate to use (REQUIRED)
   workflowTemplateRef: nextflow-repo-runner
@@ -81,6 +98,10 @@ spec:
   repoUrl: https://github.com/YOUR_ORG/variant-calling-pipeline.git
   defaultBranch: develop
   tenant: genomics-lab
+  
+  # Different GitHub App installation for a different organization
+  installationId: 87654321
+  
   workflowTemplateRef: nextflow-repo-runner
   
   # Artifacts bucket for workflow outputs (BAM, VCF files, reports)
@@ -130,6 +151,10 @@ spec:
   repoUrl: https://github.com/YOUR_ORG/internal-workflows.git
   defaultBranch: main
   tenant: internal-dev
+  
+  # Same installation as Example 1 (shared GitHub App for same org)
+  installationId: 12345678
+  
   workflowTemplateRef: nextflow-repo-runner
   
   # MinIO configuration (local development)
@@ -164,6 +189,10 @@ spec:
   repoUrl: https://github.com/YOUR_ORG/tcga-analysis.git
   defaultBranch: main
   tenant: cancer-consortium
+  
+  # Enterprise GitHub App installation for consortium
+  installationId: 99887766
+  
   workflowTemplateRef: nextflow-repo-runner
   
   # Artifacts stored in institution-specific bucket
@@ -216,6 +245,10 @@ spec:
   repoUrl: https://github.com/YOUR_ORG/public-nextflow-demo.git
   defaultBranch: main
   tenant: demos
+  
+  # Public demo GitHub App installation
+  installationId: 11223344
+  
   workflowTemplateRef: nextflow-repo-runner
   
   # Public bucket for demo outputs

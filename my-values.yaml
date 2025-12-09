@@ -4,6 +4,7 @@ repoRegistrations:
     repoUrl: https://github.com/bwalsh/nextflow-hello-project.git
     defaultBranch: main
     tenant: research-team-1
+    installationId: 12345678
     workflowTemplateRef: nextflow-repo-runner
     
     # Artifact bucket configuration

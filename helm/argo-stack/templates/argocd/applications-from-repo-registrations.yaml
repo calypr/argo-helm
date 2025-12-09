@@ -22,17 +22,22 @@ metadata:
     repo-registration/tenant: {{ $reg.tenant | quote }}
     {{- end }}
     {{- if and $.Values.notifications.enabled $.Values.notifications.github.enabled $.Values.notifications.defaultSubscriptions.autoSubscribe }}
+    {{- /* Determine the service name based on installationId */ -}}
+    {{- $serviceName := "github" }}
+    {{- if and $reg.installationId $.Values.notifications.github.useGithubApp }}
+      {{- $serviceName = printf "github-%d" (int $reg.installationId) }}
+    {{- end }}
     {{- if $.Values.notifications.triggers.onSyncSucceeded }}
-    notifications.argoproj.io/subscribe.on-sync-succeeded.github: ""
+    notifications.argoproj.io/subscribe.on-sync-succeeded.{{ $serviceName }}: ""
     {{- end }}
     {{- if $.Values.notifications.triggers.onSyncFailed }}
-    notifications.argoproj.io/subscribe.on-sync-failed.github: ""
+    notifications.argoproj.io/subscribe.on-sync-failed.{{ $serviceName }}: ""
     {{- end }}
     {{- if $.Values.notifications.triggers.onSyncRunning }}
-    notifications.argoproj.io/subscribe.on-sync-running.github: ""
+    notifications.argoproj.io/subscribe.on-sync-running.{{ $serviceName }}: ""
     {{- end }}
     {{- if $.Values.notifications.triggers.onHealthDegraded }}
-    notifications.argoproj.io/subscribe.on-health-degraded.github: ""
+    notifications.argoproj.io/subscribe.on-health-degraded.{{ $serviceName }}: ""
     {{- end }}
     {{- end }}    
 spec:

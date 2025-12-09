@@ -3,6 +3,17 @@
 # This values file demonstrates using the repoRegistrations array
 # instead of manually configuring applications and events.github.repositories.
 #
+# Multi-GitHub App Installation Support:
+# ---------------------------------------
+# Each repository can specify its own installationId to support multiple
+# GitHub App installations. This enables:
+# - Different organizations/accounts to use separate GitHub Apps
+# - Independent notification configurations per installation
+# - Isolated credentials and permissions
+#
+# The chart automatically generates unique service.github-<installationId>
+# configurations for each distinct installationId found in repoRegistrations.
+#
 # Usage:
 #   helm upgrade --install argo-stack ./helm/argo-stack \
 #     --namespace argocd --create-namespace \
@@ -133,6 +144,7 @@ repoRegistrations:
     repoUrl: https://github.com/bwalsh/nextflow-hello-project.git
     defaultBranch: main
     tenant: research-team-1
+    installationId: 12345678  # GitHub App installation ID for this repository
     namespace: wf-poc
     workflowTemplateRef: nextflow-repo-runner
     
@@ -163,10 +175,12 @@ repoRegistrations:
     isPublic: false
 
   # Example 2: Genomics pipeline with separate artifact and data buckets
+  # This example uses a DIFFERENT GitHub App installation ID
   - name: genomics-variant-calling
     repoUrl: https://github.com/genomics-lab/variant-calling-pipeline.git
     defaultBranch: develop
     tenant: genomics-lab
+    installationId: 87654321  # Different installation ID for this organization
     namespace: wf-poc
     workflowTemplateRef: nextflow-repo-runner
     
@@ -203,10 +217,12 @@ repoRegistrations:
     isPublic: false
 
   # Example 3: Using MinIO (local development)
+  # This repo uses the same installation ID as Example 1
   - name: local-dev-workflows
     repoUrl: https://github.com/internal/dev-workflows.git
     defaultBranch: main
     tenant: internal-dev
+    installationId: 12345678  # Same installation as Example 1
     namespace: wf-poc
     workflowTemplateRef: nextflow-repo-runner
     
