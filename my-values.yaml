@@ -32,4 +32,5 @@ repoRegistrations:
       - student@research.edu
     
     isPublic: false
+    installationId: 98663092
 
