@@ -27,16 +27,16 @@ metadata:
     {{- /* Use dot-separated format: github.<installationId> for ArgoCD to recognize type */ -}}
     {{- $serviceName := printf "github.%d" (int64 $reg.installationId) }}
     {{- if $.Values.notifications.triggers.onSyncSucceeded }}
-    notifications.argoproj.io/subscribe.on-sync-succeeded.{{ $serviceName }}: ""
+    "notifications.argoproj.io/subscribe.on-sync-succeeded.{{ $serviceName }}": ""
     {{- end }}
     {{- if $.Values.notifications.triggers.onSyncFailed }}
-    notifications.argoproj.io/subscribe.on-sync-failed.{{ $serviceName }}: ""
+    "notifications.argoproj.io/subscribe.on-sync-failed.{{ $serviceName }}": ""
     {{- end }}
     {{- if $.Values.notifications.triggers.onSyncRunning }}
-    notifications.argoproj.io/subscribe.on-sync-running.{{ $serviceName }}: ""
+    "notifications.argoproj.io/subscribe.on-sync-running.{{ $serviceName }}": ""
     {{- end }}
     {{- if $.Values.notifications.triggers.onHealthDegraded }}
-    notifications.argoproj.io/subscribe.on-health-degraded.{{ $serviceName }}: ""
+    "notifications.argoproj.io/subscribe.on-health-degraded.{{ $serviceName }}": ""
     {{- end }}
     {{- end }}    
 spec:
