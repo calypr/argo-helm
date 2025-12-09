@@ -197,6 +197,9 @@ argo-cd:
       # server.rootpath: "/applications"
   notifications:
     enabled: true
+    # Disable the default ConfigMap creation - we create our own with dynamic services
+    cm:
+      create: false
 
 # ============================================================================
 # Authorization Adapter Settings (Arborist Integration)
