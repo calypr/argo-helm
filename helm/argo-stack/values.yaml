@@ -201,6 +201,9 @@ argo-cd:
     cm:
       create: false
 
+    # Disable the default ConfigMap creation - we create our own with dynamic services
+    cm:
+      create: false    
 # ============================================================================
 # Authorization Adapter Settings (Arborist Integration)
 # ============================================================================
