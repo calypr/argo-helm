@@ -35,7 +35,7 @@ data:
   {{- /* Validate global installationId is present */ -}}
   {{- $globalInstallationId := .Values.notifications.github.installationId | default .Values.githubApp.installationId }}
   {{- if not $globalInstallationId }}
-    {{- fail "GitHub App configuration error: installationId is required when using global configuration (no repoRegistrations have installationId set)" }}
+    {{- fail "GitHub App configuration error: installationId required (no repoRegistrations have installationId)" }}
   {{- end }}
   service.github: |
     # Using GitHub App for notifications (global configuration)
