@@ -7,9 +7,6 @@ service.github-<installationId> configurations for each distinct
 installationId found in repoRegistrations.
 """
 
-import yaml
-from typing import Dict, List, Any
-
 
 def test_multi_installation_service_generation():
     """
