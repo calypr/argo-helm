@@ -670,7 +670,7 @@ notifications:
     # installationId: ""
 
     # Private key secret reference (defaults to githubApp.privateKeySecretName if not set)
-    # privateKeySecretName: ""
+    privateKeySecretName: argocd-github-app-key
 
   # Default notification triggers
   # These define when notifications are sent
