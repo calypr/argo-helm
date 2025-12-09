@@ -22,16 +22,16 @@ data:
     {{- fail "GitHub App configuration error: appId is required when notifications.github.useGithubApp is true" }}
   {{- end }}
   
+  {{- /* Determine the secret name and key for GitHub App private key */ -}}
+  {{- $privateKeySecretName := .Values.notifications.github.privateKeySecretName | default (.Values.githubApp.privateKeySecretName | default "argocd-github-app-key") }}
+  {{- $privateKeySecretKey := .Values.notifications.github.privateKeySecretKey | default (.Values.githubApp.privateKeySecretKey | default "privateKey") }}
+  
   {{- /* Collect unique installation IDs from repoRegistrations */ -}}
   {{- /* installationId is mandatory per CRD schema */ -}}
   {{- $installationIds := dict }}
   {{- range $reg := .Values.repoRegistrations }}
     {{- $_ := set $installationIds (printf "%d" (int64 $reg.installationId)) true }}
   {{- end }}
-  
-  {{- /* Determine the secret name and key for GitHub App private key */ -}}
-  {{- $privateKeySecretName := .Values.notifications.github.privateKeySecretName | default (.Values.githubApp.privateKeySecretName | default "argocd-github-app-key") }}
-  {{- $privateKeySecretKey := .Values.notifications.github.privateKeySecretKey | default (.Values.githubApp.privateKeySecretKey | default "privateKey") }}
   
   {{- /* Generate one service.github.<installationId> for each unique installationId */ -}}
   {{- /* Using dot-separated format so ArgoCD recognizes 'github' as the type */ -}}
