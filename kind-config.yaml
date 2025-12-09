@@ -12,4 +12,5 @@ nodes:
   extraMounts:
     - hostPath: $PWD/landing-page-content
       containerPath: /var/www/docs
-    
+    - hostPath: $PWD/registrations
+      containerPath: /var/registrations

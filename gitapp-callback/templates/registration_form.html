@@ -1,0 +1,732 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Repository Registration - {{ github_app_name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f5f7fa;
+            color: #475569;
+            min-height: 100vh;
+            display: flex;
+        }
+
+        /* Left Navigation */
+        .sidebar {
+            width: 250px;
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 2rem 0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar h1 {
+            color: #ffffff;
+            font-size: 1.5rem;
+            padding: 0 1.5rem;
+            margin-bottom: 2rem;
+            font-weight: 600;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+        }
+
+        .sidebar nav li {
+            margin: 0.25rem 0;
+        }
+
+        .sidebar nav a {
+            display: block;
+            padding: 0.75rem 1.5rem;
+            color: #cbd5e1;
+            text-decoration: none;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .sidebar nav a:hover,
+        .sidebar nav a.active {
+            background-color: #334155;
+            color: #ffffff;
+        }
+
+        /* Main Content */
+        .main-content {
+            margin-left: 250px;
+            flex: 1;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 2rem;
+        }
+
+        .header h2 {
+            color: #1e293b;
+            font-size: 2rem;
+            font-weight: 700;
+            margin-bottom: 0.5rem;
+        }
+
+        .header p {
+            color: #64748b;
+            font-size: 1rem;
+        }
+
+        /* Card */
+        .card {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            padding: 2rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .card h3 {
+            color: #1e293b;
+            font-size: 1.25rem;
+            font-weight: 600;
+            margin-bottom: 1.5rem;
+        }
+
+        /* Form Elements */
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        .form-group label {
+            display: block;
+            color: #334155;
+            font-weight: 500;
+            margin-bottom: 0.5rem;
+            font-size: 0.9rem;
+        }
+
+        .form-group label .required {
+            color: #ef4444;
+        }
+
+        .form-group input,
+        .form-group textarea {
+            width: 100%;
+            padding: 0.75rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 8px;
+            font-size: 1rem;
+            color: #1e293b;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        .form-group input:focus,
+        .form-group textarea:focus {
+            outline: none;
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+        }
+
+        .form-group textarea {
+            resize: vertical;
+            min-height: 80px;
+        }
+
+        .help-text {
+            font-size: 0.875rem;
+            color: #64748b;
+            margin-top: 0.25rem;
+        }
+
+        /* Buttons */
+        .btn-group {
+            display: flex;
+            gap: 1rem;
+            margin-top: 2rem;
+        }
+
+        .btn {
+            padding: 0.75rem 1.5rem;
+            border: none;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            text-decoration: none;
+            display: inline-block;
+            text-align: center;
+        }
+
+        .btn:active {
+            transform: translateY(1px);
+        }
+
+        .btn-primary {
+            background-color: #3b82f6;
+            color: white;
+        }
+
+        .btn-primary:hover {
+            background-color: #2563eb;
+        }
+
+        .btn-primary:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+        }
+
+        .btn-secondary {
+            background-color: #e2e8f0;
+            color: #475569;
+        }
+
+        .btn-secondary:hover {
+            background-color: #cbd5e1;
+        }
+
+        /* Password Field */
+        .password-field {
+            position: relative;
+            display: flex;
+            align-items: center;
+        }
+
+        .password-field input {
+            flex: 1;
+            padding-right: 4rem;
+        }
+
+        .toggle-password {
+            position: absolute;
+            right: 0.75rem;
+            background: none;
+            border: none;
+            color: #3b82f6;
+            cursor: pointer;
+            font-size: 0.875rem;
+            font-weight: 500;
+            padding: 0.25rem 0.5rem;
+        }
+
+        .toggle-password:hover {
+            text-decoration: underline;
+        }
+
+        /* Alert Messages */
+        .alert {
+            padding: 1rem;
+            border-radius: 8px;
+            margin-bottom: 1.5rem;
+            display: none;
+        }
+
+        .alert.show {
+            display: block;
+        }
+
+        .alert-error {
+            background-color: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+
+        .alert-success {
+            background-color: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        .alert-info {
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+        }
+
+        /* Installation ID Badge */
+        .installation-badge {
+            display: inline-flex;
+            align-items: center;
+            padding: 0.5rem 1rem;
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            border-radius: 8px;
+            margin-bottom: 1rem;
+        }
+
+        .installation-badge strong {
+            margin-right: 0.5rem;
+            color: #1e40af;
+        }
+
+        .installation-badge code {
+            background-color: #dbeafe;
+            padding: 0.25rem 0.5rem;
+            border-radius: 4px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9rem;
+        }
+    </style>
+</head>
+<body>
+    <!-- Left Navigation -->
+    <aside class="sidebar">
+        <h1>{{ github_app_name }}</h1>
+        <nav>
+            <ul>
+                <li><a href="#" class="active">Repository Registration</a></li>
+                <li><a href="#">My Repositories</a></li>
+                <li><a href="#">Settings</a></li>
+                <li><a href="#">Documentation</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <div class="container">
+            <div class="header">
+                <h2>Complete Repository Registration</h2>
+                <p>Configure your repository settings to get started with Argo Workflows.</p>
+            </div>
+
+            <div class="installation-badge">
+                <strong>Installation ID:</strong>
+                <code>{{ installation_id }}</code>
+            </div>
+
+            {% if setup_action == 'update' %}
+            <div class="alert alert-info show">
+                You are updating an existing installation. Review and update your settings below.
+            </div>
+            {% endif %}
+
+            <div id="alertContainer"></div>
+
+            <form id="registrationForm" method="POST" action="/registrations">
+                <input type="hidden" name="installation_id" value="{{ installation_id }}">
+
+                <div class="card">
+                    <h3>Repository Configuration</h3>
+
+                    <div class="form-group">
+                        <label for="defaultBranch">
+                            Default Branch
+                        </label>
+                        <input
+                            type="text"
+                            id="defaultBranch"
+                            name="defaultBranch"
+                            value="{{ initial_data.defaultBranch if initial_data else 'main' }}"
+                            placeholder="main"
+                        >
+                        <p class="help-text">The default branch to use for workflows (e.g., main, master, develop)</p>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Data Bucket Configuration</h3>
+                    <p class="help-text" style="margin-bottom: 1.5rem;">S3-compatible bucket for storing workflow data (optional)</p>
+
+                    <div class="form-group">
+                        <label for="dataBucket_bucket">
+                            Bucket Name
+                        </label>
+                        <input
+                            type="text"
+                            id="dataBucket_bucket"
+                            name="dataBucket_bucket"
+                            placeholder="my-data-bucket"
+                            value="{{ initial_data.dataBucket.bucket if initial_data and initial_data.dataBucket else '' }}"
+                        >
+                    </div>
+
+                    <div id="dataBucketFields" style="display: none;">
+                        <div class="form-group">
+                            <label for="dataBucket_accessKey">
+                                Access Key <span class="required">*</span>
+                            </label>
+                            <div class="password-field">
+                                <input
+                                    type="password"
+                                    id="dataBucket_accessKey"
+                                    name="dataBucket_accessKey"
+                                    placeholder="AKIAIOSFODNN7EXAMPLE"
+                                    value="{{ initial_data.dataBucket.accessKey if initial_data and initial_data.dataBucket else '' }}"
+                                >
+                                <button type="button" class="toggle-password" data-target="dataBucket_accessKey">
+                                    <span class="show-text">Show</span>
+                                    <span class="hide-text" style="display: none;">Hide</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="dataBucket_secretKey">
+                                Secret Key <span class="required">*</span>
+                            </label>
+                            <div class="password-field">
+                                <input
+                                    type="password"
+                                    id="dataBucket_secretKey"
+                                    name="dataBucket_secretKey"
+                                    placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                                    value="{{ initial_data.dataBucket.secretKey if initial_data and initial_data.dataBucket else '' }}"
+                                >
+                                <button type="button" class="toggle-password" data-target="dataBucket_secretKey">
+                                    <span class="show-text">Show</span>
+                                    <span class="hide-text" style="display: none;">Hide</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    id="dataBucket_is_aws"
+                                    name="dataBucket_is_aws"
+                                    {% if not initial_data or not initial_data.dataBucket or initial_data.dataBucket.is_aws %}checked{% endif %}
+                                >
+                                Is AWS S3
+                            </label>
+                            <p class="help-text">Uncheck if using a non-AWS S3-compatible service (e.g., MinIO)</p>
+                        </div>
+
+                        <div id="dataBucketNonAwsFields" style="display: none;">
+                            <div class="form-group">
+                                <label for="dataBucket_hostname">
+                                    Hostname <span class="required">*</span>
+                                </label>
+                                <input
+                                    type="url"
+                                    id="dataBucket_hostname"
+                                    name="dataBucket_hostname"
+                                    placeholder="https://minio.example.org:9000"
+                                    value="{{ initial_data.dataBucket.hostname if initial_data and initial_data.dataBucket else '' }}"
+                                >
+                                <p class="help-text">S3 endpoint URL (must start with https://)</p>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="dataBucket_region">
+                                    Region <span class="required">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    id="dataBucket_region"
+                                    name="dataBucket_region"
+                                    placeholder="us-west-2"
+                                    value="{{ initial_data.dataBucket.region if initial_data and initial_data.dataBucket else '' }}"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        id="dataBucket_pathStyle"
+                                        name="dataBucket_pathStyle"
+                                        {% if initial_data and initial_data.dataBucket and initial_data.dataBucket.pathStyle %}checked{% endif %}
+                                    >
+                                    Use Path-Style Requests
+                                </label>
+                                <p class="help-text">Forces path-style requests (e.g., s3.amazonaws.com/bucket)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Artifact Bucket Configuration</h3>
+                    <p class="help-text" style="margin-bottom: 1.5rem;">S3-compatible bucket for storing workflow artifacts (optional)</p>
+
+                    <div class="form-group">
+                        <label for="artifactBucket_bucket">
+                            Bucket Name
+                        </label>
+                        <input
+                            type="text"
+                            id="artifactBucket_bucket"
+                            name="artifactBucket_bucket"
+                            placeholder="my-artifact-bucket"
+                            value="{{ initial_data.artifactBucket.bucket if initial_data and initial_data.artifactBucket else '' }}"
+                        >
+                    </div>
+
+                    <div id="artifactBucketFields" style="display: none;">
+                        <div class="form-group">
+                            <label for="artifactBucket_accessKey">
+                                Access Key <span class="required">*</span>
+                            </label>
+                            <div class="password-field">
+                                <input
+                                    type="password"
+                                    id="artifactBucket_accessKey"
+                                    name="artifactBucket_accessKey"
+                                    placeholder="AKIAIOSFODNN7EXAMPLE"
+                                    value="{{ initial_data.artifactBucket.accessKey if initial_data and initial_data.artifactBucket else '' }}"
+                                >
+                                <button type="button" class="toggle-password" data-target="artifactBucket_accessKey">
+                                    <span class="show-text">Show</span>
+                                    <span class="hide-text" style="display: none;">Hide</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="artifactBucket_secretKey">
+                                Secret Key <span class="required">*</span>
+                            </label>
+                            <div class="password-field">
+                                <input
+                                    type="password"
+                                    id="artifactBucket_secretKey"
+                                    name="artifactBucket_secretKey"
+                                    placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                                    value="{{ initial_data.artifactBucket.secretKey if initial_data and initial_data.artifactBucket else '' }}"
+                                >
+                                <button type="button" class="toggle-password" data-target="artifactBucket_secretKey">
+                                    <span class="show-text">Show</span>
+                                    <span class="hide-text" style="display: none;">Hide</span>
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input
+                                    type="checkbox"
+                                    id="artifactBucket_is_aws"
+                                    name="artifactBucket_is_aws"
+                                    {% if not initial_data or not initial_data.artifactBucket or initial_data.artifactBucket.is_aws %}checked{% endif %}
+                                >
+                                Is AWS S3
+                            </label>
+                            <p class="help-text">Uncheck if using a non-AWS S3-compatible service (e.g., MinIO)</p>
+                        </div>
+
+                        <div id="artifactBucketNonAwsFields" style="display: none;">
+                            <div class="form-group">
+                                <label for="artifactBucket_hostname">
+                                    Hostname <span class="required">*</span>
+                                </label>
+                                <input
+                                    type="url"
+                                    id="artifactBucket_hostname"
+                                    name="artifactBucket_hostname"
+                                    placeholder="https://minio.example.org:9000"
+                                    value="{{ initial_data.artifactBucket.hostname if initial_data and initial_data.artifactBucket else '' }}"
+                                >
+                                <p class="help-text">S3 endpoint URL (must start with https://)</p>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="artifactBucket_region">
+                                    Region <span class="required">*</span>
+                                </label>
+                                <input
+                                    type="text"
+                                    id="artifactBucket_region"
+                                    name="artifactBucket_region"
+                                    placeholder="us-west-2"
+                                    value="{{ initial_data.artifactBucket.region if initial_data and initial_data.artifactBucket else '' }}"
+                                >
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input
+                                        type="checkbox"
+                                        id="artifactBucket_pathStyle"
+                                        name="artifactBucket_pathStyle"
+                                        {% if initial_data and initial_data.artifactBucket and initial_data.artifactBucket.pathStyle %}checked{% endif %}
+                                    >
+                                    Use Path-Style Requests
+                                </label>
+                                <p class="help-text">Forces path-style requests (e.g., s3.amazonaws.com/bucket)</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <h3>Access Control</h3>
+
+                    <div class="form-group">
+                        <label for="adminUsers">
+                            Admin Users <span class="required">*</span>
+                        </label>
+                        <textarea
+                            id="adminUsers"
+                            name="adminUsers"
+                            placeholder="admin@example.com, lead@example.com"
+                            required
+                        >{{ initial_data.adminUsers|join(', ') if initial_data and initial_data.adminUsers else '' }}</textarea>
+                        <p class="help-text">Comma-separated list of admin user email addresses (at least one required)</p>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="readUsers">
+                            Read-Only Users
+                        </label>
+                        <textarea
+                            id="readUsers"
+                            name="readUsers"
+                            placeholder="viewer@example.com, analyst@example.com"
+                        >{{ initial_data.readUsers|join(', ') if initial_data and initial_data.readUsers else '' }}</textarea>
+                        <p class="help-text">Comma-separated list of read-only user email addresses (optional)</p>
+                    </div>
+                </div>
+
+                <div class="btn-group">
+                    <button type="submit" class="btn btn-primary" id="submitBtn">
+                        Complete Registration
+                    </button>
+                    <a href="https://github.com/apps/{{ github_app_name|urlencode }}" class="btn btn-secondary">
+                        Cancel
+                    </a>
+                </div>
+            </form>
+        </div>
+    </main>
+
+    <script>
+        // Password toggle functionality
+        document.querySelectorAll('.toggle-password').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const input = document.getElementById(targetId);
+                const showText = this.querySelector('.show-text');
+                const hideText = this.querySelector('.hide-text');
+                
+                if (input.type === 'password') {
+                    input.type = 'text';
+                    showText.style.display = 'none';
+                    hideText.style.display = 'inline';
+                } else {
+                    input.type = 'password';
+                    showText.style.display = 'inline';
+                    hideText.style.display = 'none';
+                }
+            });
+        });
+
+        // Show/hide bucket credential fields when bucket name is entered
+        function setupBucketFieldToggle(bucketPrefix) {
+            const bucketInput = document.getElementById(`${bucketPrefix}_bucket`);
+            const fieldsContainer = document.getElementById(`${bucketPrefix}Fields`);
+            const isAwsCheckbox = document.getElementById(`${bucketPrefix}_is_aws`);
+            const nonAwsFields = document.getElementById(`${bucketPrefix}NonAwsFields`);
+            
+            bucketInput.addEventListener('input', function() {
+                if (this.value.trim()) {
+                    fieldsContainer.style.display = 'block';
+                } else {
+                    fieldsContainer.style.display = 'none';
+                }
+            });
+            
+            isAwsCheckbox.addEventListener('change', function() {
+                if (this.checked) {
+                    nonAwsFields.style.display = 'none';
+                } else {
+                    nonAwsFields.style.display = 'block';
+                }
+            });
+        }
+
+        setupBucketFieldToggle('dataBucket');
+        setupBucketFieldToggle('artifactBucket');
+
+        // Initialize bucket field visibility for existing data
+        function initializeBucketFields(bucketPrefix) {
+            const bucketInput = document.getElementById(`${bucketPrefix}_bucket`);
+            const fieldsContainer = document.getElementById(`${bucketPrefix}Fields`);
+            const isAwsCheckbox = document.getElementById(`${bucketPrefix}_is_aws`);
+            const nonAwsFields = document.getElementById(`${bucketPrefix}NonAwsFields`);
+            
+            // Show fields if bucket name exists
+            if (bucketInput.value.trim()) {
+                fieldsContainer.style.display = 'block';
+            }
+            
+            // Show non-AWS fields if not AWS
+            if (!isAwsCheckbox.checked) {
+                nonAwsFields.style.display = 'block';
+            }
+        }
+        
+        initializeBucketFields('dataBucket');
+        initializeBucketFields('artifactBucket');
+
+        // Form submission handling
+        document.getElementById('registrationForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const submitBtn = document.getElementById('submitBtn');
+            const alertContainer = document.getElementById('alertContainer');
+
+            // Disable submit button
+            submitBtn.disabled = true;
+            submitBtn.textContent = 'Processing...';
+
+            // Clear previous alerts
+            alertContainer.innerHTML = '';
+
+            try {
+                const formData = new FormData(this);
+                const response = await fetch('/registrations', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    const contentType = response.headers.get('content-type');
+                    if (contentType && contentType.includes('application/json')) {
+                        // JSON response
+                        const data = await response.json();
+                        showAlert('success', data.message || 'Registration completed successfully');
+                    } else {
+                        // HTML response - replace page content
+                        const html = await response.text();
+                        document.open();
+                        document.write(html);
+                        document.close();
+                    }
+                } else {
+                    const data = await response.json();
+                    showAlert('error', data.error || 'Failed to submit registration');
+                }
+            } catch (error) {
+                showAlert('error', 'Network error. Please try again.');
+            } finally {
+                submitBtn.disabled = false;
+                submitBtn.textContent = 'Complete Registration';
+            }
+        });
+
+        function showAlert(type, message) {
+            const alertContainer = document.getElementById('alertContainer');
+            const alertClass = type === 'error' ? 'alert-error' : 'alert-success';
+            alertContainer.innerHTML = `
+                <div class="alert ${alertClass} show">
+                    ${message}
+                </div>
+            `;
+        }
+    </script>
+</body>
+</html>
