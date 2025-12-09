@@ -23,26 +23,12 @@ data:
   {{- end }}
   
   {{- /* Collect unique installation IDs from repoRegistrations */ -}}
+  {{- /* installationId is mandatory per CRD schema */ -}}
   {{- $installationIds := dict }}
   {{- range $reg := .Values.repoRegistrations }}
-    {{- if $reg.installationId }}
-      {{- $_ := set $installationIds (printf "%d" (int64 $reg.installationId)) true }}
-    {{- end }}
+    {{- $_ := set $installationIds (printf "%d" (int64 $reg.installationId)) true }}
   {{- end }}
   
-  {{- /* If no repoRegistrations with installationId, use global config */ -}}
-  {{- if eq (len $installationIds) 0 }}
-  {{- /* Validate global installationId is present */ -}}
-  {{- $globalInstallationId := .Values.notifications.github.installationId | default .Values.githubApp.installationId }}
-  {{- if not $globalInstallationId }}
-    {{- fail "GitHub App configuration error: installationId required (no repoRegistrations have installationId)" }}
-  {{- end }}
-  service.github: |
-    # Using GitHub App for notifications (global configuration)
-    appID: {{ $appId }}
-    installationID: {{ $globalInstallationId }}
-    privateKey: $github-privateKey
-  {{- else }}
   {{- /* Generate one service.github.<installationId> for each unique installationId */ -}}
   {{- /* Using dot-separated format so ArgoCD recognizes 'github' as the type */ -}}
   {{- range $installationId, $_ := $installationIds }}
@@ -51,7 +37,6 @@ data:
     appID: {{ $appId }}
     installationID: {{ $installationId }}
     privateKey: $github-privateKey
-  {{- end }}
   {{- end }}
   {{- end }}
 
@@ -165,39 +150,8 @@ data:
   # =========================================================
   # Default Subscriptions
   # =========================================================
-  {{- /* When using per-installation services, apps subscribe via annotations */ -}}
-  {{- /* Global subscriptions hardcode service name as "github" which conflicts */ -}}
-  {{- /* with installation-specific service names like "github-12345678" */ -}}
-  {{- /* Only add global subscriptions when NOT using per-installation services */ -}}
-  {{- $usePerInstallationServices := false }}
-  {{- if .Values.notifications.github.useGithubApp }}
-    {{- range $reg := .Values.repoRegistrations }}
-      {{- if $reg.installationId }}
-        {{- $usePerInstallationServices = true }}
-      {{- end }}
-    {{- end }}
-  {{- end }}
-  {{- if not $usePerInstallationServices }}
-  subscriptions: |
-    {{- if .Values.notifications.triggers.onSyncSucceeded }}
-    - recipients:
-        - github
-      triggers:
-        - on-sync-succeeded
-    {{- end }}
-    {{- if .Values.notifications.triggers.onSyncFailed }}
-    - recipients:
-        - github
-      triggers:
-        - on-sync-failed
-    {{- end }}
-    {{- if .Values.notifications.triggers.onHealthDegraded }}
-    - recipients:
-        - github
-      triggers:
-        - on-health-degraded
-    {{- end }}
-  {{- end }}
+  {{- /* Applications subscribe via annotations to their specific service */ -}}
+  {{- /* No global subscriptions needed when using per-installation services */ -}}
 {{- end }}
 {{- end }}
 
