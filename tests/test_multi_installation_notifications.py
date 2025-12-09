@@ -23,7 +23,9 @@ def test_multi_installation_service_generation():
         {"name": "repo3", "installationId": 12345678},  # Same as repo1
     ]
     
-    # Collect unique installation IDs (same logic as template)
+    # Collect unique installation IDs
+    # Note: Using dict here to match Helm template behavior (Helm doesn't have sets)
+    # In Python, we could use a set, but we're simulating the template logic
     installation_ids = {}
     for reg in repo_registrations:
         if "installationId" in reg:
@@ -39,6 +41,11 @@ def test_multi_installation_service_generation():
     
     print("✅ Test passed: Multiple installation IDs collected correctly")
     print(f"   Unique installation IDs: {sorted(installation_ids.keys())}")
+    
+    # Alternative implementation using set (more Pythonic, but not available in Helm)
+    installation_ids_set = {str(reg["installationId"]) for reg in repo_registrations if "installationId" in reg}
+    assert len(installation_ids_set) == 2
+    print(f"   (Python set alternative also works: {sorted(installation_ids_set)})")
 
 
 def test_service_name_generation():
