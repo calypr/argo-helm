@@ -41,7 +41,7 @@ data:
     # GitHub App notifications for installation {{ $installationId }}
     appID: {{ $appId }}
     installationID: {{ $installationId }}
-    privateKey: ${{ $privateKeySecretName }}:{{ $privateKeySecretKey }}
+    privateKey: {{ $privateKeySecretName }}:{{ $privateKeySecretKey }}
   {{- end }}
   {{- end }}
 
