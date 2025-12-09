@@ -73,6 +73,9 @@ built at: 2025-09-07T06:18:52Z
 ✓ openssl is installed at: /usr/bin/openssl
   Version: OpenSSL 3.2.2 4 Jun 2024 (Library: OpenSSL 3.2.2 4 Jun 2024)
 
+✓ sqlite3 is installed at: /usr/bin/sqlite3
+  Version: 3.40.0 2023-06-02 12:56:32 00a1256aa915eba233626a380102f8e74157cde64f0cd68731893b588c97alt1
+
 ```
 
 

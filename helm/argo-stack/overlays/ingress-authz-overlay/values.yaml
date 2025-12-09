@@ -142,43 +142,36 @@ ingressAuthzOverlay:
       # backendProtocol: HTTPS
 
     # GitHub Repository Registrations EventSource
+#    events:
+#      enabled: true
+#      namespace: argo-events
+#      service: github-repo-registrations-eventsource-svc
+#      # EventSource is in argo-events namespace
+#      serviceNamespace: argo-events
+#      port: 12000
+#      pathPrefix: /events
+#      useRegex: true
+#      rewriteTarget: /$2
+
+#    # Calypr API Service
+#    api:
+#      enabled: true
+#      namespace: calypr-api
+#      service: calypr-api
+#      # Service is in same namespace as ingress
+#      serviceNamespace: calypr-api
+#      port: 3000
+#      pathPrefix: /api
+#      useRegex: true
+#      rewriteTarget: /$2
+
+    # GitHubb Callback for Repository Registrations
     registrations:
       enabled: true
-      namespace: argo-events
-      service: github-repo-registrations-eventsource-svc
-      # EventSource is in argo-events namespace
-      serviceNamespace: argo-events
-      port: 12000
+      namespace: security
+      service: gitapp-callback
+      # Service is in same namespace as ingress
+      serviceNamespace: security
+      port: 8080
       pathPrefix: /registrations
-      useRegex: true
-      rewriteTarget: /$2
-
-    # Calypr API Service
-    api:
-      enabled: true
-      namespace: calypr-api
-      service: calypr-api
-      # Service is in same namespace as ingress
-      serviceNamespace: calypr-api
-      port: 3000
-      pathPrefix: /api
-      useRegex: true
-      rewriteTarget: /$2
-
-    # Calypr Tenants Service
-    tenants:
-      enabled: true
-      namespace: calypr-tenants
-      service: calypr-tenants
-      # Service is in same namespace as ingress
-      serviceNamespace: calypr-tenants
-      port: 3001
-      pathPrefix: /tenants
-      useRegex: true
-      rewriteTarget: /$2
-      # Optional: Allow public access to login endpoint
-      # Set to true to skip auth for /tenants/login
-      publicPaths:
-        - /tenants/login
-        - /tenants/logout
-        - /tenants/callback
+        
