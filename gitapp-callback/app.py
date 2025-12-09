@@ -149,8 +149,8 @@ def registrations_form():
     configuration.
 
     Query Parameters:
-        installation_id: GitHub installation ID (required)
-        setup_action: 'install' or 'update' (optional)
+        installation_id: GitHub installation ID (required, must be integer)
+        setup_action: 'install' or 'update' (optional, defaults to 'install')
 
     Returns:
         HTML form for repository registration configuration
@@ -158,12 +158,39 @@ def registrations_form():
     installation_id = request.args.get("installation_id")
     setup_action = request.args.get("setup_action", "install")
 
+    # Validate installation_id is present
     if not installation_id:
         logger.warning("Missing installation_id in callback")
         return (
             render_template(
                 "error.html",
                 error_message="Missing installation_id. Please reinstall the GitHub App.",
+                github_app_name=GITHUB_APP_NAME,
+            ),
+            400,
+        )
+    
+    # Validate installation_id is an integer
+    try:
+        int(installation_id)
+    except ValueError:
+        logger.warning(f"Invalid installation_id (not an integer): {installation_id[:50]}")
+        return (
+            render_template(
+                "error.html",
+                error_message=f"Invalid installation_id '{installation_id}'. Must be an integer.",
+                github_app_name=GITHUB_APP_NAME,
+            ),
+            400,
+        )
+    
+    # Validate setup_action is valid
+    if setup_action not in ["install", "update"]:
+        logger.warning(f"Invalid setup_action: {setup_action[:50]}")
+        return (
+            render_template(
+                "error.html",
+                error_message=f"Invalid setup_action '{setup_action}'. Must be 'install' or 'update'.",
                 github_app_name=GITHUB_APP_NAME,
             ),
             400,

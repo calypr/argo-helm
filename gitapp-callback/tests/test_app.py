@@ -356,17 +356,17 @@ def test_install_with_existing_registration_redirects(client):
     
     # Create existing registration
     existing_data = {
-        'installation_id': 'existing-789',
+        'installation_id': '78900001',
         'defaultBranch': 'main',
         'adminUsers': ['admin@example.com'],
         'readUsers': [],
         'dataBucket': None,
         'artifactBucket': None
     }
-    save_registration('existing-789', existing_data)
+    save_registration('78900001', existing_data)
     
     # Try to access install form (should get error/redirect)
-    response = client.get('/registrations?installation_id=existing-789&setup_action=install')
+    response = client.get('/registrations?installation_id=78900001&setup_action=install')
     
     assert response.status_code == 200
     assert b'already registered' in response.data
@@ -376,7 +376,7 @@ def test_install_with_existing_registration_redirects(client):
 def test_update_without_existing_registration_fails(client):
     """Test that update action without existing registration returns error."""
     # Try to access update form without existing data
-    response = client.get('/registrations?installation_id=nonexistent-999&setup_action=update')
+    response = client.get('/registrations?installation_id=99900001&setup_action=update')
     
     assert response.status_code == 404
     assert b'not found' in response.data
@@ -388,7 +388,7 @@ def test_update_form_prepopulates_data(client):
     
     # Create existing registration with bucket data
     existing_data = {
-        'installation_id': 'prepopulate-111',
+        'installation_id': '11100001',
         'defaultBranch': 'staging',
         'dataBucket': {
             'bucket': 'my-data',
@@ -400,10 +400,10 @@ def test_update_form_prepopulates_data(client):
         'adminUsers': ['user1@example.com', 'user2@example.com'],
         'readUsers': ['viewer@example.com']
     }
-    save_registration('prepopulate-111', existing_data)
+    save_registration('11100001', existing_data)
     
     # Access update form
-    response = client.get('/registrations?installation_id=prepopulate-111&setup_action=update')
+    response = client.get('/registrations?installation_id=11100001&setup_action=update')
     
     assert response.status_code == 200
     assert b'staging' in response.data
@@ -411,3 +411,29 @@ def test_update_form_prepopulates_data(client):
     assert b'user1@example.com' in response.data
     assert b'user2@example.com' in response.data
     assert b'viewer@example.com' in response.data
+
+
+def test_invalid_installation_id_non_integer(client):
+    """Test that non-integer installation_id returns error."""
+    response = client.get('/registrations?installation_id=abc123')
+    
+    assert response.status_code == 400
+    assert b'Invalid installation_id' in response.data
+    assert b'Must be an integer' in response.data
+
+
+def test_invalid_setup_action(client):
+    """Test that invalid setup_action returns error."""
+    response = client.get('/registrations?installation_id=12345678&setup_action=invalid')
+    
+    assert response.status_code == 400
+    assert b'Invalid setup_action' in response.data
+    assert b'install' in response.data and b'update' in response.data
+
+
+def test_missing_setup_action_defaults_to_install(client):
+    """Test that missing setup_action defaults to install."""
+    response = client.get('/registrations?installation_id=12345678')
+    
+    assert response.status_code == 200
+    assert b'Complete Repository Registration' in response.data
