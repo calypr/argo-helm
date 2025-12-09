@@ -60,27 +60,30 @@ lint:
 
 template: check-vars deps
 	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
-	envsubst < my-values.yaml | \
-	helm template argo-stack helm/argo-stack \
-		--debug \
-		--set-string events.github.secret.tokenValue=${GITHUB_PAT} \
-		--set-string argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}" \
+	envsubst < my-values.yaml | helm template  \
+		argo-stack ./helm/argo-stack -n argocd --create-namespace \
+		--wait --atomic --timeout 10m0s \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
-		--set-string events.github.webhook.url=http://${ARGO_HOSTNAME}/registrations \
+		--set-string events.github.webhook.url=https://${ARGO_HOSTNAME}/events\
 		--set-string s3.enabled=${S3_ENABLED} \
-		--set-string s3.accessKeyId=${S3_ACCESS_KEY_ID} \
-		--set-string s3.secretAccessKey=${S3_SECRET_ACCESS_KEY} \
 		--set-string s3.bucket=${S3_BUCKET} \
+		--set-string s3.pathStyle=true \
+		--set-string s3.insecure=true \
+		--set-string s3.region=${S3_REGION} \
+		--set-string s3.hostname=${S3_HOSTNAME} \
+		--set-string ingress.argoWorkflows.host=${ARGO_HOSTNAME} \
+		--set-string ingress.argocd.host=${ARGO_HOSTNAME} \
+		--set-string ingress.gitappCallback.enabled=true \
+		--set-string ingress.gitappCallback.host=${ARGO_HOSTNAME} \
 		--set-string githubApp.enabled=true \
 		--set-string githubApp.appId="${GITHUBHAPP_APP_ID}" \
 		--set-string githubApp.installationId="${GITHUBHAPP_INSTALLATION_ID}" \
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
 		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
-		--set ingress={} \
-		-f - \
 		-f helm/argo-stack/admin-values.yaml \
-		--namespace argocd > rendered.yaml
+		-f - \
+		> rendered.yaml
 
 validate:
 	kubeconform -strict -ignore-missing-schemas \
