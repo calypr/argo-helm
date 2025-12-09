@@ -39,16 +39,15 @@ data:
   {{- end }}
   service.github: |
     # Using GitHub App for notifications (global configuration)
-    type: github
     appID: {{ $appId }}
     installationID: {{ $globalInstallationId }}
     privateKey: $github-privateKey
   {{- else }}
-  {{- /* Generate one service.github-<installationId> for each unique installationId */ -}}
+  {{- /* Generate one service.github.<installationId> for each unique installationId */ -}}
+  {{- /* Using dot-separated format so ArgoCD recognizes 'github' as the type */ -}}
   {{- range $installationId, $_ := $installationIds }}
-  service.github-{{ $installationId }}: |
+  service.github.{{ $installationId }}: |
     # GitHub App notifications for installation {{ $installationId }}
-    type: github
     appID: {{ $appId }}
     installationID: {{ $installationId }}
     privateKey: $github-privateKey

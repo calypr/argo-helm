@@ -27,7 +27,8 @@ metadata:
     {{- if and $reg.installationId $.Values.notifications.github.useGithubApp }}
       {{- /* installationId is validated as integer by CRD schema (minimum: 1) */ -}}
       {{- /* Use int64 to handle large numbers that YAML may parse as float64 */ -}}
-      {{- $serviceName = printf "github-%d" (int64 $reg.installationId) }}
+      {{- /* Use dot-separated format: github.<installationId> for ArgoCD to recognize type */ -}}
+      {{- $serviceName = printf "github.%d" (int64 $reg.installationId) }}
     {{- end }}
     {{- if $.Values.notifications.triggers.onSyncSucceeded }}
     notifications.argoproj.io/subscribe.on-sync-succeeded.{{ $serviceName }}: ""
