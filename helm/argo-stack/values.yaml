@@ -258,6 +258,50 @@ landingPage:
   docsPath: "/var/www/docs"
 
 # ============================================================================
+# GitHub App Callback Service Configuration
+# ============================================================================
+# Handles GitHub App post-installation callbacks and provides a web form
+# for users to configure repository registration settings.
+
+gitappCallback:
+  # Enable the GitHub App callback service deployment
+  enabled: true
+  # Container image configuration
+  image:
+    repository: gitapp-callback
+    tag: v1.0.0
+    pullPolicy: IfNotPresent
+  # Number of replicas
+  replicas: 2
+  # Flask secret key for session management
+  # IMPORTANT: Override this in production with a secure random value
+  # Recommended: Use Vault with External Secrets Operator
+  # Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'
+  secretKey: "REPLACE_ME_WITH_SECURE_RANDOM_VALUE"
+  # GitHub App name (displayed in the UI)
+  githubAppName: "calypr-workflows"
+  # Persistence configuration for registration database
+  persistence:
+    # Enable persistent storage for SQLite database (uses PVC or host mount based on useExtraMounts)
+    enabled: true
+    # Use host-mounted volumes for persistence (for kind clusters with extraMounts)
+    # When true, uses hostPath volume. When false and enabled=true, uses PVC.
+    # Must match the extraMounts configuration in kind-config.yaml:
+    #   - hostPath: $PWD/registrations
+    #     containerPath: /var/registrations
+    useExtraMounts: true
+    # Host path to mount for registrations data (when useExtraMounts is true)
+    # This should match the containerPath in kind-config.yaml extraMounts
+    # Example: "/var/registrations"
+    registrationsPath: "/var/registrations"
+    # Use an existing PVC (if not specified and useExtraMounts=false, a new one will be created)
+    existingClaim: ""
+    # Storage class for PVC (if empty, uses cluster default)
+    storageClass: ""
+    # Storage size
+    size: "10Mi" # Requests 10 Megabytes of storage
+
+# ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )
 # ============================================================================
 
@@ -277,6 +321,35 @@ ingressAuth:
   enabled: true
   authURL: "http://authz-adapter.security.svc.cluster.local:8080/check"
   passAuthorization: true
+
+# ============================================================================
+# Ingress Configuration
+# ============================================================================
+
+ingress:
+  # Argo Workflows ingress
+  argoWorkflows:
+    enabled: false
+    host: ""
+    tls:
+      enabled: false
+      secretName: ""
+  
+  # Argo CD ingress
+  argocd:
+    enabled: false
+    host: ""
+    tls:
+      enabled: false
+      secretName: ""
+  
+  # GitHub App Callback ingress
+  gitappCallback:
+    enabled: false
+    host: ""
+    tls:
+      enabled: false
+      secretName: ""
 
 # ============================================================================
 # Ingress AuthZ Overlay - Unified Path-Based Routing with Centralized Auth
@@ -327,7 +400,7 @@ ingressAuthzOverlay:
       namespace: argo-stack
       service: github-repo-registrations-eventsource-svc
       port: 12000
-      pathPrefix: /registrations
+      pathPrefix: /events
     api:
       namespace: calypr-api
       service: calypr-api
