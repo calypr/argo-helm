@@ -21,15 +21,6 @@ spec:
           type: object
           description: RepoRegistration defines self-service onboarding for Git repos.
           properties:
-            apiVersion:
-              type: string
-              description: "APIVersion defines the versioned schema of this representation of an object"
-            kind:
-              type: string
-              description: "Kind is a string value representing the REST resource this object represents"
-            metadata:
-              type: object
-              description: "Standard object's metadata"
             spec:
               type: object
               description: "Specification of the desired behavior of the RepoRegistration"
