@@ -24,7 +24,7 @@ metadata:
     {{- if and $.Values.notifications.enabled $.Values.notifications.github.enabled $.Values.notifications.defaultSubscriptions.autoSubscribe }}
     {{- /* Determine the service name based on installationId */ -}}
     {{- $serviceName := "github" }}
-    {{- if and $reg.installationId $.Values.notifications.github.useGithubApp }}
+    {{- if $reg.installationId }}
       {{- /* installationId is validated as integer by CRD schema (minimum: 1) */ -}}
       {{- /* Use int64 to handle large numbers that YAML may parse as float64 */ -}}
       {{- /* Use dot-separated format: github.<installationId> for ArgoCD to recognize type */ -}}
