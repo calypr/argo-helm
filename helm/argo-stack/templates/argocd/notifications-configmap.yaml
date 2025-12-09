@@ -166,6 +166,17 @@ data:
   # =========================================================
   # Default Subscriptions
   # =========================================================
+  {{- /* When using per-installation services, apps subscribe via annotations */ -}}
+  {{- /* Only add global subscriptions when NOT using per-installation services */ -}}
+  {{- $usePerInstallationServices := false }}
+  {{- if .Values.notifications.github.useGithubApp }}
+    {{- range $reg := .Values.repoRegistrations }}
+      {{- if $reg.installationId }}
+        {{- $usePerInstallationServices = true }}
+      {{- end }}
+    {{- end }}
+  {{- end }}
+  {{- if not $usePerInstallationServices }}
   subscriptions: |
     {{- if .Values.notifications.triggers.onSyncSucceeded }}
     - recipients:
@@ -185,6 +196,7 @@ data:
       triggers:
         - on-health-degraded
     {{- end }}
+  {{- end }}
 {{- end }}
 {{- end }}
 
