@@ -14,6 +14,8 @@ spec:
     - name: v1alpha1
       served: true
       storage: true
+      subresources:
+        status: {}
       schema:
         openAPIV3Schema:
           type: object
@@ -21,12 +23,16 @@ spec:
           properties:
             apiVersion:
               type: string
+              description: "APIVersion defines the versioned schema of this representation of an object"
             kind:
               type: string
+              description: "Kind is a string value representing the REST resource this object represents"
             metadata:
               type: object
+              description: "Standard object's metadata"
             spec:
               type: object
+              description: "Specification of the desired behavior of the RepoRegistration"
               required:
                 - repoUrl
                 - installationId
@@ -54,44 +60,60 @@ spec:
 
                 artifactBucket:
                   type: object
+                  description: "S3-compatible artifact bucket configuration for workflow outputs"
                   properties:
                     hostname:
                       type: string
+                      description: "S3 endpoint URL (e.g., https://s3.us-west-2.amazonaws.com)"
                     bucket:
                       type: string
+                      description: "Bucket name for storing workflow artifacts"
                     region:
                       type: string
+                      description: "Object store region"
                     insecure:
                       type: boolean
+                      description: "Use HTTP instead of HTTPS"
                     pathStyle:
                       type: boolean
+                      description: "Force path-style requests (s3.amazonaws.com/bucket)"
                     externalSecretPath:
                       type: string
+                      description: "Vault KV v2 path for S3 credentials"
 
                 dataBucket:
                   type: object
+                  description: "S3-compatible data bucket configuration for primary data"
                   properties:
                     hostname:
                       type: string
+                      description: "S3 endpoint URL (e.g., https://s3.us-west-2.amazonaws.com)"
                     bucket:
                       type: string
+                      description: "Bucket name for storing primary data"
                     region:
                       type: string
+                      description: "Object store region"
                     insecure:
                       type: boolean
+                      description: "Use HTTP instead of HTTPS"
                     pathStyle:
                       type: boolean
+                      description: "Force path-style requests (s3.amazonaws.com/bucket)"
                     externalSecretPath:
                       type: string
+                      description: "Vault KV v2 path for S3 credentials"
 
                 adminUsers:
                   type: array
+                  description: "List of admin user email addresses (Fence-authenticated)"
                   items:
                     type: string
                     format: email
 
                 readUsers:
                   type: array
+                  description: "List of read-only user email addresses (Fence-authenticated)"
                   items:
                     type: string
                     format: email
@@ -99,14 +121,18 @@ spec:
                 isPublic:
                   type: boolean
                   default: false
-
-          status:
-            type: object
-            properties:
-              phase:
-                type: string
-              message:
-                type: string
-              lastReconciled:
-                type: string
-                format: date-time
+                  description: "Public visibility flag - workflows viewable without login"
+            status:
+              type: object
+              description: "Status of the RepoRegistration"
+              properties:
+                phase:
+                  type: string
+                  description: "Current phase of the registration (e.g., Pending, Active, Failed)"
+                message:
+                  type: string
+                  description: "Human-readable message about the current status"
+                lastReconciled:
+                  type: string
+                  format: date-time
+                  description: "Timestamp of last reconciliation"
