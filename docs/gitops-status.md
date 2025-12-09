@@ -271,3 +271,67 @@ Argo CD:
 - Should preview environments be mandatory for all PRs?  
 - Should we standardize commit status context names?  
 
+---
+
+## 10. Multi-Installation GitHub App Support
+
+### 10.1 Overview
+
+The platform supports multiple GitHub App installations, enabling notifications to be posted to repositories across different organizations or GitHub accounts. Each repository registration can specify its own `installationId`, and the system automatically generates isolated notification configurations for each unique installation.
+
+### 10.2 How It Works
+
+1. **Installation ID Collection**: The Helm chart iterates over all `repoRegistrations` and collects unique `installationId` values.
+
+2. **Service Generation**: For each unique `installationId`, a separate notification service is created:
+   - `service.github-12345678` for installation 12345678
+   - `service.github-87654321` for installation 87654321
+   - etc.
+
+3. **Application Subscriptions**: Each ArgoCD Application automatically subscribes to the correct notification service based on its repository's `installationId`.
+
+### 10.3 Configuration Example
+
+```yaml
+repoRegistrations:
+  # Repository in Organization A
+  - name: org-a-repo
+    repoUrl: https://github.com/org-a/repo.git
+    installationId: 12345678  # GitHub App installation for Org A
+    # ... other config ...
+  
+  # Repository in Organization B
+  - name: org-b-repo
+    repoUrl: https://github.com/org-b/repo.git
+    installationId: 87654321  # GitHub App installation for Org B
+    # ... other config ...
+  
+  # Another repository in Organization A
+  - name: org-a-another-repo
+    repoUrl: https://github.com/org-a/another-repo.git
+    installationId: 12345678  # Same installation as first repo
+    # ... other config ...
+```
+
+Result: Two notification services are created (`service.github-12345678` and `service.github-87654321`), with applications automatically subscribing to the appropriate one.
+
+### 10.4 Benefits
+
+- **Multi-Organization Support**: Post notifications to repositories across different GitHub organizations
+- **Isolated Credentials**: Each installation uses its own GitHub App credentials
+- **Automatic Configuration**: No manual service configuration needed
+- **Backward Compatibility**: Falls back to global configuration if no `installationId` is specified
+
+### 10.5 Finding Your Installation ID
+
+1. Navigate to your GitHub App settings page
+2. Click "Install App" and select your installation
+3. The installation ID appears in the URL: `/settings/installations/{installation_id}`
+
+### 10.6 Implementation Details
+
+See:
+- `helm/argo-stack/templates/argocd/notifications-configmap.yaml` - Service generation logic
+- `helm/argo-stack/templates/argocd/applications-from-repo-registrations.yaml` - Subscription logic
+- `examples/repo-registrations-values.yaml` - Complete configuration examples  
+

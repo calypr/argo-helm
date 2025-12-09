@@ -84,6 +84,10 @@ spec:
     pathStyle: false
     externalSecretPath: argo/apps/my-nextflow-project/s3/data
   
+  # GitHub App installation ID (REQUIRED)
+  # Find this in your GitHub App installation settings
+  installationId: 12345678
+  
   # GitHub secret reference
   githubSecretName: github-secret-my-project
   
@@ -140,6 +144,15 @@ kubectl get secret s3-credentials-my-project -n wf-poc
 - **Type:** `string`
 - **Description:** Tenant identifier (program/project or org short code)
 - **Example:** `genomics-team`, `cancer-research`
+
+#### `spec.installationId`
+- **Type:** `integer`
+- **Required:** Yes
+- **Minimum:** 1
+- **Description:** GitHub App installation ID for this repository. Required for GitHub App authentication and enables multi-installation support for cross-organization deployments.
+- **How to find:** Navigate to your GitHub App's installation page. The installation ID is in the URL: `/settings/installations/{installation_id}`
+- **Example:** `12345678`
+- **Multi-Installation Support:** Each unique `installationId` gets its own notification service configuration (`service.github-{installationId}`), enabling ArgoCD to post notifications to repositories across different GitHub organizations or accounts.
 
 #### `spec.workflowTemplateRef`
 - **Type:** `string`
