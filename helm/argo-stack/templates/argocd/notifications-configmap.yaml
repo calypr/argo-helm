@@ -39,6 +39,7 @@ data:
   {{- end }}
   service.github: |
     # Using GitHub App for notifications (global configuration)
+    type: github
     appID: {{ $appId }}
     installationID: {{ $globalInstallationId }}
     privateKey: $github-privateKey
@@ -47,6 +48,7 @@ data:
   {{- range $installationId, $_ := $installationIds }}
   service.github-{{ $installationId }}: |
     # GitHub App notifications for installation {{ $installationId }}
+    type: github
     appID: {{ $appId }}
     installationID: {{ $installationId }}
     privateKey: $github-privateKey
