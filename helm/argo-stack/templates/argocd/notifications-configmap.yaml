@@ -167,6 +167,8 @@ data:
   # Default Subscriptions
   # =========================================================
   {{- /* When using per-installation services, apps subscribe via annotations */ -}}
+  {{- /* Global subscriptions hardcode service name as "github" which conflicts */ -}}
+  {{- /* with installation-specific service names like "github-12345678" */ -}}
   {{- /* Only add global subscriptions when NOT using per-installation services */ -}}
   {{- $usePerInstallationServices := false }}
   {{- if .Values.notifications.github.useGithubApp }}
