@@ -29,14 +29,19 @@ data:
     {{- $_ := set $installationIds (printf "%d" (int64 $reg.installationId)) true }}
   {{- end }}
   
+  {{- /* Determine the secret name and key for GitHub App private key */ -}}
+  {{- $privateKeySecretName := .Values.notifications.github.privateKeySecretName | default (.Values.githubApp.privateKeySecretName | default "argocd-github-app-key") }}
+  {{- $privateKeySecretKey := "privateKey" }}
+  
   {{- /* Generate one service.github.<installationId> for each unique installationId */ -}}
   {{- /* Using dot-separated format so ArgoCD recognizes 'github' as the type */ -}}
+  {{- /* ArgoCD Notifications format: $<secret-name>:<key-name> */ -}}
   {{- range $installationId, $_ := $installationIds }}
   service.github.{{ $installationId }}: |
     # GitHub App notifications for installation {{ $installationId }}
     appID: {{ $appId }}
     installationID: {{ $installationId }}
-    privateKey: $github-privateKey
+    privateKey: ${{ $privateKeySecretName }}:{{ $privateKeySecretKey }}
   {{- end }}
   {{- end }}
 
