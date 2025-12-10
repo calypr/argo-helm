@@ -1,0 +1,68 @@
+{{- if .Values.repoRegistrations }}
+{{- range $reg := .Values.repoRegistrations }}
+{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+---
+# ArgoCD Application generated from RepoRegistration: {{ $reg.name }}
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: {{ $reg.name }}
+  namespace: {{ $.Values.namespaces.argocd | default "argocd" }}
+  labels:
+    app.kubernetes.io/name: {{ $reg.name }}
+    app.kubernetes.io/part-of: argo-stack
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    repo-registration/repo-url: {{ $reg.repoUrl | quote }}
+    {{- if $reg.tenant }}
+    repo-registration/tenant: {{ $reg.tenant | quote }}
+    {{- end }}
+    {{- if and $.Values.notifications.enabled $.Values.notifications.github.enabled $.Values.notifications.defaultSubscriptions.autoSubscribe }}
+    {{- if $.Values.notifications.triggers.onSyncSucceeded }}
+    notifications.argoproj.io/subscribe.on-sync-succeeded.github: ""
+    {{- end }}
+    {{- if $.Values.notifications.triggers.onSyncFailed }}
+    notifications.argoproj.io/subscribe.on-sync-failed.github: ""
+    {{- end }}
+    {{- if $.Values.notifications.triggers.onSyncRunning }}
+    notifications.argoproj.io/subscribe.on-sync-running.github: ""
+    {{- end }}
+    {{- if $.Values.notifications.triggers.onHealthDegraded }}
+    notifications.argoproj.io/subscribe.on-health-degraded.github: ""
+    {{- end }}
+    {{- end }}    
+spec:
+  project: {{ $reg.project | default "default" }}
+  source:
+    repoURL: {{ $reg.repoUrl | quote }}
+    targetRevision: {{ $reg.defaultBranch | default "main" | quote }}
+    path: {{ $reg.path | default "." | quote }}
+  destination:
+    name: in-cluster
+    namespace: {{ $namespace }}
+  syncPolicy:
+    {{- if $reg.syncPolicy }}
+    {{- if $reg.syncPolicy.automated }}
+    automated:
+      prune: {{ $reg.syncPolicy.automated.prune | default false }}
+      selfHeal: {{ $reg.syncPolicy.automated.selfHeal | default false }}
+    {{- else }}
+    automated:
+      prune: true
+      selfHeal: true
+    {{- end }}
+    {{- if $reg.syncPolicy.syncOptions }}
+    syncOptions:
+{{ toYaml $reg.syncPolicy.syncOptions | indent 6 }}
+    {{- end }}
+    {{- else }}
+    automated:
+      prune: true
+      selfHeal: true
+    {{- end }}
+{{- end }}
+{{- end }}

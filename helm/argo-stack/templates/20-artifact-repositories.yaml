@@ -1,4 +1,5 @@
 {{- if .Values.s3.enabled }}
+{{- if not (include "argo-stack.vault.enabled" .) }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -9,12 +10,18 @@ stringData:
   AWS_ACCESS_KEY_ID: {{ .Values.s3.accessKeyId | quote  }}
   AWS_SECRET_ACCESS_KEY: {{ .Values.s3.secretAccessKey | quote  }}
 ---
+{{- end }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
   name: artifact-repositories
   namespace: {{ .Values.namespaces.argo }}
+  labels:
+    app.kubernetes.io/name: argo-workflows
+    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/component: artifact-repository
 data:
+  # Legacy default key for backward compatibility
   default-v1: |
     archiveLogs: true
     s3:
@@ -30,4 +37,61 @@ data:
         key: AWS_SECRET_ACCESS_KEY
       useSDKCreds: false
       pathStyle: {{ .Values.s3.pathStyle }}
+  
+  # Multi-repository configuration for artifactRepositoryRef
+  artifactRepositories: |
+    # Default artifact repository
+    default:
+      archiveLogs: true
+      s3:
+        bucket: {{ .Values.s3.bucket }}
+        endpoint: {{ .Values.s3.hostname }}
+        region: {{ .Values.s3.region }}
+        insecure: {{ .Values.s3.insecure }}
+        accessKeySecret:
+          name: s3-credentials
+          key: AWS_ACCESS_KEY_ID
+        secretKeySecret:
+          name: s3-credentials
+          key: AWS_SECRET_ACCESS_KEY
+        useSDKCreds: false
+        pathStyle: {{ .Values.s3.pathStyle }}
+{{- if .Values.repoRegistrations }}
+{{- range $reg := .Values.repoRegistrations }}
+{{- if $reg.artifactBucket }}
+    
+    # Artifact repository for {{ $reg.name }}
+    {{ $reg.name }}:
+      archiveLogs: true
+      s3:
+        bucket: {{ $reg.artifactBucket.bucket }}
+        {{- if $reg.artifactBucket.keyPrefix }}
+        keyPrefix: {{ $reg.artifactBucket.keyPrefix }}
+        {{- else }}
+        keyPrefix: "workflows/"
+        {{- end }}
+        {{- if $reg.artifactBucket.hostname }}
+        endpoint: {{ $reg.artifactBucket.hostname }}
+        {{- end }}
+        {{- if $reg.artifactBucket.region }}
+        region: {{ $reg.artifactBucket.region }}
+        {{- end }}
+        insecure: {{ $reg.artifactBucket.insecure | default false }}
+        {{- if $reg.artifactBucket.useSDKCreds }}
+        useSDKCreds: {{ $reg.artifactBucket.useSDKCreds }}
+        {{- else }}
+        accessKeySecret:
+          name: s3-credentials-{{ $reg.name }}
+          key: AWS_ACCESS_KEY_ID
+        secretKeySecret:
+          name: s3-credentials-{{ $reg.name }}
+          key: AWS_SECRET_ACCESS_KEY
+        useSDKCreds: false
+        {{- end }}
+        {{- if $reg.artifactBucket.pathStyle }}
+        pathStyle: {{ $reg.artifactBucket.pathStyle }}
+        {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
 {{- end }}

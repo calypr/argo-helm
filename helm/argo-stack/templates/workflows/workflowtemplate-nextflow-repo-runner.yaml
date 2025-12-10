@@ -1,0 +1,78 @@
+apiVersion: argoproj.io/v1alpha1
+kind: WorkflowTemplate
+metadata:
+  name: nextflow-repo-runner
+  namespace: {{ .Values.namespaces.argo }}
+  labels:
+    app.kubernetes.io/name: argo-stack
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  entrypoint: run-nextflow
+  arguments:
+    parameters:
+      - name: repo-name
+        description: "Repository name or identifier for accessing repo-specific secrets."
+      - name: repo-url
+        description: "Git repo containing the Nextflow pipeline."
+      - name: revision
+        description: "Git revision (branch, tag, or SHA) to run."
+        value: "main"
+      - name: pipeline-file
+        description: "Nextflow pipeline entry point file (e.g., main.nf, workflow.nf, pipeline.nf)."
+        value: "main.nf"
+      - name: work-dir
+        description: "Work directory inside the container."
+        value: "/workspace"
+      - name: artifact-bucket
+        description: "Artifact bucket name (from RepoRegistration.spec.artifactBucket.bucket)."
+      - name: artifact-endpoint
+        description: "Artifact S3 endpoint hostname/URL."
+      - name: artifact-region
+        description: "Artifact S3 region."
+
+  templates:
+    - name: run-nextflow
+      metadata:
+        annotations:
+          workflows.argoproj.io/description: |
+            Run a Nextflow pipeline from a Git repo using S3-backed
+            work and artifact storage derived from RepoRegistration.
+      container:
+        image: nextflow-runner:latest
+        workingDir: "{{ "{{workflow.parameters.work-dir}}" }}"
+        command: ["/bin/sh", "-c"]
+        args:
+          - |
+            set -euo pipefail
+            echo "Cloning repo: {{ "{{workflow.parameters.repo-url}}" }}"
+            git clone {{ "{{workflow.parameters.repo-url}}" }} repo
+            cd repo
+            git checkout {{ "{{workflow.parameters.revision}}" }}
+
+            echo "Configuring S3 environment for artifacts..."
+            echo "Artifact bucket: {{ "{{workflow.parameters.artifact-bucket}}" }}"
+
+            # Configure Nextflow to use S3 work directory
+            export NXF_WORK="s3://{{ "{{workflow.parameters.artifact-bucket}}" }}/work"
+            export NXF_S3_ENDPOINT="{{ "{{workflow.parameters.artifact-endpoint}}" }}"
+            export NXF_S3_REGION="{{ "{{workflow.parameters.artifact-region}}" }}"
+
+            echo "Running Nextflow pipeline..."
+            nextflow run {{ "{{workflow.parameters.pipeline-file}}" }} -with-report report.html -with-trace -with-timeline timeline.html
+
+        env:
+          - name: NXF_HOME
+            value: /workspace/.nextflow
+          - name: AWS_ACCESS_KEY_ID
+            valueFrom:
+              secretKeyRef:
+                name: s3-credentials-{{ "{{workflow.parameters.repo-name}}" }}
+                key: AWS_ACCESS_KEY_ID
+          - name: AWS_SECRET_ACCESS_KEY
+            valueFrom:
+              secretKeyRef:
+                name: s3-credentials-{{ "{{workflow.parameters.repo-name}}" }}
+                key: AWS_SECRET_ACCESS_KEY

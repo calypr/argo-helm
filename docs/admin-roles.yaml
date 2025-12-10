@@ -1,0 +1,443 @@
+Here’s a single, reusable `admin.yaml` that gives your `wf-admins` group:
+
+* Full admin over **Argo CD** (once you add the RBAC snippet to `argocd-rbac-cm`)
+* Full admin over **Argo Workflows** and **Argo Events**
+* Broad K8s rights over the resources those systems use
+
+Then I’ll show how to apply it and how to wire Argo CD’s RBAC to the same group.
+
+---
+
+## 1. `admin.yaml` (ClusterRole + ClusterRoleBinding)
+
+Save this as `admin.yaml`:
+
+```yaml
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-superuser
+  labels:
+    app.kubernetes.io/name: argo-superuser
+    app.kubernetes.io/part-of: argo-platform
+rules:
+  # Full admin on all Argo CRDs (Workflows, Events, CD, etc.)
+  - apiGroups: ["argoproj.io"]
+    resources: ["*"]
+    verbs: ["*"]
+
+  # Core Kubernetes resources needed to manage Argo pods and configs
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - pods/exec
+      - services
+      - endpoints
+      - configmaps
+      - secrets
+      - serviceaccounts
+      - events
+      - namespaces
+    verbs: ["*"]
+
+  # Workload controllers (for Argo components themselves)
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - statefulsets
+      - replicasets
+    verbs: ["*"]
+
+  # Ingress / networking (e.g. Argo CD / Workflows ingress)
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs: ["*"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-superuser-wf-admins
+  labels:
+    app.kubernetes.io/name: argo-superuser
+    app.kubernetes.io/part-of: argo-platform
+subjects:
+  - kind: Group
+    name: wf-admins         # <-- your global admin group from X-Auth-Request-Groups
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-superuser
+```
+
+This gives **anyone in the `wf-admins` group** full K8s and Argo control (within the bounds above).
+
+---
+
+## 2. Apply the manifest
+
+From your shell (with `kubectl` pointing at the right cluster):
+
+```bash
+kubectl apply -f admin.yaml
+```
+
+Confirm it’s there:
+
+```bash
+kubectl get clusterrole argo-superuser
+kubectl get clusterrolebinding argo-superuser-wf-admins
+```
+
+Quick sanity check:
+
+```bash
+kubectl auth can-i list workflows.argoproj.io --as-group=wf-admins
+kubectl auth can-i create workflows.argoproj.io --as-group=wf-admins
+kubectl auth can-i get applications.argoproj.io --as-group=wf-admins -n argocd
+```
+
+Each should say `yes`.
+
+---
+
+## 3. Wire Argo CD RBAC to the same `wf-admins` group
+
+Kubernetes RBAC alone doesn’t give you the Argo CD UI permissions; Argo CD also has its **own** RBAC layer via `argocd-rbac-cm`.
+
+You want to add this **policy snippet**:
+
+```text
+p, role:admin, *, *, *, allow
+g, wf-admins, role:admin
+```
+
+### 3.1. If Argo CD is managed by Helm (your case)
+
+In the `argo-cd` chart values, there’s usually a place like this (names vary slightly by chart):
+
+```yaml
+configs:
+  rbac:
+    policy.csv: |
+      p, role:admin, *, *, *, allow
+      g, wf-admins, role:admin
+
+    policy.default: role:readonly
+```
+
+Or sometimes:
+
+```yaml
+server:
+  rbacConfig:
+    policy.csv: |
+      p, role:admin, *, *, *, allow
+      g, wf-admins, role:admin
+    policy.default: role:readonly
+```
+
+**Important:**
+Because your `argocd-rbac-cm` is already owned by the `argo-stack` Helm release, you should **not** apply a separate `argocd-rbac-cm` from `admin.yaml`. Instead:
+
+1. Edit your `argo-stack` values (e.g. `helm/argo-stack/values.yaml` or `my-values.yaml`) to include the `policy.csv` lines above.
+
+2. Redeploy:
+
+   ```bash
+   helm upgrade --install argo-stack ./helm/argo-stack \
+     -n argocd \
+     -f ./helm/argo-stack/values.yaml \
+     -f ./my-values.yaml
+   ```
+
+3. Verify:
+
+   ```bash
+   kubectl get configmap argocd-rbac-cm -n argocd -o yaml | grep -A5 policy.csv
+   ```
+
+4. From a `wf-admins` user, run:
+
+   ```bash
+   argocd account get-user-info
+   argocd account can-i manage repositories '*'
+   argocd account can-i sync applications '*/*'
+   ```
+
+You should see that user has `role:admin`.
+
+---
+
+## 4. Optional: lock Argo Workflows UI to wf-admins (and others)
+
+If you later want the **Workflows UI** itself to only be accessible to certain groups (instead of “anyone who can log in”), you can add a small annotation to the `argo-workflows-server` Deployment:
+
+```yaml
+metadata:
+  annotations:
+    workflows.argoproj.io/rbac-rule-precedence: "1"
+    workflows.argoproj.io/rbac-rule: |
+      'wf-admins' in groups
+```
+
+Or, if you want admins and tenant groups:
+
+```yaml
+workflows.argoproj.io/rbac-rule: |
+  'wf-admins' in groups
+  || 'wf-bwalsh-nextflow-hello-project-writers' in groups
+  || 'wf-bwalsh-nextflow-hello-project-readers' in groups
+```
+
+That’s separate from `admin.yaml` (and should be managed by your Helm chart), but it’s good to know where it plugs in.
+
+---
+
+## 5. Quick verification flow
+
+Once you’ve:
+
+* Applied `admin.yaml`
+* Wired the `wf-admins` group into `argocd-rbac-cm` via Helm values
+* Confirmed your authz-adapter emits `X-Auth-Request-Groups: wf-admins,...` for an admin user
+
+You can verify end to end:
+
+1. Open Argo CD via your ingress as an admin user.
+2. `argocd account get-user-info` shows `Groups: wf-admins`.
+3. User can:
+
+   * See and manage all Applications and Projects.
+   * Sync, delete, and edit applications.
+4. In K8s:
+
+   * `kubectl auth can-i` with `--as-group=wf-admins` returns `yes` for workflows, sensors, apps, etc.
+
+
+
+Here’s a single, reusable `admin.yaml` that gives your `wf-admins` group:
+
+* Full admin over **Argo CD** (once you add the RBAC snippet to `argocd-rbac-cm`)
+* Full admin over **Argo Workflows** and **Argo Events**
+* Broad K8s rights over the resources those systems use
+
+Then I’ll show how to apply it and how to wire Argo CD’s RBAC to the same group.
+
+---
+
+## 1. `admin.yaml` (ClusterRole + ClusterRoleBinding)
+
+Save this as `admin.yaml`:
+
+```yaml
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: argo-superuser
+  labels:
+    app.kubernetes.io/name: argo-superuser
+    app.kubernetes.io/part-of: argo-platform
+rules:
+  # Full admin on all Argo CRDs (Workflows, Events, CD, etc.)
+  - apiGroups: ["argoproj.io"]
+    resources: ["*"]
+    verbs: ["*"]
+
+  # Core Kubernetes resources needed to manage Argo pods and configs
+  - apiGroups: [""]
+    resources:
+      - pods
+      - pods/log
+      - pods/exec
+      - services
+      - endpoints
+      - configmaps
+      - secrets
+      - serviceaccounts
+      - events
+      - namespaces
+    verbs: ["*"]
+
+  # Workload controllers (for Argo components themselves)
+  - apiGroups: ["apps"]
+    resources:
+      - deployments
+      - statefulsets
+      - replicasets
+    verbs: ["*"]
+
+  # Ingress / networking (e.g. Argo CD / Workflows ingress)
+  - apiGroups: ["networking.k8s.io"]
+    resources:
+      - ingresses
+    verbs: ["*"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-superuser-wf-admins
+  labels:
+    app.kubernetes.io/name: argo-superuser
+    app.kubernetes.io/part-of: argo-platform
+subjects:
+  - kind: Group
+    name: wf-admins         # <-- your global admin group from X-Auth-Request-Groups
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: argo-superuser
+```
+
+This gives **anyone in the `wf-admins` group** full K8s and Argo control (within the bounds above).
+
+---
+
+## 2. Apply the manifest
+
+From your shell (with `kubectl` pointing at the right cluster):
+
+```bash
+kubectl apply -f admin.yaml
+```
+
+Confirm it’s there:
+
+```bash
+kubectl get clusterrole argo-superuser
+kubectl get clusterrolebinding argo-superuser-wf-admins
+```
+
+Quick sanity check:
+
+```bash
+kubectl auth can-i list workflows.argoproj.io --as-group=wf-admins
+kubectl auth can-i create workflows.argoproj.io --as-group=wf-admins
+kubectl auth can-i get applications.argoproj.io --as-group=wf-admins -n argocd
+```
+
+Each should say `yes`.
+
+---
+
+## 3. Wire Argo CD RBAC to the same `wf-admins` group
+
+Kubernetes RBAC alone doesn’t give you the Argo CD UI permissions; Argo CD also has its **own** RBAC layer via `argocd-rbac-cm`.
+
+You want to add this **policy snippet**:
+
+```text
+p, role:admin, *, *, *, allow
+g, wf-admins, role:admin
+```
+
+### 3.1. If Argo CD is managed by Helm (your case)
+
+In the `argo-cd` chart values, there’s usually a place like this (names vary slightly by chart):
+
+```yaml
+configs:
+  rbac:
+    policy.csv: |
+      p, role:admin, *, *, *, allow
+      g, wf-admins, role:admin
+
+    policy.default: role:readonly
+```
+
+Or sometimes:
+
+```yaml
+server:
+  rbacConfig:
+    policy.csv: |
+      p, role:admin, *, *, *, allow
+      g, wf-admins, role:admin
+    policy.default: role:readonly
+```
+
+**Important:**
+Because your `argocd-rbac-cm` is already owned by the `argo-stack` Helm release, you should **not** apply a separate `argocd-rbac-cm` from `admin.yaml`. Instead:
+
+1. Edit your `argo-stack` values (e.g. `helm/argo-stack/values.yaml` or `my-values.yaml`) to include the `policy.csv` lines above.
+
+2. Redeploy:
+
+   ```bash
+   helm upgrade --install argo-stack ./helm/argo-stack \
+     -n argocd \
+     -f ./helm/argo-stack/values.yaml \
+     -f ./my-values.yaml
+   ```
+
+3. Verify:
+
+   ```bash
+   kubectl get configmap argocd-rbac-cm -n argocd -o yaml | grep -A5 policy.csv
+   ```
+
+4. From a `wf-admins` user, run:
+
+   ```bash
+   argocd account get-user-info
+   argocd account can-i manage repositories '*'
+   argocd account can-i sync applications '*/*'
+   ```
+
+You should see that user has `role:admin`.
+
+---
+
+## 4. Optional: lock Argo Workflows UI to wf-admins (and others)
+
+If you later want the **Workflows UI** itself to only be accessible to certain groups (instead of “anyone who can log in”), you can add a small annotation to the `argo-workflows-server` Deployment:
+
+```yaml
+metadata:
+  annotations:
+    workflows.argoproj.io/rbac-rule-precedence: "1"
+    workflows.argoproj.io/rbac-rule: |
+      'wf-admins' in groups
+```
+
+Or, if you want admins and tenant groups:
+
+```yaml
+workflows.argoproj.io/rbac-rule: |
+  'wf-admins' in groups
+  || 'wf-bwalsh-nextflow-hello-project-writers' in groups
+  || 'wf-bwalsh-nextflow-hello-project-readers' in groups
+```
+
+That’s separate from `admin.yaml` (and should be managed by your Helm chart), but it’s good to know where it plugs in.
+
+---
+
+## 5. Quick verification flow
+
+Once you’ve:
+
+* Applied `admin.yaml`
+* Wired the `wf-admins` group into `argocd-rbac-cm` via Helm values
+* Confirmed your authz-adapter emits `X-Auth-Request-Groups: wf-admins,...` for an admin user
+
+You can verify end to end:
+
+1. Open Argo CD via your ingress as an admin user.
+2. `argocd account get-user-info` shows `Groups: wf-admins`.
+3. User can:
+
+   * See and manage all Applications and Projects.
+   * Sync, delete, and edit applications.
+4. In K8s:
+
+   * `kubectl auth can-i` with `--as-group=wf-admins` returns `yes` for workflows, sensors, apps, etc.
+
+   

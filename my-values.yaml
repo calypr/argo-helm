@@ -1,0 +1,34 @@
+repoRegistrations:
+  # Example 1: Basic Nextflow pipeline
+  - name: bwalsh-nextflow-hello-project
+    repoUrl: https://github.com/bwalsh/nextflow-hello-project.git
+    defaultBranch: main
+    tenant: research-team-1
+    workflowTemplateRef: nextflow-repo-runner
+    
+    # Artifact bucket configuration
+    artifactBucket:
+      hostname: $S3_HOSTNAME
+      bucket: $S3_BUCKET
+      region: $S3_REGION
+      insecure: true
+      pathStyle: true
+      keyPrefix: bwalsh-nextflow-hello-project-workflows/
+      # Vault path for S3 credentials (relative to kv/)
+      externalSecretPath: argo/apps/bwalsh/nextflow-hello-project/s3/artifacts
+    
+    # GitHub credentials
+    githubSecretName: github-secret-bwalsh-nextflow-hello-project
+    # Vault path for GitHub token
+    githubSecretPath: argo/apps/bwalsh/nextflow-hello-project/github
+    
+    # Access control (Fence-authenticated emails)
+    adminUsers:
+      - pi@research.edu
+      - lead-scientist@research.edu
+    readUsers:
+      - postdoc@research.edu
+      - student@research.edu
+    
+    isPublic: false
+

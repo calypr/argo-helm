@@ -1,6 +1,14 @@
 .idea/
 .venv/
+venv/
+.env
 __pycache__/
 github-status-proxy/github-status-proxy
 github-status-proxy/coverage.out
 github-status-proxy/coverage.html
+rendered.yaml
+helm/argo-stack/charts/argo-events-*.tgz
+helm/argo-stack/charts/external-secrets-*.tgz
+.coverage
+htmlcov/
+.pytest_cache/

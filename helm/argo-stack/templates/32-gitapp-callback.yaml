@@ -1,0 +1,108 @@
+{{- if .Values.gitappCallback.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: gitapp-callback
+  namespace: {{ .Values.namespaces.security }}
+  labels:
+    app: gitapp-callback
+    app.kubernetes.io/name: gitapp-callback
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+spec:
+  replicas: {{ .Values.gitappCallback.replicas }}
+  selector:
+    matchLabels:
+      app: gitapp-callback
+  template:
+    metadata:
+      labels:
+        app: gitapp-callback
+    spec:
+      containers:
+      - name: gitapp-callback
+        image: "{{ .Values.gitappCallback.image.repository }}:{{ .Values.gitappCallback.image.tag }}"
+        imagePullPolicy: "{{ .Values.gitappCallback.image.pullPolicy }}"
+        env:
+        - name: SECRET_KEY
+          value: {{ .Values.gitappCallback.secretKey | quote }}
+        - name: GITHUB_APP_NAME
+          value: {{ .Values.gitappCallback.githubAppName | quote }}
+        - name: DB_PATH
+          value: "/var/registrations/registrations.sqlite"
+        ports:
+        - containerPort: 8080
+        volumeMounts:
+        - name: registrations-data
+          mountPath: /var/registrations
+        livenessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /healthz
+            port: 8080
+          initialDelaySeconds: 2
+          periodSeconds: 5
+      volumes:
+      - name: registrations-data
+        {{- if and .Values.gitappCallback.persistence.enabled .Values.gitappCallback.persistence.useExtraMounts }}
+        # Note: hostPath is used per design requirements to allow host-mounted content.
+        # Ensure the path matches the kind extraMounts configuration.
+        hostPath:
+          path: {{ .Values.gitappCallback.persistence.registrationsPath | default "/var/registrations" }}
+          type: DirectoryOrCreate
+        {{- else if .Values.gitappCallback.persistence.enabled }}
+        persistentVolumeClaim:
+          claimName: {{ .Values.gitappCallback.persistence.existingClaim | default "gitapp-callback-data" }}
+        {{- else }}
+        emptyDir: {}
+        {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: gitapp-callback
+  namespace: {{ .Values.namespaces.security }}
+  labels:
+    app: gitapp-callback
+    app.kubernetes.io/name: gitapp-callback
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+  annotations:
+    meta.helm.sh/release-name: {{ .Release.Name }}
+    meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+spec:
+  selector:
+    app: gitapp-callback
+  ports:
+  - port: 8080
+    targetPort: 8080
+---
+{{- if and .Values.gitappCallback.persistence.enabled (not .Values.gitappCallback.persistence.existingClaim) (not .Values.gitappCallback.persistence.useExtraMounts) }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: gitapp-callback-data
+  namespace: {{ .Values.namespaces.security }}
+  labels:
+    app: gitapp-callback
+    app.kubernetes.io/name: gitapp-callback
+    app.kubernetes.io/instance: {{ .Release.Name }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.gitappCallback.persistence.size | default "1Gi" }}
+  {{- if .Values.gitappCallback.persistence.storageClass }}
+  storageClassName: {{ .Values.gitappCallback.persistence.storageClass }}
+  {{- end }}
+{{- end }}
+{{- end }}

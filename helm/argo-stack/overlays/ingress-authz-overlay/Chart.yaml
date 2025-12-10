@@ -1,0 +1,16 @@
+apiVersion: v2
+name: ingress-authz-overlay
+description: Authz-aware ingress overlay providing unified path-based routing with centralized authorization for multi-tenant UIs and APIs
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+keywords:
+  - ingress
+  - authorization
+  - multi-tenant
+  - nginx
+  - argo
+home: https://github.com/calypr/argo-helm
+maintainers:
+  - name: calypr
+    url: https://github.com/calypr

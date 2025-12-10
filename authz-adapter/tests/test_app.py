@@ -353,3 +353,281 @@ class TestErrorHandling:
         for header in malformed_headers:
             response = client.get('/check', headers={'Authorization': header})
             assert response.status_code == 401
+
+
+class TestGetDebuggingVars:
+    """Test the get_debugging_vars function."""
+
+    def setup_method(self):
+        """Reset app module before each test."""
+        if 'app' in sys.modules:
+            del sys.modules['app']
+
+    @pytest.mark.unit
+    def test_get_debugging_vars_returns_none_when_no_debug_email(self):
+        """Test that get_debugging_vars returns (None, None) when DEBUG_EMAIL is not set."""
+        env_vars = {'FENCE_BASE': 'https://test-fence.example.com/user'}
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            with app.app.test_request_context('/check'):
+                email, groups = app.get_debugging_vars()
+                assert email is None
+                assert groups is None
+
+    @pytest.mark.unit
+    def test_get_debugging_vars_with_debug_email_env_only(self):
+        """Test get_debugging_vars with DEBUG_EMAIL env var set."""
+        env_vars = {
+            'FENCE_BASE': 'https://test-fence.example.com/user',
+            'DEBUG_EMAIL': 'debug@example.com'
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            with app.app.test_request_context('/check'):
+                email, groups = app.get_debugging_vars()
+                assert email == 'debug@example.com'
+                assert groups is None
+
+    @pytest.mark.unit
+    def test_get_debugging_vars_with_debug_email_and_groups_env(self):
+        """Test get_debugging_vars with DEBUG_EMAIL and DEBUG_GROUPS env vars set."""
+        env_vars = {
+            'FENCE_BASE': 'https://test-fence.example.com/user',
+            'DEBUG_EMAIL': 'debug@example.com',
+            'DEBUG_GROUPS': 'argo-runner,argo-viewer'
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            with app.app.test_request_context('/check'):
+                email, groups = app.get_debugging_vars()
+                assert email == 'debug@example.com'
+                assert groups == ['argo-runner', 'argo-viewer']
+
+    @pytest.mark.unit
+    def test_get_debugging_vars_query_params_override_env(self):
+        """Test that query params override env vars when DEBUG_EMAIL is set."""
+        env_vars = {
+            'FENCE_BASE': 'https://test-fence.example.com/user',
+            'DEBUG_EMAIL': 'env@example.com',
+            'DEBUG_GROUPS': 'env-group'
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            with app.app.test_request_context(
+                '/check?debug_email=query@example.com&debug_groups=query-group1,query-group2'
+            ):
+                email, groups = app.get_debugging_vars()
+                assert email == 'query@example.com'
+                assert groups == ['query-group1', 'query-group2']
+
+    @pytest.mark.unit
+    def test_get_debugging_vars_query_email_only(self):
+        """Test get_debugging_vars with debug_email query param only (requires DEBUG_EMAIL env)."""
+        env_vars = {
+            'FENCE_BASE': 'https://test-fence.example.com/user',
+            'DEBUG_EMAIL': 'env@example.com'
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            with app.app.test_request_context('/check?debug_email=query@example.com'):
+                email, groups = app.get_debugging_vars()
+                assert email == 'query@example.com'
+                assert groups is None
+
+    @pytest.mark.unit
+    def test_get_debugging_vars_query_groups_with_env_email(self):
+        """Test get_debugging_vars with debug_groups query param and DEBUG_EMAIL env var."""
+        env_vars = {
+            'FENCE_BASE': 'https://test-fence.example.com/user',
+            'DEBUG_EMAIL': 'env@example.com'
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            with app.app.test_request_context('/check?debug_groups=group1,group2'):
+                email, groups = app.get_debugging_vars()
+                assert email == 'env@example.com'
+                assert groups == ['group1', 'group2']
+
+    @pytest.mark.unit
+    def test_get_debugging_vars_single_group(self):
+        """Test get_debugging_vars with a single group in DEBUG_GROUPS."""
+        env_vars = {
+            'FENCE_BASE': 'https://test-fence.example.com/user',
+            'DEBUG_EMAIL': 'debug@example.com',
+            'DEBUG_GROUPS': 'single-group'
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            with app.app.test_request_context('/check'):
+                email, groups = app.get_debugging_vars()
+                assert email == 'debug@example.com'
+                assert groups == ['single-group']
+
+    @pytest.mark.unit
+    def test_get_debugging_vars_query_params_ignored_without_debug_email_env(self):
+        """Test that query params are ignored when DEBUG_EMAIL env is not set."""
+        env_vars = {'FENCE_BASE': 'https://test-fence.example.com/user'}
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            with app.app.test_request_context(
+                '/check?debug_email=query@example.com&debug_groups=group1'
+            ):
+                email, groups = app.get_debugging_vars()
+                # Without DEBUG_EMAIL env var, query params should be ignored
+                assert email is None
+                assert groups is None
+
+
+class TestCheckWithDebuggingVars:
+    """Test /check endpoint behavior with debugging variables."""
+
+    def setup_method(self):
+        """Reset app module before each test."""
+        if 'app' in sys.modules:
+            del sys.modules['app']
+
+    @pytest.mark.unit
+    def test_check_bypasses_auth_with_debug_email_and_groups(self):
+        """Test that /check bypasses auth when DEBUG_EMAIL and DEBUG_GROUPS are set."""
+        env_vars = {
+            'FENCE_BASE': 'https://test-fence.example.com/user',
+            'DEBUG_EMAIL': 'debug@example.com',
+            'DEBUG_GROUPS': 'argo-runner,argo-viewer'
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            client = app.app.test_client()
+            # No Authorization header needed when debugging vars are set
+            response = client.get('/check')
+            assert response.status_code == 200
+            assert response.headers['X-Auth-Request-User'] == 'debug@example.com'
+            assert response.headers['X-Auth-Request-Email'] == 'debug@example.com'
+            assert response.headers['X-Auth-Request-Groups'] == 'argo-runner,argo-viewer'
+            assert response.headers['X-Allowed'] == 'true'
+
+    @pytest.mark.unit
+    def test_check_falls_back_to_auth_when_only_debug_email_set(self):
+        """Test that /check falls back to auth when only DEBUG_EMAIL is set (no groups)."""
+        with requests_mock.Mocker() as m:
+            env_vars = {
+                'FENCE_BASE': 'https://test-fence.example.com/user',
+                'DEBUG_EMAIL': 'debug@example.com'
+                # No DEBUG_GROUPS set
+            }
+            with patch.dict('os.environ', env_vars, clear=True):
+                import app
+
+                mock_url = "https://test-fence.example.com/user/user"
+                user_doc = {
+                    "active": True,
+                    "email": "auth@example.com",
+                    "authz": {
+                        "/services/workflow/gen3-workflow": [
+                            {"method": "create", "service": "gen3-workflow"}
+                        ]
+                    }
+                }
+                m.get(mock_url, json=user_doc)
+
+                client = app.app.test_client()
+                # Without groups, it should fall back to real auth
+                response = client.get('/check', headers={'Authorization': 'Bearer valid-token'})
+                assert response.status_code == 200
+                # Should use the email from auth, not debug email
+                assert response.headers['X-Auth-Request-Email'] == 'auth@example.com'
+
+    @pytest.mark.unit
+    def test_check_with_debug_query_params(self):
+        """Test /check with debug_email and debug_groups query parameters."""
+        env_vars = {
+            'FENCE_BASE': 'https://test-fence.example.com/user',
+            'DEBUG_EMAIL': 'env@example.com',
+            'DEBUG_GROUPS': 'env-group'
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            client = app.app.test_client()
+            response = client.get(
+                '/check?debug_email=query@example.com&debug_groups=query-runner,query-viewer'
+            )
+            assert response.status_code == 200
+            assert response.headers['X-Auth-Request-User'] == 'query@example.com'
+            assert response.headers['X-Auth-Request-Email'] == 'query@example.com'
+            assert response.headers['X-Auth-Request-Groups'] == 'query-runner,query-viewer'
+
+    @pytest.mark.unit
+    def test_check_with_debug_groups_override_in_query(self):
+        """Test /check with debug_groups query param overriding env var."""
+        env_vars = {
+            'FENCE_BASE': 'https://test-fence.example.com/user',
+            'DEBUG_EMAIL': 'debug@example.com',
+            'DEBUG_GROUPS': 'env-group'
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            client = app.app.test_client()
+            response = client.get('/check?debug_groups=query-admin,query-viewer')
+            assert response.status_code == 200
+            assert response.headers['X-Auth-Request-Email'] == 'debug@example.com'
+            assert response.headers['X-Auth-Request-Groups'] == 'query-admin,query-viewer'
+
+    @pytest.mark.unit
+    def test_check_query_params_ignored_without_debug_email_env(self):
+        """Test that query params are ignored when DEBUG_EMAIL env is not set."""
+        with requests_mock.Mocker() as m:
+            env_vars = {'FENCE_BASE': 'https://test-fence.example.com/user'}
+            with patch.dict('os.environ', env_vars, clear=True):
+                import app
+
+                mock_url = "https://test-fence.example.com/user/user"
+                user_doc = {
+                    "active": True,
+                    "email": "auth@example.com",
+                    "authz": {
+                        "/services/workflow/gen3-workflow": [
+                            {"method": "create", "service": "gen3-workflow"}
+                        ]
+                    }
+                }
+                m.get(mock_url, json=user_doc)
+
+                client = app.app.test_client()
+                # Query params should be ignored without DEBUG_EMAIL env
+                response = client.get(
+                    '/check?debug_email=query@example.com&debug_groups=query-group',
+                    headers={'Authorization': 'Bearer valid-token'}
+                )
+                assert response.status_code == 200
+                # Should use auth email, not query param email
+                assert response.headers['X-Auth-Request-Email'] == 'auth@example.com'
+
+    @pytest.mark.unit
+    def test_check_without_auth_fails_when_debug_incomplete(self):
+        """Test /check returns 401 when debug vars are incomplete and no auth provided."""
+        env_vars = {
+            'FENCE_BASE': 'https://test-fence.example.com/user',
+            'DEBUG_EMAIL': 'debug@example.com'
+            # No DEBUG_GROUPS - incomplete debug config
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            client = app.app.test_client()
+            # No Authorization header, and debug vars incomplete
+            response = client.get('/check')
+            assert response.status_code == 401
+
+    @pytest.mark.unit
+    def test_check_with_empty_debug_groups(self):
+        """Test /check behavior with empty DEBUG_GROUPS."""
+        env_vars = {
+            'FENCE_BASE': 'https://test-fence.example.com/user',
+            'DEBUG_EMAIL': 'debug@example.com',
+            'DEBUG_GROUPS': ''  # Empty groups
+        }
+        with patch.dict('os.environ', env_vars, clear=True):
+            import app
+            client = app.app.test_client()
+            # Empty groups should result in fallback to real auth
+            response = client.get('/check')
+            # Without valid auth, should fail
+            assert response.status_code == 401
