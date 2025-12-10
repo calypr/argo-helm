@@ -1,29 +1,18 @@
-FROM golang:1.22-alpine AS builder
+# Use busybox as a minimal base with basic utilities
+FROM busybox:glibc
 
 WORKDIR /app
 
-# Copy go.mod and go.sum first for better caching
-COPY go.mod go.sum* ./
-RUN go mod download
+# Copy the pre-built binary
+# The binary should be built before running docker build using:
+# CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o github-status-proxy .
+COPY github-status-proxy /app/github-status-proxy
 
-# Copy source code
-COPY *.go ./
-
-# Build the binary
-RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o github-status-proxy .
-
-# Final stage
-FROM alpine:latest
-
-RUN apk --no-cache add ca-certificates
-
-WORKDIR /root/
-
-# Copy the binary from builder
-COPY --from=builder /app/github-status-proxy .
+# Make the binary executable
+RUN chmod +x /app/github-status-proxy
 
 # Expose port
 EXPOSE 8080
 
 # Run the binary
-CMD ["./github-status-proxy"]
+CMD ["/app/github-status-proxy"]
