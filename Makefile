@@ -12,7 +12,7 @@ S3_REGION            ?= us-east-1
 S3_HOSTNAME          ?= minio.minio-system.svc.cluster.local:9000
 
 # GitHub Status Proxy image configuration
-PROXY_IMAGE          ?= ghcr.io/calypr/github-status-proxy
+PROXY_IMAGE          ?= github-status-proxy
 PROXY_TAG            ?= latest
 PROXY_IMAGE_FULL     := $(PROXY_IMAGE):$(PROXY_TAG)
 # Vault configuration for local development (in-cluster deployment)
@@ -199,7 +199,7 @@ argo-stack:
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
 		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
-		--set githubStatusProxy.enabled=false \
+		--set githubStatusProxy.enabled=true\
 		--set githubStatusProxy.image="${PROXY_IMAGE_FULL}" \
 		--set githubStatusProxy.githubAppId="${GITHUBHAPP_APP_ID}" \
 		--set githubStatusProxy.privateKeySecret.name="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
@@ -263,7 +263,8 @@ build-proxy-image: build-proxy-binary
 # Load the proxy image into kind cluster
 load-proxy-image: build-proxy-image
 	@echo "📦 Loading GitHub Status Proxy image into kind cluster..."
-	@kind load docker-image $(PROXY_IMAGE_FULL) || (echo "❌ Failed to load image. Is kind cluster running?" && exit 1)
+	@kind load docker-image $(PROXY_IMAGE_FULL) --name kind || (echo "❌ Failed to load image. Is kind cluster running?" && exit 1)
+	docker exec -it kind-control-plane crictl images | grep $(PROXY_IMAGE)
 	@echo "✅ Image loaded into kind cluster"
 
 # Deploy GitHub Status Proxy to the cluster
