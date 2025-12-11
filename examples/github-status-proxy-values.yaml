@@ -20,12 +20,44 @@ githubStatusProxy:
   namespace: argocd
   
   # Secret containing GitHub App private key
+  # OPTION 1: Manual secret creation
   # Create with: kubectl create secret generic github-app-private-key \
   #   --from-file=private-key.pem=/path/to/your/github-app-key.pem \
   #   -n argocd
+  #
+  # OPTION 2: Using External Secrets with Vault (recommended)
+  # Set privateKeyVaultPath to point to your vault secret
   privateKeySecret:
     name: github-app-private-key
     key: private-key.pem
+  
+  # Vault path for the GitHub App private key (when using External Secrets)
+  # Format: "path#key" where path is relative to vault.kv.defaultPathPrefix
+  # Example: "github/status-proxy#privateKey"
+  # Leave empty to create secret manually
+  privateKeyVaultPath: "github/status-proxy#privateKey"  # REPLACE or leave empty
+  
+  # Log level: INFO or DEBUG
+  # DEBUG will log all HTTP requests/responses (useful for troubleshooting)
+  logLevel: "INFO"
+
+# Vault integration (required if using privateKeyVaultPath)
+vault:
+  enabled: true
+  # Vault address
+  address: "https://vault.example.com"  # REPLACE with your Vault URL
+  # Authentication method
+  auth:
+    approle:
+      enabled: true
+      roleId: "your-role-id"  # REPLACE
+      secretRef:
+        name: "vault-approle-secret"
+        key: "secretId"
+  # KV secrets engine configuration
+  kv:
+    engineVersion: "v2"
+    defaultPathPrefix: "kv"  # Your secrets are stored under kv/github/status-proxy
 
 # Standard Argo CD configuration
 argo-cd:

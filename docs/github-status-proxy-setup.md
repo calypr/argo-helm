@@ -35,14 +35,59 @@ If you don't already have a GitHub App, create one:
 6. Scroll down and click "Generate a private key"
 7. Save the downloaded `.pem` file securely
 
-## Step 2: Create Kubernetes Secret for GitHub App Private Key
+## Step 2: Configure Secret for GitHub App Private Key
 
-Create a Kubernetes secret in the `argocd` namespace with your GitHub App's private key:
+You have two options for providing the GitHub App private key:
+
+### Option A: Using External Secrets with Vault (Recommended for Production)
+
+If you're using HashiCorp Vault with External Secrets Operator:
+
+1. Store your GitHub App private key in Vault:
+   ```bash
+   # Example: Store the private key in Vault
+   vault kv put kv/github/status-proxy privateKey=@/path/to/your/private-key.pem
+   ```
+
+2. Configure the vault path in your Helm values:
+   ```yaml
+   githubStatusProxy:
+     enabled: true
+     githubAppId: "123456"  # Replace with your GitHub App ID
+     privateKeyVaultPath: "github/status-proxy#privateKey"  # Vault path
+     privateKeySecret:
+       name: github-app-private-key
+       key: private-key.pem
+   
+   # Ensure vault is enabled
+   vault:
+     enabled: true
+     address: "https://vault.example.com"
+     # ... other vault configuration
+   ```
+
+The External Secrets Operator will automatically create the `github-app-private-key` secret from Vault.
+
+### Option B: Manual Secret Creation
+
+For development or if not using Vault:
 
 ```bash
 kubectl create secret generic github-app-private-key \
   --from-file=private-key.pem=/path/to/your/private-key.pem \
   -n argocd
+```
+
+Then configure without the vault path:
+
+```yaml
+githubStatusProxy:
+  enabled: true
+  githubAppId: "123456"  # Replace with your GitHub App ID
+  privateKeySecret:
+    name: github-app-private-key
+    key: private-key.pem
+  # Do NOT set privateKeyVaultPath for manual secrets
 ```
 
 ## Step 3: Enable GitHub Status Proxy in Helm Values
@@ -58,6 +103,10 @@ githubStatusProxy:
   privateKeySecret:
     name: github-app-private-key
     key: private-key.pem
+  # Optional: Set vault path if using External Secrets
+  # privateKeyVaultPath: "github/status-proxy#privateKey"
+  # Optional: Set log level
+  logLevel: "INFO"  # or "DEBUG" for troubleshooting
 ```
 
 ## Step 4: Deploy or Update the Helm Chart
