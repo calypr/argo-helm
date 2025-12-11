@@ -320,10 +320,6 @@ githubStatusProxy:
   privateKeySecret:
     name: github-app-private-key
     key: private-key.pem
-  # Vault path for the GitHub App private key (when using External Secrets)
-  # Format: "path#key" where path is relative to vault.kv.defaultPathPrefix
-  # Example: "github/status-proxy#privateKey"
-  privateKeyVaultPath: ""
   # Log level: INFO or DEBUG
   # DEBUG will log incoming/outgoing HTTP requests and responses
   logLevel: "INFO"
