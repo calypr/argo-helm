@@ -83,7 +83,10 @@ template: check-vars deps
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
 		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
-		--set ingress={} \
+		--set githubStatusProxy.image="${PROXY_IMAGE_FULL}" \
+		--set githubStatusProxy.githubAppId="${GITHUBHAPP_APP_ID}" \
+		--set githubStatusProxy.privateKeySecret.name="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
+		--set githubStatusProxy.privateKeySecret.key=privateKey \
 		-f - \
 		-f helm/argo-stack/admin-values.yaml \
 		--namespace argocd > rendered.yaml
@@ -194,6 +197,11 @@ argo-stack:
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
 		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
+		--set githubStatusProxy.enabled=true \
+		--set githubStatusProxy.image="${PROXY_IMAGE_FULL}" \
+		--set githubStatusProxy.githubAppId="${GITHUBHAPP_APP_ID}" \
+		--set githubStatusProxy.privateKeySecret.name="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
+		--set githubStatusProxy.privateKeySecret.key=privateKey \
 		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
@@ -258,25 +266,16 @@ load-proxy-image: build-proxy-image
 # Deploy GitHub Status Proxy to the cluster
 deploy-proxy: load-proxy-image
 	@echo "🚀 Deploying GitHub Status Proxy..."
-	@if [ -z "$(GITHUB_APP_ID)" ]; then \
-		echo "❌ ERROR: GITHUB_APP_ID must be set. Run 'export GITHUB_APP_ID=...' before deploying"; \
-		exit 1; \
-	fi
-	@if [ ! -f "$(GITHUB_APP_PRIVATE_KEY_FILE)" ]; then \
-		echo "❌ ERROR: GITHUB_APP_PRIVATE_KEY_FILE must point to a valid PEM file"; \
-		echo "   Example: export GITHUB_APP_PRIVATE_KEY_FILE=/path/to/private-key.pem"; \
-		exit 1; \
-	fi
 	@echo "📝 Creating secret for GitHub App credentials..."
 	@kubectl create secret generic github-app-private-key \
-		--from-file=private-key.pem=$(GITHUB_APP_PRIVATE_KEY_FILE) \
+		--from-file=private-key.pem=$(GITHUBHAPP_PRIVATE_KEY_FILE_PATH) \
 		-n argocd --dry-run=client -o yaml | kubectl apply -f -
 	@echo "📝 Deploying GitHub Status Proxy with Helm..."
 	helm upgrade --install argo-stack ./helm/argo-stack \
 		-n argocd --create-namespace \
 		--set githubStatusProxy.enabled=true \
 		--set githubStatusProxy.image=$(PROXY_IMAGE_FULL) \
-		--set githubStatusProxy.githubAppId=$(GITHUB_APP_ID) \
+		--set githubStatusProxy.githubAppId=$(GITHUBHAPP_APP_ID) \
 		--set githubStatusProxy.privateKeySecret.name=github-app-private-key \
 		--set githubStatusProxy.privateKeySecret.key=private-key.pem \
 		--wait
@@ -594,4 +593,5 @@ docker-gitapp-callback:
 	docker exec -it kind-control-plane crictl images | grep gitapp-callback
 	@echo "✅ loaded docker gitapp-callback"
 
-docker-install: docker-runner docker-authz docker-landing-page docker-gitapp-callback
+docker-install: docker-runner docker-authz docker-landing-page docker-gitapp-callback load-proxy-image
+
