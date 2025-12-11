@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"net/http/httputil"
 	"net/url"
 	"os"
 	"strconv"
@@ -36,6 +37,7 @@ var (
 	githubAppID         int64
 	githubAppPrivateKey *rsa.PrivateKey
 	httpClient          *http.Client
+	debugLogging        bool
 )
 
 func main() {
@@ -51,6 +53,12 @@ func main() {
 	port := os.Getenv("PORT")
 	if port == "" {
 		port = "8080"
+	}
+
+	logLevel := os.Getenv("LOG_LEVEL")
+	if strings.ToUpper(logLevel) == "DEBUG" {
+		debugLogging = true
+		log.Printf("DEBUG logging enabled")
 	}
 
 	log.Printf("GitHub Status Proxy starting on port %s", port)
@@ -106,6 +114,11 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Debug log incoming request
+	if debugLogging {
+		logIncomingRequest(r)
+	}
+
 	// Limit request body size to prevent DoS attacks (1MB max)
 	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
 
@@ -114,6 +127,12 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
 		return
+	}
+
+	// Debug log parsed request
+	if debugLogging {
+		reqJSON, _ := json.MarshalIndent(req, "", "  ")
+		log.Printf("DEBUG: Parsed request body:\n%s", string(reqJSON))
 	}
 
 	// Validate request
@@ -127,6 +146,10 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid repo_url: %v", err))
 		return
+	}
+
+	if debugLogging {
+		log.Printf("DEBUG: Parsed repository: owner=%s, repo=%s", owner, repo)
 	}
 
 	// Create GitHub App JWT
@@ -143,6 +166,10 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 		log.Printf("Failed to get installation ID for %s/%s: %v", owner, repo, err)
 		respondError(w, http.StatusNotFound, fmt.Sprintf("GitHub App not installed on repository %s/%s", owner, repo))
 		return
+	}
+
+	if debugLogging {
+		log.Printf("DEBUG: Found installation ID: %d for %s/%s", installationID, owner, repo)
 	}
 
 	// Get installation access token
@@ -244,11 +271,17 @@ func getInstallationID(appJWT, owner, repo string) (int64, error) {
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 
+	// Log outgoing request in DEBUG mode
+	logOutgoingRequest(req, "Get Installation ID")
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return 0, err
 	}
 	defer resp.Body.Close()
+
+	// Log response in DEBUG mode
+	logOutgoingResponse(resp, "Get Installation ID")
 
 	if resp.StatusCode != http.StatusOK {
 		return 0, fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
@@ -277,11 +310,17 @@ func getInstallationToken(appJWT string, installationID int64) (string, error) {
 	req.Header.Set("Accept", "application/vnd.github+json")
 	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
 
+	// Log outgoing request in DEBUG mode
+	logOutgoingRequest(req, "Get Installation Token")
+
 	resp, err := httpClient.Do(req)
 	if err != nil {
 		return "", err
 	}
 	defer resp.Body.Close()
+
+	// Log response in DEBUG mode
+	logOutgoingResponse(resp, "Get Installation Token")
 
 	if resp.StatusCode != http.StatusCreated {
 		return "", fmt.Errorf("GitHub API returned status %d", resp.StatusCode)
@@ -294,6 +333,10 @@ func getInstallationToken(appJWT string, installationID int64) (string, error) {
 	}
 	if err := json.NewDecoder(limitedReader).Decode(&tokenResp); err != nil {
 		return "", err
+	}
+
+	if debugLogging {
+		log.Printf("DEBUG: Successfully obtained installation token (length: %d)", len(tokenResp.Token))
 	}
 
 	return tokenResp.Token, nil
@@ -313,7 +356,18 @@ func createCommitStatus(installationToken, owner, repo string, req *StatusReques
 		status.TargetURL = &req.TargetURL
 	}
 
-	_, _, err := client.Repositories.CreateStatus(ctx, owner, repo, req.SHA, status)
+	if debugLogging {
+		log.Printf("DEBUG: Creating commit status for %s/%s@%s", owner, repo, req.SHA)
+		log.Printf("DEBUG: Status details: state=%s, context=%s, description=%s, target_url=%s",
+			req.State, req.Context, req.Description, req.TargetURL)
+	}
+
+	_, resp, err := client.Repositories.CreateStatus(ctx, owner, repo, req.SHA, status)
+	
+	if debugLogging && resp != nil {
+		log.Printf("DEBUG: Create status response: status=%s", resp.Status)
+	}
+	
 	return err
 }
 
@@ -333,4 +387,81 @@ func respondSuccess(w http.ResponseWriter, message string) {
 		Success: true,
 		Message: message,
 	})
+}
+
+// logIncomingRequest logs details of incoming HTTP requests when DEBUG logging is enabled
+func logIncomingRequest(r *http.Request) {
+	log.Printf("DEBUG: === Incoming Request ===")
+	log.Printf("DEBUG: Method: %s", r.Method)
+	log.Printf("DEBUG: URL: %s", r.URL.String())
+	log.Printf("DEBUG: Headers:")
+	for name, values := range r.Header {
+		for _, value := range values {
+			// Mask sensitive headers
+			if strings.ToLower(name) == "authorization" {
+				log.Printf("DEBUG:   %s: [REDACTED]", name)
+			} else {
+				log.Printf("DEBUG:   %s: %s", name, value)
+			}
+		}
+	}
+	
+	// Read and log body (we need to restore it for later use)
+	if r.Body != nil {
+		bodyBytes, err := io.ReadAll(r.Body)
+		if err == nil {
+			log.Printf("DEBUG: Body:\n%s", string(bodyBytes))
+			// Restore the body for the actual handler
+			r.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+		}
+	}
+	log.Printf("DEBUG: === End Incoming Request ===")
+}
+
+// logOutgoingRequest logs details of outgoing HTTP requests when DEBUG logging is enabled
+func logOutgoingRequest(req *http.Request, description string) {
+	if !debugLogging {
+		return
+	}
+	
+	log.Printf("DEBUG: === Outgoing Request: %s ===", description)
+	log.Printf("DEBUG: Method: %s", req.Method)
+	log.Printf("DEBUG: URL: %s", req.URL.String())
+	log.Printf("DEBUG: Headers:")
+	for name, values := range req.Header {
+		for _, value := range values {
+			// Mask sensitive headers
+			if strings.ToLower(name) == "authorization" {
+				log.Printf("DEBUG:   %s: [REDACTED]", name)
+			} else {
+				log.Printf("DEBUG:   %s: %s", name, value)
+			}
+		}
+	}
+	
+	// Log body if present
+	if req.Body != nil {
+		bodyBytes, err := httputil.DumpRequestOut(req, true)
+		if err == nil {
+			log.Printf("DEBUG: Request dump:\n%s", string(bodyBytes))
+		}
+	}
+	log.Printf("DEBUG: === End Outgoing Request ===")
+}
+
+// logOutgoingResponse logs details of outgoing HTTP responses when DEBUG logging is enabled
+func logOutgoingResponse(resp *http.Response, description string) {
+	if !debugLogging {
+		return
+	}
+	
+	log.Printf("DEBUG: === Response: %s ===", description)
+	log.Printf("DEBUG: Status: %s", resp.Status)
+	log.Printf("DEBUG: Headers:")
+	for name, values := range resp.Header {
+		for _, value := range values {
+			log.Printf("DEBUG:   %s: %s", name, value)
+		}
+	}
+	log.Printf("DEBUG: === End Response ===")
 }

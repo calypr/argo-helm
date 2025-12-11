@@ -22,6 +22,25 @@ spec:
       labels:
         app: github-status-proxy
     spec:
+      # Init container to wait for the secret to be created
+      # This is useful when the secret is managed by external-secrets/vault
+      initContainers:
+      - name: wait-for-secret
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for secret {{ .Values.githubStatusProxy.privateKeySecret.name }} to be available..."
+          until [ -f /etc/github/private-key.pem ]; do
+            echo "Secret not found, waiting..."
+            sleep 2
+          done
+          echo "Secret found, proceeding with startup"
+        volumeMounts:
+        - name: github-app-key
+          mountPath: /etc/github
+          readOnly: true
       containers:
       - name: github-status-proxy
         image: {{ .Values.githubStatusProxy.image }}
@@ -32,6 +51,8 @@ spec:
           value: /etc/github/private-key.pem
         - name: PORT
           value: "8080"
+        - name: LOG_LEVEL
+          value: {{ .Values.githubStatusProxy.logLevel | default "INFO" | quote }}
         ports:
         - containerPort: 8080
           name: http
@@ -58,6 +79,7 @@ spec:
           items:
           - key: {{ .Values.githubStatusProxy.privateKeySecret.key }}
             path: private-key.pem
+          optional: false
 ---
 apiVersion: v1
 kind: Service
