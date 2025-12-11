@@ -316,10 +316,12 @@ githubStatusProxy:
   # The App ID can be found in your GitHub App settings
   githubAppId: ""
   # Reference to a secret containing the GitHub App private key
-  # The secret should have a key named "private-key.pem"
+  # This should typically reference the same secret created by the githubApp ExternalSecret
+  # When using vault/external-secrets: set githubApp.privateKeyVaultPath and this will
+  # automatically reference the secret created by externalsecret-github-app.yaml
   privateKeySecret:
     name: github-app-private-key
-    key: private-key.pem
+    key: privateKey  # Key name in the secret (matches ExternalSecret output)
   # Log level: INFO or DEBUG
   # DEBUG will log incoming/outgoing HTTP requests and responses
   logLevel: "INFO"

@@ -35,29 +35,79 @@ If you don't already have a GitHub App, create one:
 6. Scroll down and click "Generate a private key"
 7. Save the downloaded `.pem` file securely
 
-## Step 2: Create Kubernetes Secret for GitHub App Private Key
+## Step 2: Configure Secret Management
 
-Create a Kubernetes secret in the `argocd` namespace with your GitHub App's private key:
+The GitHub Status Proxy needs access to your GitHub App's private key. There are two options:
 
-```bash
-kubectl create secret generic github-app-private-key \
-  --from-file=private-key.pem=/path/to/your/private-key.pem \
-  -n argocd
+### Option A: Using Vault/External Secrets (Recommended for Production)
+
+If you're using the External Secrets Operator with Vault, configure the GitHub App settings:
+
+```yaml
+githubApp:
+  enabled: true
+  appId: "123456"  # Your GitHub App ID
+  installationId: "789012"  # Installation ID for your organization
+  privateKeySecretName: github-app-private-key
+  privateKeyVaultPath: "kv/argo/argocd/github-app"  # Path in Vault
 ```
 
-## Step 3: Enable GitHub Status Proxy in Helm Values
+This creates an ExternalSecret that syncs the private key from Vault to a Kubernetes secret with key `privateKey`.
 
-Add the following to your Helm values file (or use `--set` flags):
+The GitHub Status Proxy automatically reuses this same secret:
 
 ```yaml
 githubStatusProxy:
   enabled: true
-  githubAppId: "123456"  # Replace with your GitHub App ID
-  replicas: 2
-  image: ghcr.io/calypr/github-status-proxy:latest
+  githubAppId: "123456"  # Same App ID as above
+  privateKeySecret:
+    name: github-app-private-key  # Same secret name
+    key: privateKey  # Key created by ExternalSecret
+```
+
+### Option B: Manual Secret Creation (Development/Testing)
+
+For development or if not using Vault, create the secret manually:
+
+```bash
+kubectl create secret generic github-app-private-key \
+  --from-file=privateKey=/path/to/your/private-key.pem \
+  -n argocd
+```
+
+Then configure:
+
+```yaml
+githubStatusProxy:
+  enabled: true
+  githubAppId: "123456"
   privateKeySecret:
     name: github-app-private-key
-    key: private-key.pem
+    key: privateKey
+```
+
+## Step 3: Enable GitHub Status Proxy in Helm Values
+
+Complete example with Vault integration:
+
+```yaml
+# GitHub App configuration (creates ExternalSecret)
+githubApp:
+  enabled: true
+  appId: "123456"
+  installationId: "789012"
+  privateKeySecretName: github-app-private-key
+  privateKeyVaultPath: "kv/argo/argocd/github-app"
+
+# GitHub Status Proxy (reuses the ExternalSecret above)
+githubStatusProxy:
+  enabled: true
+  githubAppId: "123456"  # Same App ID
+  replicas: 2
+  privateKeySecret:
+    name: github-app-private-key  # Same secret name
+    key: privateKey  # Key name in the secret
+  logLevel: "INFO"  # or "DEBUG" for detailed logging
 ```
 
 ## Step 4: Deploy or Update the Helm Chart

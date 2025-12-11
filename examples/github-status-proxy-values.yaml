@@ -1,13 +1,23 @@
 # Example values file for enabling GitHub Status Proxy
-# This demonstrates a complete setup with GitHub App integration
+# This demonstrates a complete setup with GitHub App integration and Vault
 
-# Enable GitHub Status Proxy for self-service commit status posting
+# ==============================================================================
+# Option 1: With Vault/External Secrets (Recommended for Production)
+# ==============================================================================
+
+# GitHub App configuration (creates ExternalSecret from Vault)
+githubApp:
+  enabled: true
+  appId: "123456"  # REPLACE with your GitHub App ID
+  installationId: "789012"  # REPLACE with your installation ID
+  privateKeySecretName: github-app-private-key
+  privateKeyVaultPath: "kv/argo/argocd/github-app"  # Path in Vault
+
+# GitHub Status Proxy (reuses the secret created above)
 githubStatusProxy:
   enabled: true
   
-  # GitHub App ID - find this in your GitHub App settings
-  # Example: if your app URL is https://github.com/apps/my-app
-  # the App ID is shown on the app's settings page
+  # GitHub App ID - same as githubApp.appId above
   githubAppId: "123456"  # REPLACE with your actual App ID
   
   # Number of replicas for high availability
@@ -19,13 +29,44 @@ githubStatusProxy:
   # Namespace where the proxy will run (should match argocd namespace)
   namespace: argocd
   
-  # Secret containing GitHub App private key
-  # Create with: kubectl create secret generic github-app-private-key \
-  #   --from-file=private-key.pem=/path/to/your/github-app-key.pem \
-  #   -n argocd
+  # Secret reference - uses the same secret created by githubApp ExternalSecret
   privateKeySecret:
-    name: github-app-private-key
-    key: private-key.pem
+    name: github-app-private-key  # Same as githubApp.privateKeySecretName
+    key: privateKey  # Key name created by ExternalSecret
+  
+  # Log level: INFO or DEBUG
+  # DEBUG provides detailed logging of HTTP requests/responses
+  logLevel: "INFO"
+
+# Vault configuration (required for ExternalSecrets)
+vault:
+  enabled: true
+  address: "http://vault.vault.svc.cluster.local:8200"
+  # Additional vault auth configuration...
+
+# External Secrets configuration
+externalSecrets:
+  enabled: true
+  # Additional ESO configuration...
+
+# ==============================================================================
+# Option 2: Manual Secret (Development/Testing - without Vault)
+# ==============================================================================
+# If not using Vault, comment out the githubApp and vault sections above,
+# and create the secret manually:
+#
+# kubectl create secret generic github-app-private-key \
+#   --from-file=privateKey=/path/to/your/github-app-key.pem \
+#   -n argocd
+#
+# Then use this simpler configuration:
+#
+# githubStatusProxy:
+#   enabled: true
+#   githubAppId: "123456"
+#   privateKeySecret:
+#     name: github-app-private-key
+#     key: privateKey
 
 # Standard Argo CD configuration
 argo-cd:
