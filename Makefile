@@ -83,10 +83,12 @@ template: check-vars deps
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
 		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
+		--set githubStatusProxy.enabled=true \
 		--set githubStatusProxy.image="${PROXY_IMAGE_FULL}" \
 		--set githubStatusProxy.githubAppId="${GITHUBHAPP_APP_ID}" \
 		--set githubStatusProxy.privateKeySecret.name="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set githubStatusProxy.privateKeySecret.key=privateKey \
+		--set githubStatusProxy.logLevel="DEBUG" \
 		-f - \
 		-f helm/argo-stack/admin-values.yaml \
 		--namespace argocd > rendered.yaml
@@ -202,6 +204,7 @@ argo-stack:
 		--set githubStatusProxy.githubAppId="${GITHUBHAPP_APP_ID}" \
 		--set githubStatusProxy.privateKeySecret.name="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set githubStatusProxy.privateKeySecret.key=privateKey \
+		--set githubStatusProxy.logLevel="DEBUG" \
 		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
