@@ -39,6 +39,8 @@ If you don't already have a GitHub App, create one:
 
 The GitHub Status Proxy needs access to your GitHub App's private key. There are two options:
 
+**Important:** The proxy Deployment uses Helm post-install/post-upgrade hooks with weight 5, ensuring it deploys AFTER ExternalSecrets (weight 1) are created. This prevents startup failures when secrets are managed by Vault.
+
 ### Option A: Using Vault/External Secrets (Recommended for Production)
 
 If you're using the External Secrets Operator with Vault, configure the GitHub App settings:

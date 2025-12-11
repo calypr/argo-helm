@@ -12,6 +12,9 @@ metadata:
   annotations:
     meta.helm.sh/release-name: {{ .Release.Name }}
     meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+    # Run after ExternalSecrets are created (weight: 1) so secret is available
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
 spec:
   replicas: {{ .Values.githubStatusProxy.replicas | default 2 }}
   selector:
@@ -94,6 +97,9 @@ metadata:
   annotations:
     meta.helm.sh/release-name: {{ .Release.Name }}
     meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+    # Run with Deployment after ExternalSecrets
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"
 spec:
   selector:
     app: github-status-proxy
