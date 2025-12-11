@@ -23,8 +23,13 @@ githubStatusProxy:
   # Number of replicas for high availability
   replicas: 2
   
-  # Docker image - update to use your registry if building custom image
-  image: ghcr.io/calypr/github-status-proxy:latest
+  # Docker image configuration
+  # For local development with kind:
+  image: github-status-proxy:latest
+  imagePullPolicy: IfNotPresent
+  # For production:
+  # image: ghcr.io/calypr/github-status-proxy:v1.0.0
+  # imagePullPolicy: Always
   
   # Namespace where the proxy will run (should match argocd namespace)
   namespace: argocd

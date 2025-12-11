@@ -104,6 +104,9 @@ githubApp:
 # GitHub Status Proxy (reuses the ExternalSecret above)
 githubStatusProxy:
   enabled: true
+  image: github-status-proxy:latest  # For local development with kind
+  # image: ghcr.io/calypr/github-status-proxy:v1.0.0  # For production
+  imagePullPolicy: IfNotPresent  # Use Always for production
   githubAppId: "123456"  # Same App ID
   replicas: 2
   privateKeySecret:
@@ -111,6 +114,10 @@ githubStatusProxy:
     key: privateKey  # Key name in the secret
   logLevel: "INFO"  # or "DEBUG" for detailed logging
 ```
+
+**Image Configuration:**
+- **Development (local kind cluster):** Use `image: github-status-proxy:latest` with `imagePullPolicy: IfNotPresent` to use locally loaded images
+- **Production:** Use a specific version tag like `ghcr.io/calypr/github-status-proxy:v1.0.0` with `imagePullPolicy: Always` to ensure latest updates
 
 ## Step 4: Deploy or Update the Helm Chart
 

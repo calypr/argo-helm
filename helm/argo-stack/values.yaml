@@ -309,7 +309,8 @@ gitappCallback:
 
 githubStatusProxy:
   enabled: false
-  image: ghcr.io/calypr/github-status-proxy:latest
+  image: github-status-proxy:latest
+  imagePullPolicy: IfNotPresent  # Use IfNotPresent for local development, Always for production
   replicas: 2
   namespace: argocd
   # GitHub App configuration
