@@ -35,6 +35,9 @@ spec:
       - name: revision
         description: "Git revision (branch, tag, or SHA) to run."
         value: {{ $reg.defaultBranch | default "main" | quote }}
+      - name: commit-sha
+        description: "Git commit SHA that the workflow is executing."
+        value: ""
       - name: pipeline-file
         description: "Nextflow pipeline entry point file (e.g., main.nf, workflow.nf, pipeline.nf)."
         value: "pipelines/push/main.nf"
@@ -57,13 +60,33 @@ spec:
         value: {{ $reg.artifactBucket.region | quote }}
         {{- end }}
 
+  # Exit handler for GitHub status notifications
+  onExit: notify-github-exit
+
   templates:
+    # Exit handler template for GitHub notifications
+    - name: notify-github-exit
+      steps:
+        - - name: notify-status
+            templateRef:
+              name: github-status-notify
+              template: notify-github-status
+              clusterScope: true
+            arguments:
+              parameters:
+                - name: event
+                  value: "workflow-{{`{{workflow.status.phase}}`}}"
+    
     - name: run-nextflow
       metadata:
+        labels:
+          calypr.io/commit-sha: "{{`{{workflow.parameters.commit-sha}}`}}"
+          calypr.io/repo: {{ $repoName }}
         annotations:
           workflows.argoproj.io/description: |
             Run a Nextflow pipeline from a Git repo using S3-backed
             work and artifact storage derived from RepoRegistration.
+          workflows.argoproj.io/notifications: "enabled"
       container:
         image: nextflow-runner:latest
         imagePullPolicy: IfNotPresent
