@@ -47,7 +47,7 @@ spec:
       containers:
       - name: github-status-proxy
         image: "{{ .Values.githubStatusProxy.image.repository }}:{{ .Values.githubStatusProxy.image.tag }}"
-        imagePullPolicy: {{ .Values.githubStatusProxy.imagePullPolicy | default "IfNotPresent" }}
+        imagePullPolicy: {{ .Values.githubStatusProxy.image.pullPolicy | default "IfNotPresent" }}
         env:
         - name: GITHUB_APP_ID
           value: {{ .Values.githubStatusProxy.githubAppId | quote }}
