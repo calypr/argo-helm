@@ -545,6 +545,10 @@ workflows:
   # ServiceAccount name used by workflow pods in tenant namespaces
   # This is created automatically per tenant by repoRegistrations
   runnerServiceAccount: wf-runner
+  
+  # Base URL for Argo Workflows UI - used in GitHub commit status target URLs
+  # This should point to your Argo Workflows ingress/UI endpoint
+  baseUrl: "https://argo-workflows.example.com"
 
 # ============================================================================
 # RepoRegistration - Self-Service Repository Onboarding (DECLARATIVE)

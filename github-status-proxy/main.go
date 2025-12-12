@@ -41,6 +41,7 @@ type WorkflowEvent struct {
 	FinishedAt  string            `json:"finishedAt,omitempty"`
 	Labels      map[string]string `json:"labels"`
 	Annotations map[string]string `json:"annotations"`
+	TargetURL   string            `json:"target_url,omitempty"` // URL to the workflow in Argo Workflows UI
 	// Status is intentionally left as raw JSON so we don't need a full struct.
 	Status any `json:"status"`
 }
@@ -55,7 +56,6 @@ var (
 	githubAppPrivateKey *rsa.PrivateKey
 	httpClient          *http.Client
 	debugLogging        bool
-	argoWorkflowsURL    string
 )
 
 func main() {
@@ -117,14 +117,6 @@ func loadConfig() error {
 	// Initialize HTTP client with timeout
 	httpClient = &http.Client{
 		Timeout: 30 * time.Second,
-	}
-
-	// Load Argo Workflows URL for creating target URLs in commit statuses
-	// If not set, uses a default placeholder
-	argoWorkflowsURL = os.Getenv("ARGO_WORKFLOWS_URL")
-	if argoWorkflowsURL == "" {
-		argoWorkflowsURL = "https://argo-workflows.example.com"
-		log.Printf("WARNING: ARGO_WORKFLOWS_URL not set, using default: %s", argoWorkflowsURL)
 	}
 
 	return nil
@@ -290,8 +282,8 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 	// Create description based on event type
 	description := fmt.Sprintf("Workflow %s", strings.ToLower(event.Phase))
 	
-	// Create target URL using configured Argo Workflows URL
-	targetURL := fmt.Sprintf("%s/workflows/%s/%s", argoWorkflowsURL, event.Namespace, event.Workflow)
+	// Use target URL from event payload (composed in the ClusterWorkflowTemplate)
+	targetURL := event.TargetURL
 
 	// Create status request from workflow event
 	statusReq := StatusRequest{
