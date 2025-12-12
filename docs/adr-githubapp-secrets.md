@@ -32,7 +32,7 @@ openssl rand -hex 20
 Adds to GitHub webhook “Secret”.  
 Platform mirrors it:
 ```bash
-kubectl -n argo-events create secret generic github-webhook-secret   --from-literal=token=<same-string>
+kubectl -n argo-events create secret generic github-webhook-secret --from-literal=token=<same-string>
 ```
 
 Referenced via:
@@ -72,5 +72,7 @@ spec:
 
 **References**
 - 🔗 [Argo CD — Private Repositories (GitHub App)](https://argo-cd.readthedocs.io/en/stable/user-guide/private-repositories)  
-- 🔗 [Argo CD — Notifications / GitHub Service](https://argo-cd.readthedocs.io/en/release-2.5/operator-manual/notifications/services/github)  
+- 🔗 [Argo CD — Notifications / GitHub Service](https://argo-cd.readthedocs.io/en/stable/operator-manual/notifications/services/github)  
 - 🔗 [Argo CD Discussion — Using GitHub App for Repo Access](https://github.com/argoproj/argo-cd/discussions/15641)
+
+> ℹ️ If you are using a different version of Argo CD, consult the documentation matching your installed version.

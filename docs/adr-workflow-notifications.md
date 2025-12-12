@@ -20,7 +20,7 @@ apiVersion: v1
 kind: ConfigMap
 metadata:
   name: workflow-notifications-cm
-  namespace: wf-bwalsh-nextflow-hello-project   # or wherever your workflows live
+  namespace: <your-namespace>   # replace with your workflow namespace
 data:
   # Service: webhook to github-status-proxy
   service.webhook.github-status-proxy: |
@@ -126,6 +126,7 @@ metadata:
     # add GitHub-related info so proxy can route
     repo-url: https://github.com/bwalsh/nextflow-hello-project.git
     tenant: research-team-1
+    git-sha: abcd1234
 spec:
   # ...
 ```
@@ -191,7 +192,7 @@ func (s *Server) handleWorkflow(w http.ResponseWriter, r *http.Request) {
   // You can either:
   //   - parse owner/repo from repoURL directly (what you’re already doing), or
   //   - use RepoRegistration lookup if you want installation_id from there.
-  owner, repo := parseGitHubRepoURL(repoURL)
+  owner, repo := parseRepoURL(repoURL)
 
   // Example: map workflow event → commit status state + description
   state := "pending"
@@ -222,7 +223,7 @@ func (s *Server) handleWorkflow(w http.ResponseWriter, r *http.Request) {
   //   - get installation ID (either from /installation API or from RepoRegistration)
   //   - mint token
   //   - post commit status
-  if err := s.postCommitStatus(owner, repo, sha, state, description, evt); err != nil {
+  if err := s.postCommitStatus(owner, repo, sha, state, description); err != nil {
     log.Printf("Failed to post commit status for workflow: %v", err)
     http.Error(w, "github error", http.StatusBadGateway)
     return
