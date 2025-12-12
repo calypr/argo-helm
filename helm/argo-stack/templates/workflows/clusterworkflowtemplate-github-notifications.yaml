@@ -21,7 +21,7 @@ spec:
       inputs:
         parameters:
           - name: event
-            description: "Event type: workflow-pending, workflow-succeeded, or workflow-failed"
+            description: "Event type: workflow-{phase} where phase is the workflow status phase (e.g., workflow-Succeeded, workflow-Failed)"
       http:
         url: http://github-status-proxy.{{ .Values.namespaces.argocd }}.svc.cluster.local/workflow
         method: POST

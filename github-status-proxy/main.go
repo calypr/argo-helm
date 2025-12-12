@@ -269,7 +269,12 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 			respondError(w, http.StatusBadRequest, "Missing both calypr.io/repo-url and calypr.io/repo labels")
 			return
 		}
-		// Assume repo name is in "owner/repo" format
+		// Validate repo name is in "owner/repo" format
+		if !strings.Contains(repoName, "/") {
+			respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid repo name format: %s (expected 'owner/repo')", repoName))
+			return
+		}
+		// Construct URL from repo name
 		repoURL = fmt.Sprintf("https://github.com/%s", repoName)
 		if debugLogging {
 			log.Printf("DEBUG: Constructed repo URL from repo name: %s", repoURL)
