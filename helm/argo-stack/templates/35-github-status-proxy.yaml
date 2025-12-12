@@ -46,7 +46,7 @@ spec:
           readOnly: true
       containers:
       - name: github-status-proxy
-        image: {{ .Values.githubStatusProxy.image }}
+        image: "{{ .Values.githubStatusProxy.image.repository }}:{{ .Values.githubStatusProxy.image.tag }}"
         imagePullPolicy: {{ .Values.githubStatusProxy.imagePullPolicy | default "IfNotPresent" }}
         env:
         - name: GITHUB_APP_ID

@@ -309,8 +309,10 @@ gitappCallback:
 
 githubStatusProxy:
   enabled: false
-  image: github-status-proxy:latest
-  imagePullPolicy: Never  # Use Never for kind development, Always for production registries
+  image:
+    repository: github-status-proxy
+    tag: latest
+    pullPolicy: IfNotPresent  
   replicas: 2
   namespace: argocd
   # GitHub App configuration
