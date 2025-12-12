@@ -1,0 +1,82 @@
+{{- /*
+ClusterRole and ClusterRoleBinding for accessing ClusterWorkflowTemplates
+This allows Argo Events sensors and workflow service accounts to reference
+ClusterWorkflowTemplates when submitting and executing workflows.
+See ADR 0003 for context on ClusterWorkflowTemplate-based notifications.
+*/ -}}
+---
+# ClusterRole for reading ClusterWorkflowTemplates
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: clusterworkflowtemplate-reader
+  labels:
+    app.kubernetes.io/name: argo-stack
+    app.kubernetes.io/part-of: argo-workflows
+    app.kubernetes.io/component: rbac
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources: ["clusterworkflowtemplates"]
+    verbs: ["get", "list", "watch"]
+
+---
+# ClusterRoleBinding for Argo Events sensor service account
+# This allows sensors to submit workflows that reference ClusterWorkflowTemplates
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: argo-events-clusterworkflowtemplate-reader
+  labels:
+    app.kubernetes.io/name: argo-stack
+    app.kubernetes.io/part-of: argo-workflows
+    app.kubernetes.io/component: rbac
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: clusterworkflowtemplate-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.events.github.sensorServiceAccount | default "default" }}
+    namespace: {{ .Values.namespaces.argoEvents | default "argo-events" }}
+
+{{- if .Values.repoRegistrations }}
+{{- range $reg := .Values.repoRegistrations }}
+{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+---
+# ClusterRoleBinding for workflow runner service account in tenant namespace: {{ $reg.name }}
+# This allows workflows to execute templates that reference ClusterWorkflowTemplates
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: wf-runner-clusterworkflowtemplate-{{ $reg.name }}
+  labels:
+    app.kubernetes.io/name: {{ $reg.name }}
+    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/component: rbac
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
+    repo-registration/name: {{ $reg.name | quote }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: clusterworkflowtemplate-reader
+subjects:
+  - kind: ServiceAccount
+    name: wf-runner
+    namespace: {{ $namespace }}
+{{- end }}
+{{- end }}
