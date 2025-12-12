@@ -10,7 +10,7 @@
 
 *A complete, production-ready Kubernetes GitOps and workflow automation stack with enterprise-grade authorization*
 
-[🚀 Quick Start](QUICKSTART.md) • [Features](#-features) • [Architecture](#-architecture) • [Contributing](#-contributing)
+[🚀 Quick Start](QUICKSTART.md) • [Overview](#-overview) • [Architecture](#-architecture) • [Contributing](#-contributing)
 
 </div>
 
@@ -22,6 +22,37 @@
 
 ## Use cases
 See [User Guide](docs/user-guide.md)
+
+```mermaid
+sequenceDiagram
+    autonumber
+
+    participant B as Bioinformatician
+    participant G as Git Repository
+    participant O as Calypr GitOps
+    participant S as Workflow Services
+    participant P as Portal Application
+
+    rect rgba(200, 220, 255, 0.35)
+        Note over O,P: Calypr Platform
+    end
+
+    B->>G: Commit new data<br/>and metadata updates
+    G-->>O: Trigger GitOps sync
+
+    rect rgba(200, 220, 255, 0.12)
+        O->>S: Apply updated configs<br/>and publish new data
+        S-->>O: Acknowledge deployment<br/>and updated records
+        O-->>G: Updated Git status
+
+        O->>P: Update portal manifests<br/>and reload content
+        P-->>B: Portal reflects<br/>latest validated data
+    end
+
+
+    Note over B,P: Git commits become the single source of truth,<br/>and all systems stay in sync automatically.
+
+```
 
 ---
 
@@ -38,38 +69,6 @@ This repository provides a **complete Kubernetes-native GitOps and workflow auto
 - **🔐 Authorization Adapter** - Enterprise-grade RBAC with OIDC integration
 - **🚪 NGINX Ingress** - Secure external access with per-request authorization
 - **🆕 Vault Integration** - Centralized secret management with HashiCorp Vault and External Secrets Operator
----
-
-## ✨ Features
-
-
-### 🔧 Core Components
-- **🤖 Self-Service Onboarding** - GitHub App-based repository registration via `RepoRegistration` CRD
-- **Argo Workflows** (v0.41.7) - Container-native workflow execution
-- **Argo CD** (v7.6.12) - GitOps continuous delivery
-- **Custom AuthZ Adapter** - Flask-based authorization service
-- **GitHub Status Proxy** - Self-service GitHub App integration for commit statuses
-- **Multi-tenant RBAC** - Namespace isolation and role-based access
-
-### 🔒 Security Features
-- **OIDC Integration** - Seamless authentication with Fence/Gen3
-- **Per-request Authorization** - Real-time access control
-- **Service Account Management** - Automated RBAC configuration
-- **Secure Artifact Storage** - S3-compatible with encryption support
-- **Vault Integration** - HashiCorp Vault + External Secrets Operator for centralized secret management
-
-### 🚀 Self-Service Features
-- **RepoRegistration CRD** - Self-service onboarding for GitHub repositories with automated webhook setup
-- **Per-Repository S3 Buckets** - Dedicated artifact and data storage with tenant isolation
-- **Automated Secret Management** - Vault-backed credentials via External Secrets Operator
-- **Fine-Grained Access Control** - Per-repository admin and read-only user management
-
-### 🌐 Infrastructure
-- **NGINX Ingress Ready** - Production-grade external access
-- **Namespace Isolation** - Clean multi-tenant architecture
-- **Health Monitoring** - Built-in health checks and observability
-- **One-click Teardown** - Clean uninstall capability
-
 ---
 
 ## 🏗 Architecture
