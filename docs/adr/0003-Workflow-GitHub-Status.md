@@ -87,6 +87,79 @@ type WorkflowEvent struct {
 }
 ```
 
+## Alternatives Considered
+
+
+A few important points to line up:
+
+---
+
+## 1. Kubernetes reality: ConfigMaps are namespace-scoped
+
+A `ConfigMap` lives in a single namespace:
+
+* A pod in `wf-tenant-a` **cannot mount** or `envFrom` a `ConfigMap` in `argo`.
+* There is no “global” `workflow-notifications-cm` that other namespaces can magically reference by name.
+
+So if your pattern relies on **pods** reading `workflow-notifications-cm`, you’re limited to:
+
+* **One shared namespace** for all workflows (single “argo” ns), or
+* **One CM per namespace**, created from a common source (Helm / ArgoCD).
+
+---
+
+## 2. Argo Workflows itself doesn’t have a built-in “notifications ConfigMap”
+
+Unlike Argo CD / Argo Rollouts, Argo Workflows today doesn’t have:
+
+* A special `workflow-notifications-cm` name that the controller watches, or
+* A `workflows.argoproj.io/notifications` feature documented like `notifications.argoproj.io` in Argo CD.
+
+The official docs for “Workflow notifications” basically say:
+
+* Use **exitHandlers** per workflow or via **default workflow spec**.
+* Or watch Workflow events with something like Argo Events / EventRouter and fan those out to Slack, webhooks, etc. ([Argo Workflows][1])
+
+So there’s no native concept of:
+
+> “Let workflows in any namespace refer to a single `workflow-notifications-cm` over there.”
+
+---
+
+## 3. Practical patterns to get what you want
+
+You still *can* centralize behavior – just not by cross-namespace ConfigMap reference. Common patterns:
+
+### Option A – One Argo Workflows namespace (simplest)
+
+If you’re okay collapsing workflows into a single namespace:
+
+* Run `workflow-controller` in e.g. `argo`.
+* All `Workflow` / `CronWorkflow` live in `argo`.
+* Your “notifications config” (whether CM + HTTP template, or just a ClusterWorkflowTemplate) lives in `argo`.
+* Every workflow uses the same **exit handler** / **template** to call `github-status-proxy`.
+
+Then you truly have “one source of truth” and no cross-ns config problems.
+
+---
+Option B – Multi-ns workflows, centralize via ClusterWorkflowTemplate
+
+If you want each tenant in its own namespace (which you do 🙂), the clean way to share logic is:
+
+> 🏆 🏆 🏆 That's what we did above with `ClusterWorkflowTemplate`. 👆 👆 👆
+
+---
+### Option C – Replicate a shared CM per namespace (GitOps)
+
+If you really like the **“notifications CM”** pattern:
+
+* Keep a single *authoritative* YAML for `workflow-notifications-cm` in Git.
+* Use Argo CD / Helm to **deploy that same CM into each workflow namespace** (e.g. `wf-tenant-a`, `wf-tenant-b`, …).
+* Your exit handlers or templates in each namespace read from the local CM.
+
+You still don’t *refer* cross-namespace, but the contents are identical and managed from one place.
+
+
 ## References
 
 - [Argo Workflows: ClusterWorkflowTemplate](https://argo-workflows.readthedocs.io/en/latest/cluster-workflow-templates/)
@@ -94,3 +167,5 @@ type WorkflowEvent struct {
 - [Argo Workflows: Workflow Lifecycle Hooks](https://argo-workflows.readthedocs.io/en/latest/lifecyclehook/)
 - [GitHub Issue #128](https://github.com/calypr/argo-helm/issues/128)
 - [ADR 0001: GitHub Status Proxy](0001-github-status-proxy-for-multi-tenant-github-apps.md)
+- ["Workflow Notifications - Argo Workflows - The workflow engine for Kubernetes"](https://argo-workflows.readthedocs.io/en/latest/workflow-notifications/) 
+
