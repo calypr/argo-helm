@@ -279,6 +279,7 @@ deploy-proxy: load-proxy-image
 		-n argocd --create-namespace \
 		--set githubStatusProxy.enabled=true \
 		--set githubStatusProxy.image=$(PROXY_IMAGE_FULL) \
+		--set githubStatusProxy.imagePullPolicy=Never \
 		--set githubStatusProxy.githubAppId=$(GITHUBHAPP_APP_ID) \
 		--set githubStatusProxy.privateKeySecret.name=github-app-private-key \
 		--set githubStatusProxy.privateKeySecret.key=private-key.pem \

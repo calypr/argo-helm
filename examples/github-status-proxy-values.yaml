@@ -26,7 +26,7 @@ githubStatusProxy:
   # Docker image configuration
   # For local development with kind:
   image: github-status-proxy:latest
-  imagePullPolicy: IfNotPresent
+  imagePullPolicy: Never  # Never pull from registry, only use local image
   # For production:
   # image: ghcr.io/calypr/github-status-proxy:v1.0.0
   # imagePullPolicy: Always

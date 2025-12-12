@@ -310,7 +310,7 @@ gitappCallback:
 githubStatusProxy:
   enabled: false
   image: github-status-proxy:latest
-  imagePullPolicy: IfNotPresent  # Use IfNotPresent for local development, Always for production
+  imagePullPolicy: Never  # Use Never for kind development, Always for production registries
   replicas: 2
   namespace: argocd
   # GitHub App configuration

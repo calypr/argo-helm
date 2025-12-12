@@ -106,7 +106,7 @@ githubStatusProxy:
   enabled: true
   image: github-status-proxy:latest  # For local development with kind
   # image: ghcr.io/calypr/github-status-proxy:v1.0.0  # For production
-  imagePullPolicy: IfNotPresent  # Use Always for production
+  imagePullPolicy: Never  # Use Never for kind, Always for production
   githubAppId: "123456"  # Same App ID
   replicas: 2
   privateKeySecret:
@@ -116,8 +116,10 @@ githubStatusProxy:
 ```
 
 **Image Configuration:**
-- **Development (local kind cluster):** Use `image: github-status-proxy:latest` with `imagePullPolicy: IfNotPresent` to use locally loaded images
+- **Development (local kind cluster):** Use `image: github-status-proxy:latest` with `imagePullPolicy: Never` to ensure Kubernetes only uses the locally loaded image
 - **Production:** Use a specific version tag like `ghcr.io/calypr/github-status-proxy:v1.0.0` with `imagePullPolicy: Always` to ensure latest updates
+
+**Important:** When using kind clusters, set `imagePullPolicy: Never` to prevent Kubernetes from attempting to pull the image from a registry. The `IfNotPresent` policy can still trigger pull attempts if the image metadata doesn't match exactly.
 
 ## Step 4: Deploy or Update the Helm Chart
 
