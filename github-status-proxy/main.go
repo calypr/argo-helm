@@ -374,19 +374,23 @@ func createCommitStatus(installationToken, owner, repo string, req *StatusReques
 func respondError(w http.ResponseWriter, statusCode int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(StatusResponse{
+	if err := json.NewEncoder(w).Encode(StatusResponse{
 		Success: false,
 		Message: message,
-	})
+	}); err != nil {
+		log.Printf("ERROR: failed to encode error response: %v", err)
+	}
 }
 
 func respondSuccess(w http.ResponseWriter, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(StatusResponse{
+	if err := json.NewEncoder(w).Encode(StatusResponse{
 		Success: true,
 		Message: message,
-	})
+	}); err != nil {
+		log.Printf("ERROR: failed to encode success response: %v", err)
+	}
 }
 
 // logIncomingRequest logs details of incoming HTTP requests when DEBUG logging is enabled
