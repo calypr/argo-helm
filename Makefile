@@ -1,8 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter github-status-proxy test-artifacts all minio minio-ls help
-.PHONY: build-proxy-binary build-proxy-image load-proxy-image deploy-proxy
-.PHONY: deps lint template validate kind ct adapter test-artifacts test-secrets test-artifact-repository-ref all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup vault-seed-github-app
-
+.PHONY: deps lint template validate kind ct adapter github-status-proxy test-artifacts all minio minio-ls help build-proxy-binary build-proxy-image load-proxy-image deploy-proxy test-secrets test-artifact-repository-ref minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup vault-seed-github-app
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
 S3_ACCESS_KEY_ID     ?= minioadmin
