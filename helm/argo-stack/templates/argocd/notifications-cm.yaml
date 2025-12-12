@@ -22,6 +22,9 @@ data:
   # Notification Templates
   # ============================================================================
 
+  {{- /* derive base URL once */ -}}
+  {{- $argocdUrl := .Values.notifications.argocdUrl | default "https://calypr-demo.ddns.net/applications" }}
+
   # Template for successful sync
   template.app-sync-succeeded: |
     webhook:
@@ -31,10 +34,10 @@ data:
         body: |
           {
             "repo_url": "{{`{{.app.spec.source.repoURL}}`}}",
-            "sha": "{{`{{.app.status.operationState.operation.sync.revision}}`}}",
+            "sha": "{{`{{.app.status.sync.revision}}`}}",
             "state": "success",
             "context": "argocd/{{`{{.app.metadata.name}}`}}",
-            "target_url": "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}",
+            "target_url": "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}",
             "description": "Application synced successfully"
           }
 
@@ -47,10 +50,10 @@ data:
         body: |
           {
             "repo_url": "{{`{{.app.spec.source.repoURL}}`}}",
-            "sha": "{{`{{.app.status.operationState.operation.sync.revision}}`}}",
+            "sha": "{{`{{.app.status.sync.revision}}`}}",
             "state": "failure",
             "context": "argocd/{{`{{.app.metadata.name}}`}}",
-            "target_url": "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}",
+            "target_url": "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}",
             "description": "Application sync failed"
           }
 
@@ -63,10 +66,10 @@ data:
         body: |
           {
             "repo_url": "{{`{{.app.spec.source.repoURL}}`}}",
-            "sha": "{{`{{.app.status.operationState.operation.sync.revision}}`}}",
+            "sha": "{{`{{.app.status.sync.revision}}`}}",
             "state": "pending",
             "context": "argocd/{{`{{.app.metadata.name}}`}}",
-            "target_url": "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}",
+            "target_url": "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}",
             "description": "Application sync in progress"
           }
 
@@ -79,10 +82,10 @@ data:
         body: |
           {
             "repo_url": "{{`{{.app.spec.source.repoURL}}`}}",
-            "sha": "{{`{{.app.status.operationState.operation.sync.revision}}`}}",
+            "sha": "{{`{{.app.status.sync.revision}}`}}",
             "state": "success",
             "context": "argocd/{{`{{.app.metadata.name}}`}}/deployed",
-            "target_url": "{{`{{.context.argocdUrl}}`}}/applications/{{`{{.app.metadata.name}}`}}",
+            "target_url": "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}",
             "description": "Application deployed successfully"
           }
 
@@ -127,3 +130,4 @@ data:
   #   - on-sync-failed
   #   - on-sync-running
 {{- end }}
+
