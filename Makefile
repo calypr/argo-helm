@@ -279,6 +279,7 @@ deploy-proxy: load-proxy-image
 		--set githubStatusProxy.enabled=true \
 		--set githubStatusProxy.image.repository=$(PROXY_IMAGE) \
 		--set githubStatusProxy.image.tag=$(PROXY_TAG) \
+		--set githubStatusProxy.image.pullPolicy=Never \
 		--set githubStatusProxy.githubAppId=$(GITHUBHAPP_APP_ID) \
 		--set githubStatusProxy.privateKeySecret.name=github-app-private-key \
 		--set githubStatusProxy.privateKeySecret.key=private-key.pem \
@@ -378,7 +379,6 @@ help:
 	@echo "  PROXY_TAG         - Docker image tag (default: latest)"
 	@echo "  GITHUB_APP_ID     - GitHub App ID for deployment"
 	@echo "  GITHUB_APP_PRIVATE_KEY_FILE - Path to GitHub App private key PEM file"
-all: lint template validate kind ct adapter test-artifacts
 
 # ============================================================================
 # Vault Development Targets (Helm-based in-cluster deployment)

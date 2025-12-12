@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"crypto/rsa"
 	"encoding/json"
@@ -413,12 +414,21 @@ func logIncomingRequest(r *http.Request) {
 	}
 	
 	// Read and log body (we need to restore it for later use)
+	// Limit body size to prevent memory exhaustion in debug mode
 	if r.Body != nil {
-		bodyBytes, err := io.ReadAll(r.Body)
+		const maxLogBodySize = 1 << 20 // 1MB
+		limitedReader := io.LimitReader(r.Body, maxLogBodySize+1)
+		bodyBytes, err := io.ReadAll(limitedReader)
 		if err == nil {
-			log.Printf("DEBUG: Body:\n%s", string(bodyBytes))
-			// Restore the body for the actual handler
-			r.Body = io.NopCloser(strings.NewReader(string(bodyBytes)))
+			if len(bodyBytes) > maxLogBodySize {
+				log.Printf("DEBUG: Body (truncated to %d bytes):\n%s", maxLogBodySize, string(bodyBytes[:maxLogBodySize]))
+				// Restore only what we read (truncated)
+				r.Body = io.NopCloser(bytes.NewReader(bodyBytes[:maxLogBodySize]))
+			} else {
+				log.Printf("DEBUG: Body:\n%s", string(bodyBytes))
+				// Restore the body for the actual handler
+				r.Body = io.NopCloser(bytes.NewReader(bodyBytes))
+			}
 		}
 	}
 	log.Printf("DEBUG: === End Incoming Request ===")
