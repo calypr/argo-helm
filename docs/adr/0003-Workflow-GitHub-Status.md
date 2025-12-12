@@ -26,8 +26,8 @@ sequenceDiagram
     participant GSP as github-status-proxy
     participant GH as GitHub
 
-    WF->>CWT: onExit notify-github
-    event=workflow-{phase}
+    WF->>CWT: onExit notify-github<br/>phase={phase}
+    CWT->>GSP: HTTP POST /workflow<br/>event=workflow-{phase}
     GSP->>GSP: Resolve installation via RepoRegistration
     GSP->>GH: Post commit status
     GH-->>User: Status visible on commit/PR
@@ -49,17 +49,18 @@ spec:
     - name: notify-github-status
       inputs:
         parameters:
-          - name: event
+          - name: phase
+            description: "Workflow status phase (e.g., Succeeded, Failed, Pending)"
       http:
         url: http://github-status-proxy.argocd.svc.cluster.local/workflow
         method: POST
         body: |
           {
             "kind": "workflow",
-            "event": "{{inputs.parameters.event}}",
+            "event": "workflow-{{inputs.parameters.phase}}",
             "workflowName": "{{workflow.name}}",
             "namespace": "{{workflow.namespace}}",
-            "phase": "{{workflow.status.phase}}",
+            "phase": "{{inputs.parameters.phase}}",
             "labels": {{toJson workflow.labels}},
             "annotations": {{toJson workflow.annotations}},
             "status": {{toJson workflow.status}},
@@ -68,6 +69,8 @@ spec:
           }
 
 ```
+
+**Implementation Note:** The template accepts a `phase` parameter (e.g., "Succeeded", "Failed") rather than a complete event name. This is because Argo Workflows doesn't support string concatenation in parameter values (e.g., `"workflow-{{workflow.status.phase}}"` cannot be resolved when passed as a parameter). Instead, the event name is constructed in the HTTP body as `"workflow-{{inputs.parameters.phase}}"`, which resolves correctly.
 
 ```go
 // WorkflowEvent describes the JSON payload sent by Argo Workflows notifications.

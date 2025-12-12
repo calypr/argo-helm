@@ -20,8 +20,8 @@ spec:
     - name: notify-github-status
       inputs:
         parameters:
-          - name: event
-            description: "Event type: workflow-{phase} where phase is the workflow status phase (e.g., workflow-Succeeded, workflow-Failed)"
+          - name: phase
+            description: "Workflow status phase (e.g., Succeeded, Failed, Pending)"
       http:
         url: http://github-status-proxy.{{ .Values.namespaces.argocd }}.svc.cluster.local/workflow
         method: POST
@@ -31,10 +31,10 @@ spec:
         body: |
           {
             "kind": "workflow",
-            "event": "{{`{{inputs.parameters.event}}`}}",
+            "event": "workflow-{{`{{inputs.parameters.phase}}`}}",
             "workflowName": "{{`{{workflow.name}}`}}",
             "namespace": "{{`{{workflow.namespace}}`}}",
-            "phase": "{{`{{workflow.status.phase}}`}}",
+            "phase": "{{`{{inputs.parameters.phase}}`}}",
             "labels": {{`{{toJson workflow.labels}}`}},
             "annotations": {{`{{toJson workflow.annotations}}`}},
             "status": {{`{{toJson workflow.status}}`}},
