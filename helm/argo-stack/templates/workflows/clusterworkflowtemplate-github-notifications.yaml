@@ -1,0 +1,45 @@
+{{- /*
+ClusterWorkflowTemplate for GitHub Status Notifications
+Provides a centralized notification mechanism for workflows across all namespaces.
+See ADR 0003 for design rationale.
+*/ -}}
+apiVersion: argoproj.io/v1alpha1
+kind: ClusterWorkflowTemplate
+metadata:
+  name: github-status-notify
+  labels:
+    app.kubernetes.io/name: argo-stack
+    app.kubernetes.io/part-of: argo-workflows
+    app.kubernetes.io/component: notifications
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
+    helm.sh/hook-delete-policy: before-hook-creation
+spec:
+  templates:
+    - name: notify-github-status
+      inputs:
+        parameters:
+          - name: event
+            description: "Event type: workflow-{phase} where phase is the workflow status phase (e.g., workflow-Succeeded, workflow-Failed)"
+      http:
+        url: http://github-status-proxy.{{ .Values.namespaces.argocd }}.svc.cluster.local/workflow
+        method: POST
+        headers:
+          - name: Content-Type
+            value: "application/json"
+        body: |
+          {
+            "kind": "workflow",
+            "event": "{{`{{inputs.parameters.event}}`}}",
+            "workflowName": "{{`{{workflow.name}}`}}",
+            "namespace": "{{`{{workflow.namespace}}`}}",
+            "phase": "{{`{{workflow.status.phase}}`}}",
+            "labels": {{`{{toJson workflow.labels}}`}},
+            "annotations": {{`{{toJson workflow.annotations}}`}},
+            "status": {{`{{toJson workflow.status}}`}},
+            "startedAt": "{{`{{workflow.status.startedAt}}`}}",
+            "finishedAt": "{{`{{workflow.status.finishedAt}}`}}",
+            "target_url": "{{ .Values.workflows.baseUrl }}/workflows/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}"
+          }
+
