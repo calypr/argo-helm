@@ -1,4 +1,4 @@
-# ADR: Workflow → GitHub Status Integration via ClusterWorkflowTemplate
+# ADR 0003: Workflow → GitHub Status Integration via ClusterWorkflowTemplate
 
 ## Status
 Accepted
@@ -26,8 +26,8 @@ sequenceDiagram
     participant GSP as github-status-proxy
     participant GH as GitHub
 
-    WF->>CWT: onExit notify-github<br/>event=workflow-{phase}
-    CWT->>GSP: HTTP POST /workflow<br/>JSON payload with repo-url, git-sha, tenant
+    WF->>CWT: onExit notify-github
+    event=workflow-{phase}
     GSP->>GSP: Resolve installation via RepoRegistration
     GSP->>GH: Post commit status
     GH-->>User: Status visible on commit/PR
@@ -62,9 +62,9 @@ spec:
             "phase": "{{workflow.status.phase}}",
             "labels": {{toJson workflow.labels}},
             "annotations": {{toJson workflow.annotations}},
-            "status": {{ toJson .workflow.status }},
-            "startedAt": "{{.workflow.status.startedAt}}",
-            "finishedAt": "{{.workflow.status.finishedAt}}"
+            "status": {{toJson workflow.status}},
+            "startedAt": "{{workflow.status.startedAt}}",
+            "finishedAt": "{{workflow.status.finishedAt}}"
           }
 
 ```
