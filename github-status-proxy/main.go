@@ -252,24 +252,29 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract repo URL from labels
-	repoURL, ok := event.Labels["calypr.io/repo-url"]
+	// Extract repo URL from annotations (preferred) or construct from labels
+	// Annotations are used because Kubernetes labels cannot contain : or / characters
+	repoURL, ok := event.Annotations["calypr.io/repo-url"]
 	if !ok || repoURL == "" {
-		// Fallback: try to construct from repo name
-		repoName, ok := event.Labels["calypr.io/repo"]
-		if !ok || repoName == "" {
-			respondError(w, http.StatusBadRequest, "Missing both calypr.io/repo-url and calypr.io/repo labels")
-			return
-		}
-		// Validate repo name is in "owner/repo" format
-		if !strings.Contains(repoName, "/") {
-			respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid repo name format: %s (expected 'owner/repo')", repoName))
-			return
-		}
-		// Construct URL from repo name
-		repoURL = fmt.Sprintf("https://github.com/%s", repoName)
-		if debugLogging {
-			log.Printf("DEBUG: Constructed repo URL from repo name: %s", repoURL)
+		// Fallback: try labels (for backward compatibility)
+		repoURL, ok = event.Labels["calypr.io/repo-url"]
+		if !ok || repoURL == "" {
+			// Fallback: construct from repo name label
+			repoName, ok := event.Labels["calypr.io/repo"]
+			if !ok || repoName == "" {
+				respondError(w, http.StatusBadRequest, "Missing repo URL in annotations and calypr.io/repo label")
+				return
+			}
+			// Validate repo name is in "owner/repo" format
+			if !strings.Contains(repoName, "/") {
+				respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid repo name format: %s (expected 'owner/repo')", repoName))
+				return
+			}
+			// Construct URL from repo name
+			repoURL = fmt.Sprintf("https://github.com/%s", repoName)
+			if debugLogging {
+				log.Printf("DEBUG: Constructed repo URL from repo name: %s", repoURL)
+			}
 		}
 	}
 
