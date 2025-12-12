@@ -1,6 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter test-artifacts test-secrets test-artifact-repository-ref all minio minio-ls minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup vault-seed-github-app
-
+.PHONY: deps lint template validate kind ct adapter github-status-proxy test-artifacts all minio minio-ls help build-proxy-binary build-proxy-image load-proxy-image deploy-proxy test-secrets test-artifact-repository-ref minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup vault-seed-github-app
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
 S3_ACCESS_KEY_ID     ?= minioadmin
@@ -9,6 +8,10 @@ S3_BUCKET            ?= argo-artifacts
 S3_REGION            ?= us-east-1
 S3_HOSTNAME          ?= minio.minio-system.svc.cluster.local:9000
 
+# GitHub Status Proxy image configuration
+PROXY_IMAGE          ?= github-status-proxy
+PROXY_TAG            ?= latest
+PROXY_IMAGE_FULL     := $(PROXY_IMAGE):$(PROXY_TAG)
 # Vault configuration for local development (in-cluster deployment)
 VAULT_TOKEN          ?= root
 
@@ -77,7 +80,13 @@ template: check-vars deps
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
 		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
-		--set ingress={} \
+		--set-string githubStatusProxy.enabled=true \
+		--set-string githubStatusProxy.image.repository=$(PROXY_IMAGE) \
+		--set-string githubStatusProxy.image.tag=$(PROXY_TAG) \
+		--set githubStatusProxy.githubAppId="${GITHUBHAPP_APP_ID}" \
+		--set githubStatusProxy.privateKeySecret.name="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
+		--set githubStatusProxy.privateKeySecret.key=privateKey \
+		--set githubStatusProxy.logLevel="DEBUG" \
 		-f - \
 		-f helm/argo-stack/admin-values.yaml \
 		--namespace argocd > rendered.yaml
@@ -188,6 +197,13 @@ argo-stack:
 		--set-string githubApp.privateKeySecretName="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set-string githubApp.privateKeyVaultPath="${GITHUBHAPP_PRIVATE_KEY_VAULT_PATH}" \
 		--set-string landingPage.image.tag="${LANDING_PAGE_IMAGE_TAG}" \
+		--set githubStatusProxy.enabled=true \
+		--set githubStatusProxy.image.repository=$(PROXY_IMAGE) \
+		--set githubStatusProxy.image.tag=$(PROXY_TAG) \
+		--set githubStatusProxy.githubAppId="${GITHUBHAPP_APP_ID}" \
+		--set githubStatusProxy.privateKeySecret.name="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
+		--set githubStatusProxy.privateKeySecret.key=privateKey \
+		--set githubStatusProxy.logLevel="DEBUG" \
 		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
@@ -227,6 +243,50 @@ ports:
 
 adapter:
 	cd authz-adapter && python3 -m pip install -r requirements.txt pytest && pytest -q
+
+github-status-proxy:
+	cd github-status-proxy && go test -v ./...
+
+# Build the GitHub Status Proxy binary
+build-proxy-binary:
+	@echo "🔨 Building GitHub Status Proxy binary..."
+	cd github-status-proxy && CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -a -installsuffix cgo -o github-status-proxy .
+	@echo "✅ Binary built: github-status-proxy/github-status-proxy"
+
+# Build the GitHub Status Proxy Docker image
+build-proxy-image: build-proxy-binary
+	@echo "🐳 Building GitHub Status Proxy Docker image..."
+	docker build -t $(PROXY_IMAGE_FULL) github-status-proxy/
+	@echo "✅ Image built: $(PROXY_IMAGE_FULL)"
+
+# Load the proxy image into kind cluster
+load-proxy-image: build-proxy-image
+	@echo "📦 Loading GitHub Status Proxy image into kind cluster..."
+	@kind load docker-image $(PROXY_IMAGE_FULL) --name kind || (echo "❌ Failed to load image. Is kind cluster running?" && exit 1)
+	docker exec -it kind-control-plane crictl images | grep $(PROXY_IMAGE)
+	@echo "✅ Image loaded into kind cluster"
+
+# Deploy GitHub Status Proxy to the cluster
+deploy-proxy: load-proxy-image
+	@echo "🚀 Deploying GitHub Status Proxy..."
+	@echo "📝 Creating secret for GitHub App credentials..."
+	@kubectl create secret generic github-app-private-key \
+		--from-file=private-key.pem=$(GITHUBHAPP_PRIVATE_KEY_FILE_PATH) \
+		-n argocd --dry-run=client -o yaml | kubectl apply -f -
+	@echo "📝 Deploying GitHub Status Proxy with Helm..."
+	helm upgrade --install argo-stack ./helm/argo-stack \
+		-n argocd --create-namespace \
+		--set githubStatusProxy.enabled=true \
+		--set githubStatusProxy.image.repository=$(PROXY_IMAGE) \
+		--set githubStatusProxy.image.tag=$(PROXY_TAG) \
+		--set githubStatusProxy.image.pullPolicy=Never \
+		--set githubStatusProxy.githubAppId=$(GITHUBHAPP_APP_ID) \
+		--set githubStatusProxy.privateKeySecret.name=github-app-private-key \
+		--set githubStatusProxy.privateKeySecret.key=private-key.pem \
+		--wait
+	@echo "✅ GitHub Status Proxy deployed successfully"
+	@echo "   Check status: kubectl get pods -n argocd -l app=github-status-proxy"
+	@echo "   View logs: kubectl logs -n argocd -l app=github-status-proxy"
 
 test-artifacts:
 	./test-per-app-artifacts.sh
@@ -278,7 +338,47 @@ password:
 login:
 	argocd login localhost:8080 --skip-test-tls --insecure --name admin --password `kubectl get secret argocd-initial-admin-secret -o jsonpath="{.data.password}"  -n argocd | base64 -d`
 
-all: lint template validate kind ct adapter test-artifacts
+all: lint template validate kind ct adapter github-status-proxy test-artifacts
+
+# Display help information
+help:
+	@echo "📋 Argo Stack Makefile Targets"
+	@echo ""
+	@echo "🔧 Setup & Dependencies:"
+	@echo "  deps              - Add Helm repositories and build dependencies"
+	@echo "  kind              - Create a new kind cluster"
+	@echo "  bump-limits       - Raise system limits in kind nodes"
+	@echo "  minio             - Install MinIO for artifact storage"
+	@echo ""
+	@echo "🏗️  Build & Test:"
+	@echo "  lint              - Lint Helm charts"
+	@echo "  template          - Render Helm templates"
+	@echo "  validate          - Validate rendered templates with kubeconform"
+	@echo "  adapter           - Run authz-adapter tests"
+	@echo "  github-status-proxy - Run github-status-proxy tests"
+	@echo "  test-artifacts    - Test artifact configurations"
+	@echo ""
+	@echo "🐳 GitHub Status Proxy (Docker):"
+	@echo "  build-proxy-image - Build the GitHub Status Proxy Docker image"
+	@echo "  load-proxy-image  - Build and load image into kind cluster"
+	@echo "  deploy-proxy      - Build, load, and deploy proxy to cluster"
+	@echo "                      Requires: GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY_FILE"
+	@echo ""
+	@echo "🚀 Deployment:"
+	@echo "  deploy            - Full deployment to kind cluster"
+	@echo "  ct                - Run chart-testing lint and install"
+	@echo ""
+	@echo "🔍 Utilities:"
+	@echo "  password          - Get ArgoCD admin password"
+	@echo "  login             - Login to ArgoCD CLI"
+	@echo "  minio-ls          - List files in MinIO bucket"
+	@echo "  show-limits       - Show current system limits"
+	@echo ""
+	@echo "📦 Variables:"
+	@echo "  PROXY_IMAGE       - Docker image name (default: ghcr.io/calypr/github-status-proxy)"
+	@echo "  PROXY_TAG         - Docker image tag (default: latest)"
+	@echo "  GITHUB_APP_ID     - GitHub App ID for deployment"
+	@echo "  GITHUB_APP_PRIVATE_KEY_FILE - Path to GitHub App private key PEM file"
 
 # ============================================================================
 # Vault Development Targets (Helm-based in-cluster deployment)
@@ -497,4 +597,5 @@ docker-gitapp-callback:
 	docker exec -it kind-control-plane crictl images | grep gitapp-callback
 	@echo "✅ loaded docker gitapp-callback"
 
-docker-install: docker-runner docker-authz docker-landing-page docker-gitapp-callback
+docker-install: docker-runner docker-authz docker-landing-page docker-gitapp-callback load-proxy-image
+

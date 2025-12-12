@@ -1,0 +1,130 @@
+# Example values file for enabling GitHub Status Proxy
+# This demonstrates a complete setup with GitHub App integration and Vault
+
+# ==============================================================================
+# Option 1: With Vault/External Secrets (Recommended for Production)
+# ==============================================================================
+
+# GitHub App configuration (creates ExternalSecret from Vault)
+githubApp:
+  enabled: true
+  appId: "123456"  # REPLACE with your GitHub App ID
+  installationId: "789012"  # REPLACE with your installation ID
+  privateKeySecretName: github-app-private-key
+  privateKeyVaultPath: "kv/argo/argocd/github-app"  # Path in Vault
+
+# GitHub Status Proxy (reuses the secret created above)
+githubStatusProxy:
+  enabled: true
+  
+  # GitHub App ID - same as githubApp.appId above
+  githubAppId: "123456"  # REPLACE with your actual App ID
+  
+  # Number of replicas for high availability
+  replicas: 2
+  
+  # Docker image configuration
+  # For local development with kind:
+  image: github-status-proxy:latest
+  imagePullPolicy: Never  # Never pull from registry, only use local image
+  # For production:
+  # image: ghcr.io/calypr/github-status-proxy:v1.0.0
+  # imagePullPolicy: Always
+  
+  # Namespace where the proxy will run (should match argocd namespace)
+  namespace: argocd
+  
+  # Secret reference - uses the same secret created by githubApp ExternalSecret
+  privateKeySecret:
+    name: github-app-private-key  # Same as githubApp.privateKeySecretName
+    key: privateKey  # Key name created by ExternalSecret
+  
+  # Log level: INFO or DEBUG
+  # DEBUG provides detailed logging of HTTP requests/responses
+  logLevel: "INFO"
+
+# Vault configuration (required for ExternalSecrets)
+vault:
+  enabled: true
+  address: "http://vault.vault.svc.cluster.local:8200"
+  # Additional vault auth configuration...
+
+# External Secrets configuration
+externalSecrets:
+  enabled: true
+  # Additional ESO configuration...
+
+# ==============================================================================
+# Option 2: Manual Secret (Development/Testing - without Vault)
+# ==============================================================================
+# If not using Vault, comment out the githubApp and vault sections above,
+# and create the secret manually:
+#
+# kubectl create secret generic github-app-private-key \
+#   --from-file=privateKey=/path/to/your/github-app-key.pem \
+#   -n argocd
+#
+# Then use this simpler configuration:
+#
+# githubStatusProxy:
+#   enabled: true
+#   githubAppId: "123456"
+#   privateKeySecret:
+#     name: github-app-private-key
+#     key: privateKey
+
+# Standard Argo CD configuration
+argo-cd:
+  namespaceOverride: argocd
+  configs:
+    secret:
+      create: true
+      extra: {}
+
+# Argo Workflows configuration
+argo-workflows:
+  server:
+    enabled: true
+    secure: false
+  namespaceOverride: argo-workflows
+
+# Namespaces
+namespaces:
+  argo: argo-workflows
+  argocd: argocd
+  security: security
+
+# Authorization Adapter (optional)
+authzAdapter:
+  enabled: false
+
+# Example Application - demonstrates usage with GitHub repo
+# IMPORTANT: Applications must subscribe to notifications explicitly
+applications:
+  - name: my-github-app
+    project: default
+    repoURL: https://github.com/myorg/myrepo  # REPLACE with your repo
+    targetRevision: main
+    path: "."
+    destination:
+      server: https://kubernetes.default.svc
+      namespace: default
+    syncPolicy:
+      automated:
+        prune: true
+        selfHeal: true
+    # REQUIRED: Subscribe to GitHub status notifications
+    annotations:
+      notifications.argoproj.io/subscribe.on-sync-succeeded.github-status-proxy: ""
+      notifications.argoproj.io/subscribe.on-sync-failed.github-status-proxy: ""
+      notifications.argoproj.io/subscribe.on-sync-running.github-status-proxy: ""
+
+# After deploying with these values:
+# 1. Install the GitHub App on your repository (myorg/myrepo)
+# 2. Ensure your Application has the notification subscription annotations (shown above)
+# 3. Push a commit or trigger a sync
+# 4. Check the commit on GitHub - you should see a status from "argocd/my-github-app"
+#
+# Note: Without the subscription annotations, notifications will NOT be sent.
+# To enable notifications for ALL applications automatically, uncomment the
+# defaultTriggers section in the argocd-notifications-cm ConfigMap.

@@ -197,6 +197,8 @@ argo-cd:
       # server.rootpath: "/applications"
   notifications:
     enabled: true
+    cm:
+      create: false  # don't create default configmap, we will override settings below
 
 # ============================================================================
 # Authorization Adapter Settings (Arborist Integration)
@@ -300,6 +302,32 @@ gitappCallback:
     storageClass: ""
     # Storage size
     size: "10Mi" # Requests 10 Megabytes of storage
+
+# ============================================================================
+# GitHub Status Proxy Settings
+# ============================================================================
+
+githubStatusProxy:
+  enabled: false
+  image:
+    repository: github-status-proxy
+    tag: latest
+    pullPolicy: IfNotPresent  
+  replicas: 2
+  namespace: argocd
+  # GitHub App configuration
+  # The App ID can be found in your GitHub App settings
+  githubAppId: ""
+  # Reference to a secret containing the GitHub App private key
+  # This should typically reference the same secret created by the githubApp ExternalSecret
+  # When using vault/external-secrets: set githubApp.privateKeyVaultPath and this will
+  # automatically reference the secret created by externalsecret-github-app.yaml
+  privateKeySecret:
+    name: github-app-private-key
+    key: privateKey  # Key name in the secret (matches ExternalSecret output)
+  # Log level: INFO or DEBUG
+  # DEBUG will log incoming/outgoing HTTP requests and responses
+  logLevel: "INFO"
 
 # ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )
@@ -643,6 +671,8 @@ githubApp:
 notifications:
   # Enable Argo CD Notifications controller
   enabled: true
+  cm:
+    create: false  # don't create default configmap, we will override settings below
   # for status templates
   argocdUrl: https://calypr-demo.ddns.net/applications
   # turn on debugging
