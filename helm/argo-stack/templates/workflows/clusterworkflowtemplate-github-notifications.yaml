@@ -38,8 +38,6 @@ spec:
             "labels": {{`{{toJson workflow.labels}}`}},
             "annotations": {{`{{toJson workflow.annotations}}`}},
             "status": {{`{{toJson workflow.status}}`}},
-            "startedAt": "{{`{{workflow.status.startedAt}}`}}",
-            "finishedAt": "{{`{{workflow.status.finishedAt}}`}}",
             "target_url": "{{ .Values.workflows.baseUrl }}/workflows/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}"
           }
 
