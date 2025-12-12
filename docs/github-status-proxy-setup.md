@@ -161,7 +161,7 @@ For each repository you want to integrate with Argo CD:
 
 ## Step 7: Create Argo CD Applications
 
-Create Argo CD Applications that point to your GitHub repositories:
+Create Argo CD Applications that point to your GitHub repositories. **Important**: You must add the `notifications.argoproj.io/subscribe` annotation to enable notifications:
 
 ```yaml
 apiVersion: argoproj.io/v1alpha1
@@ -169,6 +169,11 @@ kind: Application
 metadata:
   name: my-app
   namespace: argocd
+  annotations:
+    # Enable notifications for this application
+    notifications.argoproj.io/subscribe.on-sync-succeeded.github-status-proxy: ""
+    notifications.argoproj.io/subscribe.on-sync-failed.github-status-proxy: ""
+    notifications.argoproj.io/subscribe.on-sync-running.github-status-proxy: ""
 spec:
   project: default
   source:
@@ -182,6 +187,19 @@ spec:
     automated:
       prune: true
       selfHeal: true
+```
+
+**Alternative: Using defaultTriggers** (commented out by default in the ConfigMap)
+
+If you want ALL applications to automatically send notifications without needing per-app annotations, uncomment the `defaultTriggers` section in the `argocd-notifications-cm` ConfigMap:
+
+```yaml
+# This is commented out by default to avoid unintended notifications
+# Uncomment to enable notifications for all applications
+# defaultTriggers: |
+#   - on-sync-succeeded
+#   - on-sync-failed
+#   - on-sync-running
 ```
 
 ## Step 8: Verify Commit Statuses
@@ -242,6 +260,46 @@ The following triggers are enabled by default:
 - `on-deployed`: Triggers when sync succeeds and app is healthy
 
 ## Troubleshooting
+
+### Notifications not being sent ("when condition evaluates to false")
+
+If you see in the argocd-notifications-controller logs:
+```
+level=debug msg="The OncePer condition will not be evaluated since the when condition evaluates to false"
+level=info msg="Trigger on-sync-succeeded result: [...] false"
+```
+
+This means **the application is not subscribed to notifications**. To fix:
+
+1. **Add subscription annotations to your Application:**
+   ```yaml
+   apiVersion: argoproj.io/v1alpha1
+   kind: Application
+   metadata:
+     name: my-app
+     namespace: argocd
+     annotations:
+       notifications.argoproj.io/subscribe.on-sync-succeeded.github-status-proxy: ""
+       notifications.argoproj.io/subscribe.on-sync-failed.github-status-proxy: ""
+       notifications.argoproj.io/subscribe.on-sync-running.github-status-proxy: ""
+   spec:
+     # ... rest of spec
+   ```
+
+2. **OR enable defaultTriggers** (sends notifications for ALL applications):
+   - Edit the `argocd-notifications-cm` ConfigMap
+   - Uncomment the `defaultTriggers` section:
+     ```yaml
+     defaultTriggers: |
+       - on-sync-succeeded
+       - on-sync-failed
+       - on-sync-running
+     ```
+
+3. **Trigger a sync** to test:
+   ```bash
+   argocd app sync my-app
+   ```
 
 ### Status not appearing on GitHub
 

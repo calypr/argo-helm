@@ -90,29 +90,36 @@ data:
   # Triggers - When to send notifications
   # ============================================================================
   trigger.on-sync-succeeded: |
-    - when: app != nil && app.status != nil && app.status.operationState != nil && app.status.operationState.phase in ['Succeeded']
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Succeeded']
       send: [app-sync-succeeded]
 
   trigger.on-sync-failed: |
-    - when: app != nil && app.status != nil && app.status.operationState != nil && app.status.operationState.phase in ['Error', 'Failed']
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Error', 'Failed']
       send: [app-sync-failed]
 
   trigger.on-sync-running: |
-    - when: app != nil && app.status != nil && app.status.operationState != nil && app.status.operationState.phase in ['Running']
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Running']
       send: [app-sync-running]
 
   trigger.on-deployed: |
-    - when: app != nil && app.status != nil && app.status.operationState != nil && app.status.operationState.phase in ['Succeeded'] and app.status.health.status == 'Healthy'
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Succeeded'] && app.status.health.status == 'Healthy'
       send: [app-deployed]
 
   # ============================================================================
   # Default Subscriptions
   # ============================================================================
-  # Apply these triggers to all applications by default
-  # Note: on-sync-running may be noisy for long-running syncs.
-  # Remove it from defaultTriggers if you want to reduce notification volume.
-  defaultTriggers: |
-    - on-sync-succeeded
-    - on-sync-failed
-    - on-sync-running
+  # Apply these triggers to all applications by default.
+  # IMPORTANT: This is commented out by default to prevent unintended notifications.
+  # Uncomment ONLY if you want ALL applications to automatically send GitHub statuses
+  # without requiring per-application subscription annotations.
+  #
+  # Without this, applications must explicitly subscribe using annotations like:
+  #   annotations:
+  #     notifications.argoproj.io/subscribe.on-sync-succeeded.github-status-proxy: ""
+  #     notifications.argoproj.io/subscribe.on-sync-failed.github-status-proxy: ""
+  #
+  # defaultTriggers: |
+  #   - on-sync-succeeded
+  #   - on-sync-failed
+  #   - on-sync-running
 {{- end }}

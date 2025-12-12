@@ -99,6 +99,7 @@ authzAdapter:
   enabled: false
 
 # Example Application - demonstrates usage with GitHub repo
+# IMPORTANT: Applications must subscribe to notifications explicitly
 applications:
   - name: my-github-app
     project: default
@@ -112,8 +113,18 @@ applications:
       automated:
         prune: true
         selfHeal: true
+    # REQUIRED: Subscribe to GitHub status notifications
+    annotations:
+      notifications.argoproj.io/subscribe.on-sync-succeeded.github-status-proxy: ""
+      notifications.argoproj.io/subscribe.on-sync-failed.github-status-proxy: ""
+      notifications.argoproj.io/subscribe.on-sync-running.github-status-proxy: ""
 
 # After deploying with these values:
 # 1. Install the GitHub App on your repository (myorg/myrepo)
-# 2. Push a commit or trigger a sync
-# 3. Check the commit on GitHub - you should see a status from "argocd/my-github-app"
+# 2. Ensure your Application has the notification subscription annotations (shown above)
+# 3. Push a commit or trigger a sync
+# 4. Check the commit on GitHub - you should see a status from "argocd/my-github-app"
+#
+# Note: Without the subscription annotations, notifications will NOT be sent.
+# To enable notifications for ALL applications automatically, uncomment the
+# defaultTriggers section in the argocd-notifications-cm ConfigMap.
