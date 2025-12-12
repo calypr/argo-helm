@@ -251,17 +251,21 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract repo identifier from labels
-	repoName, ok := event.Labels["calypr.io/repo"]
-	if !ok || repoName == "" {
-		respondError(w, http.StatusBadRequest, "Missing or empty calypr.io/repo label")
-		return
+	// Extract repo URL from labels
+	repoURL, ok := event.Labels["calypr.io/repo-url"]
+	if !ok || repoURL == "" {
+		// Fallback: try to construct from repo name
+		repoName, ok := event.Labels["calypr.io/repo"]
+		if !ok || repoName == "" {
+			respondError(w, http.StatusBadRequest, "Missing both calypr.io/repo-url and calypr.io/repo labels")
+			return
+		}
+		// Assume repo name is in "owner/repo" format
+		repoURL = fmt.Sprintf("https://github.com/%s", repoName)
+		if debugLogging {
+			log.Printf("DEBUG: Constructed repo URL from repo name: %s", repoURL)
+		}
 	}
-
-	// Look up repo URL from workflow parameters or annotations
-	// For now, we'll construct it from the repo name
-	// TODO: Consider getting the actual repo URL from workflow parameters
-	repoURL := fmt.Sprintf("https://github.com/%s", repoName)
 
 	// Map workflow phase to GitHub status state
 	state := mapWorkflowPhaseToGitHubState(event.Phase)

@@ -82,6 +82,7 @@ spec:
         labels:
           calypr.io/commit-sha: "{{`{{workflow.parameters.commit-sha}}`}}"
           calypr.io/repo: {{ $repoName }}
+          calypr.io/repo-url: {{ $reg.repoUrl | quote }}
         annotations:
           workflows.argoproj.io/description: |
             Run a Nextflow pipeline from a Git repo using S3-backed
