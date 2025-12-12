@@ -41,7 +41,7 @@ type WorkflowEvent struct {
 	FinishedAt  string            `json:"finishedAt,omitempty"`
 	Labels      map[string]string `json:"labels"`
 	Annotations map[string]string `json:"annotations"`
-	TargetURL   string            `json:"target_url,omitempty"` // URL to the workflow in Argo Workflows UI
+	TargetURL   string            `json:"target_url,omitempty"` // URL to the workflow in Argo Workflows UI (optional, composed in template)
 	// Status is intentionally left as raw JSON so we don't need a full struct.
 	Status any `json:"status"`
 }
@@ -283,7 +283,11 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 	description := fmt.Sprintf("Workflow %s", strings.ToLower(event.Phase))
 	
 	// Use target URL from event payload (composed in the ClusterWorkflowTemplate)
+	// If empty, the GitHub status will be created without a link to the workflow UI
 	targetURL := event.TargetURL
+	if targetURL == "" && debugLogging {
+		log.Printf("DEBUG: target_url is empty in workflow event, status will not have a link to workflow UI")
+	}
 
 	// Create status request from workflow event
 	statusReq := StatusRequest{
