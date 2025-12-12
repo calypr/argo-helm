@@ -55,6 +55,7 @@ var (
 	githubAppPrivateKey *rsa.PrivateKey
 	httpClient          *http.Client
 	debugLogging        bool
+	argoWorkflowsURL    string
 )
 
 func main() {
@@ -116,6 +117,14 @@ func loadConfig() error {
 	// Initialize HTTP client with timeout
 	httpClient = &http.Client{
 		Timeout: 30 * time.Second,
+	}
+
+	// Load Argo Workflows URL for creating target URLs in commit statuses
+	// If not set, uses a default placeholder
+	argoWorkflowsURL = os.Getenv("ARGO_WORKFLOWS_URL")
+	if argoWorkflowsURL == "" {
+		argoWorkflowsURL = "https://argo-workflows.example.com"
+		log.Printf("WARNING: ARGO_WORKFLOWS_URL not set, using default: %s", argoWorkflowsURL)
 	}
 
 	return nil
@@ -276,8 +285,8 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 	// Create description based on event type
 	description := fmt.Sprintf("Workflow %s", strings.ToLower(event.Phase))
 	
-	// Create target URL (TODO: make this configurable)
-	targetURL := fmt.Sprintf("https://argo-workflows.example.com/workflows/%s/%s", event.Namespace, event.Workflow)
+	// Create target URL using configured Argo Workflows URL
+	targetURL := fmt.Sprintf("%s/workflows/%s/%s", argoWorkflowsURL, event.Namespace, event.Workflow)
 
 	// Create status request from workflow event
 	statusReq := StatusRequest{

@@ -41,3 +41,4 @@ spec:
             "startedAt": "{{`{{workflow.status.startedAt}}`}}",
             "finishedAt": "{{`{{workflow.status.finishedAt}}`}}"
           }
+
