@@ -86,3 +86,11 @@ type WorkflowEvent struct {
 	Status any `json:"status"`
 }
 ```
+
+## References
+
+- [Argo Workflows: ClusterWorkflowTemplate](https://argo-workflows.readthedocs.io/en/latest/cluster-workflow-templates/)
+- [Argo Workflows: HTTP Template](https://argo-workflows.readthedocs.io/en/latest/http-template/)
+- [Argo Workflows: Workflow Lifecycle Hooks](https://argo-workflows.readthedocs.io/en/latest/lifecyclehook/)
+- [GitHub Issue #128](https://github.com/calypr/argo-helm/issues/128)
+- [ADR 0001: GitHub Status Proxy](0001-github-status-proxy-for-multi-tenant-github-apps.md)
