@@ -23,16 +23,16 @@ metadata:
     {{- end }}
     {{- if and $.Values.notifications.enabled $.Values.notifications.github.enabled $.Values.notifications.defaultSubscriptions.autoSubscribe }}
     {{- if $.Values.notifications.triggers.onSyncSucceeded }}
-    notifications.argoproj.io/subscribe.on-sync-succeeded.github: ""
+    notifications.argoproj.io/subscribe.on-sync-succeeded.github-status-proxy: ""
     {{- end }}
     {{- if $.Values.notifications.triggers.onSyncFailed }}
-    notifications.argoproj.io/subscribe.on-sync-failed.github: ""
+    notifications.argoproj.io/subscribe.on-sync-failed.github-status-proxy: ""
     {{- end }}
     {{- if $.Values.notifications.triggers.onSyncRunning }}
-    notifications.argoproj.io/subscribe.on-sync-running.github: ""
+    notifications.argoproj.io/subscribe.on-sync-running.github-status-proxy: ""
     {{- end }}
     {{- if $.Values.notifications.triggers.onHealthDegraded }}
-    notifications.argoproj.io/subscribe.on-health-degraded.github: ""
+    notifications.argoproj.io/subscribe.on-health-degraded.github-status-proxy: ""
     {{- end }}
     {{- end }}    
 spec:
