@@ -74,8 +74,8 @@ spec:
               clusterScope: true
             arguments:
               parameters:
-                - name: event
-                  value: "workflow-{{`{{workflow.status.phase}}`}}"
+                - name: phase
+                  value: "{{`{{workflow.status.phase}}`}}"
     
     - name: run-nextflow
       metadata:
