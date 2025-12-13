@@ -60,7 +60,7 @@ spec:
             "labels": {{toJson workflow.labels}},
             "annotations": {{toJson workflow.annotations}},
             "status": {{toJson workflow.status}},
-            "target_url": "https://argo.example.com/workflows/{{workflow.namespace}}/{{workflow.name}}"
+            "target_url": "https://<ARGO_WORKFLOWS_BASE_URL>/workflows/{{workflow.namespace}}/{{workflow.name}}"
           }
 
 ```
