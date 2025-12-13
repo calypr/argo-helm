@@ -69,7 +69,7 @@ spec:
     # at workflow submission time. workflow.status is only available at exit time.
     - name: notify-github-exit
       http:
-        url: http://github-status-proxy.{{ .Values.namespaces.argocd }}.svc.cluster.local/workflow
+        url: http://github-status-proxy.{{ $.Values.namespaces.argocd }}.svc.cluster.local/workflow
         method: POST
         headers:
           - name: Content-Type
@@ -84,7 +84,7 @@ spec:
             "labels": {{`{{toJson workflow.labels}}`}},
             "annotations": {{`{{toJson workflow.annotations}}`}},
             "status": {{`{{toJson workflow.status}}`}},
-            "target_url": "{{ .Values.workflows.baseUrl }}/workflows/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}"
+            "target_url": "{{ $.Values.workflows.baseUrl }}/workflows/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}"
           }
     
     - name: run-nextflow
