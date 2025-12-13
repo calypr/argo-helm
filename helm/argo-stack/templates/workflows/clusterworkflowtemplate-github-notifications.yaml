@@ -22,9 +22,17 @@ metadata:
 spec:
   templates:
     - name: notify-github-status
-      # Reference workflow status/metadata directly so Argo resolves the values
-      # at exit-handler execution time instead of submission time. See Argo's
-      # templateRef guidance: https://argo-workflows.readthedocs.io/en/stable/workflow-templates/#referencing-other-templates
+      # Accept workflow context via parameters because templateRef does not implicitly
+      # inherit caller variables. See Argo's templateRef guidance:
+      # https://argo-workflows.readthedocs.io/en/stable/workflow-templates/#referencing-other-templates
+      inputs:
+        parameters:
+          - name: workflow-name
+          - name: workflow-namespace
+          - name: workflow-phase
+          - name: workflow-labels
+          - name: workflow-annotations
+          - name: workflow-status
       http:
         url: http://github-status-proxy.{{ $.Values.namespaces.argocd }}.svc.cluster.local/workflow
         method: POST
@@ -34,15 +42,15 @@ spec:
         body: |
           {
             "kind": "workflow",
-            "event": "workflow-{{`{{workflow.status.phase}}`}}",
-            "workflowName": "{{`{{workflow.name}}`}}",
-            "namespace": "{{`{{workflow.namespace}}`}}",
-            "phase": "{{`{{workflow.status.phase}}`}}",
-            "labels": {{`{{toJson workflow.labels}}`}},
-            "annotations": {{`{{toJson workflow.annotations}}`}},
-            "status": {{`{{toJson workflow.status}}`}},
+            "event": "workflow-{{`{{inputs.parameters.workflow-phase}}`}}",
+            "workflowName": "{{`{{inputs.parameters.workflow-name}}`}}",
+            "namespace": "{{`{{inputs.parameters.workflow-namespace}}`}}",
+            "phase": "{{`{{inputs.parameters.workflow-phase}}`}}",
+            "labels": {{`{{inputs.parameters.workflow-labels}}`}},
+            "annotations": {{`{{inputs.parameters.workflow-annotations}}`}},
+            "status": {{`{{inputs.parameters.workflow-status}}`}},
             {{- if $baseUrl }}
-            "target_url": "{{ printf "%s/workflows/%s/%s" $baseUrl "{{workflow.namespace}}" "{{workflow.name}}" }}"
+            "target_url": "{{ printf "%s/workflows/%s/%s" $baseUrl "{{inputs.parameters.workflow-namespace}}" "{{inputs.parameters.workflow-name}}" }}"
             {{- else }}
             "target_url": ""
             {{- end }}

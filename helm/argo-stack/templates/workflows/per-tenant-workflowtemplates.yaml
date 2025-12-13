@@ -72,6 +72,20 @@ spec:
               name: github-status-notify
               template: notify-github-status
               clusterScope: true
+            arguments:
+              parameters:
+                - name: workflow-name
+                  value: "{{ `{{workflow.name}}` }}"
+                - name: workflow-namespace
+                  value: "{{ `{{workflow.namespace}}` }}"
+                - name: workflow-phase
+                  value: "{{ `{{workflow.status.phase}}` }}"
+                - name: workflow-labels
+                  value: "{{ `{{toJson workflow.labels}}` }}"
+                - name: workflow-annotations
+                  value: "{{ `{{toJson workflow.annotations}}` }}"
+                - name: workflow-status
+                  value: "{{ `{{toJson workflow.status}}` }}"
     
     - name: run-nextflow
       metadata:
