@@ -18,10 +18,6 @@ metadata:
 spec:
   templates:
     - name: notify-github-status
-      inputs:
-        parameters:
-          - name: phase
-            description: "Workflow status phase (e.g., Succeeded, Failed, Pending)"
       http:
         url: http://github-status-proxy.{{ .Values.namespaces.argocd }}.svc.cluster.local/workflow
         method: POST
@@ -31,10 +27,10 @@ spec:
         body: |
           {
             "kind": "workflow",
-            "event": "workflow-{{`{{inputs.parameters.phase}}`}}",
+            "event": "workflow-{{`{{workflow.status.phase}}`}}",
             "workflowName": "{{`{{workflow.name}}`}}",
             "namespace": "{{`{{workflow.namespace}}`}}",
-            "phase": "{{`{{inputs.parameters.phase}}`}}",
+            "phase": "{{`{{workflow.status.phase}}`}}",
             "labels": {{`{{toJson workflow.labels}}`}},
             "annotations": {{`{{toJson workflow.annotations}}`}},
             "status": {{`{{toJson workflow.status}}`}},

@@ -72,10 +72,6 @@ spec:
               name: github-status-notify
               template: notify-github-status
               clusterScope: true
-            arguments:
-              parameters:
-                - name: phase
-                  value: "{{`{{workflow.status.phase}}`}}"
     
     - name: run-nextflow
       metadata:
