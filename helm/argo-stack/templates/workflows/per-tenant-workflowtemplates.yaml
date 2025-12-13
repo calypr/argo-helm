@@ -65,13 +65,27 @@ spec:
 
   templates:
     # Exit handler template for GitHub notifications
+    # Using inline HTTP template instead of templateRef to avoid variable resolution issues
+    # at workflow submission time. workflow.status is only available at exit time.
     - name: notify-github-exit
-      steps:
-        - - name: notify-status
-            templateRef:
-              name: github-status-notify
-              template: notify-github-status
-              clusterScope: true
+      http:
+        url: http://github-status-proxy.{{ .Values.namespaces.argocd }}.svc.cluster.local/workflow
+        method: POST
+        headers:
+          - name: Content-Type
+            value: "application/json"
+        body: |
+          {
+            "kind": "workflow",
+            "event": "workflow-{{`{{workflow.status.phase}}`}}",
+            "workflowName": "{{`{{workflow.name}}`}}",
+            "namespace": "{{`{{workflow.namespace}}`}}",
+            "phase": "{{`{{workflow.status.phase}}`}}",
+            "labels": {{`{{toJson workflow.labels}}`}},
+            "annotations": {{`{{toJson workflow.annotations}}`}},
+            "status": {{`{{toJson workflow.status}}`}},
+            "target_url": "{{ .Values.workflows.baseUrl }}/workflows/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}"
+          }
     
     - name: run-nextflow
       metadata:
