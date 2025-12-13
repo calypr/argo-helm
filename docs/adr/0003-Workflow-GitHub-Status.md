@@ -65,14 +65,42 @@ spec:
 
 ```
 
-**Implementation Note:** Initially, we attempted to use a ClusterWorkflowTemplate referenced via `templateRef` with `clusterScope: true`. However, this approach failed because Argo Workflows validates all template references at workflow submission time, including variables like `{{workflow.status.phase}}` which don't exist until the workflow runs. Even though the template references the status directly in the HTTP body, the validation happens too early.
+**Implementation Note:** Initially, we attempted to use a ClusterWorkflowTemplate referenced via `templateRef` with `clusterScope: true`. However, this approach failed because Argo Workflows validates all template references at workflow submission time, including variables like `{{workflow.status.phase}}` which don't exist until the workflow runs.
 
-**Actual Implementation:** The solution is to **inline the HTTP template directly in the exit handler** instead of using `templateRef`. This defers variable resolution until the exit handler executes (after workflow completion), when `workflow.status` is available. See `helm/argo-stack/templates/workflows/per-tenant-workflowtemplates.yaml` for the working implementation.
+**Solution Progression:**
+1. First attempt: Use `templateRef` to ClusterWorkflowTemplate - Failed due to early variable validation
+2. Second attempt: Inline HTTP template directly as the exit handler - Still failed with "failed to resolve {{workflow.status.phase}}" at submission time
+3. **Final Solution:** Wrap the HTTP template call in a `steps` template. The exit handler references a steps template, which then calls the HTTP template. This pattern defers variable resolution until the exit handler actually executes (after workflow completion), when `workflow.status` is available.
+
+**Working Pattern:**
+```yaml
+onExit: notify-github-exit
+
+templates:
+  # Exit handler uses steps template
+  - name: notify-github-exit
+    steps:
+    - - name: send-notification
+        template: send-github-status
+  
+  # HTTP template is called by the steps template
+  - name: send-github-status
+    http:
+      body: |
+        {
+          "phase": "{{workflow.status.phase}}"
+        }
+```
+
+This pattern is based on the official Argo Workflows [exit-handlers.yaml](https://github.com/argoproj/argo-workflows/blob/master/examples/exit-handlers.yaml) example, which shows that exit handlers should use `steps` or `dag` templates, not direct HTTP/container templates.
+
+See `helm/argo-stack/templates/workflows/per-tenant-workflowtemplates.yaml` for the complete implementation.
 
 References:
-- [Argo Workflows Exit Handlers](https://argo-workflows.readthedocs.io/en/latest/walk-through/exit-handlers/) - Documents that exit handlers can use any template type
-- [Argo Workflows HTTP Template](https://argo-workflows.readthedocs.io/en/latest/http-template/) - Shows HTTP templates can access workflow global variables
-- [Argo Workflows Variables](https://argo-workflows.readthedocs.io/en/latest/variables/) - Explains variable resolution in different contexts
+- [Argo Workflows Exit Handlers Example](https://github.com/argoproj/argo-workflows/blob/master/examples/exit-handlers.yaml) - Official example showing exit handler pattern with workflow.status variables
+- [Argo Workflows Exit Handlers Documentation](https://argo-workflows.readthedocs.io/en/latest/walk-through/exit-handlers/) - Documents that exit handlers can use any template type
+- [Argo Workflows HTTP Template](https://argo-workflows.readthedocs.io/en/latest/http-template/) - Shows HTTP templates can access workflow global variables  
+- [Argo Workflows Variables](https://argo-workflows.readthedocs.io/en/latest/variables/) - Explains variable resolution in different contexts including workflow.status availability in exit handlers
 
 ```go
 // WorkflowEvent describes the JSON payload sent by Argo Workflows notifications.

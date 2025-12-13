@@ -65,9 +65,16 @@ spec:
 
   templates:
     # Exit handler template for GitHub notifications
-    # Using inline HTTP template instead of templateRef to avoid variable resolution issues
-    # at workflow submission time. workflow.status is only available at exit time.
+    # Uses a steps template to wrap the HTTP call, allowing proper variable resolution
+    # workflow.status is only available at exit time, not at submission time
     - name: notify-github-exit
+      steps:
+      - - name: send-notification
+          template: send-github-status
+    
+    # HTTP template for sending GitHub status notification
+    # Variables like workflow.status.phase are resolved when this template executes (after workflow completion)
+    - name: send-github-status
       http:
         url: http://github-status-proxy.{{ $.Values.namespaces.argocd }}.svc.cluster.local/workflow
         method: POST
