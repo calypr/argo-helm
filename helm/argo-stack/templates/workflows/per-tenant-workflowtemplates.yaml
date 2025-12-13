@@ -7,10 +7,6 @@ This ensures workflows can reference templates within the same namespace.
 {{- range $reg := .Values.repoRegistrations }}
 {{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
 {{- $repoName := $reg.name }}
-{{- $baseUrl := "" }}
-{{- if and $.Values.workflows $.Values.workflows.baseUrl }}
-{{- $baseUrl = $.Values.workflows.baseUrl }}
-{{- end }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
@@ -76,25 +72,6 @@ spec:
               name: github-status-notify
               template: notify-github-status
               clusterScope: true
-            # Pass workflow metadata/status as parameters because templateRef
-            # cannot access the caller workflow's context implicitly. Argo docs:
-            # https://argo-workflows.readthedocs.io/en/stable/workflow-templates/#referencing-other-templates
-            arguments:
-              parameters:
-                - name: workflow-name
-                  value: "{{`{{workflow.name}}`}}"
-                - name: workflow-namespace
-                  value: "{{`{{workflow.namespace}}`}}"
-                - name: workflow-phase
-                  value: "{{`{{workflow.status.phase}}`}}"
-                - name: workflow-labels
-                  value: "{{`{{toJson workflow.labels}}`}}"
-                - name: workflow-annotations
-                  value: "{{`{{toJson workflow.annotations}}`}}"
-                - name: workflow-status
-                  value: "{{`{{toJson workflow.status}}`}}"
-                - name: target-url
-                  value: "{{ $baseUrl }}/workflows/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}"
     
     - name: run-nextflow
       metadata:

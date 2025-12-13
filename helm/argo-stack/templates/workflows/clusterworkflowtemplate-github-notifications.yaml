@@ -3,6 +3,10 @@ ClusterWorkflowTemplate for GitHub Status Notifications
 Provides a centralized notification mechanism for workflows across all namespaces.
 See ADR 0003 for design rationale.
 */ -}}
+{{- $baseUrl := "" }}
+{{- if and $.Values.workflows $.Values.workflows.baseUrl }}
+{{- $baseUrl = $.Values.workflows.baseUrl }}
+{{- end }}
 apiVersion: argoproj.io/v1alpha1
 kind: ClusterWorkflowTemplate
 metadata:
@@ -18,20 +22,9 @@ metadata:
 spec:
   templates:
     - name: notify-github-status
-      # Inputs are explicitly enumerated so that caller workflows can pass
-      # their metadata/status when invoking this ClusterWorkflowTemplate via
-      # templateRef. Argo requires parameters to be provided by the caller; they
-      # cannot be resolved from the callee's context. See Argo docs:
-      # https://argo-workflows.readthedocs.io/en/stable/workflow-templates/#referencing-other-templates
-      inputs:
-        parameters:
-          - name: workflow-name
-          - name: workflow-namespace
-          - name: workflow-phase
-          - name: workflow-labels
-          - name: workflow-annotations
-          - name: workflow-status
-          - name: target-url
+      # Reference workflow status/metadata directly so Argo resolves the values
+      # at exit-handler execution time instead of submission time. See Argo's
+      # templateRef guidance: https://argo-workflows.readthedocs.io/en/stable/workflow-templates/#referencing-other-templates
       http:
         url: http://github-status-proxy.{{ $.Values.namespaces.argocd }}.svc.cluster.local/workflow
         method: POST
@@ -41,13 +34,17 @@ spec:
         body: |
           {
             "kind": "workflow",
-            "event": "workflow-{{`{{inputs.parameters.workflow-phase}}`}}",
-            "workflowName": "{{`{{inputs.parameters.workflow-name}}`}}",
-            "namespace": "{{`{{inputs.parameters.workflow-namespace}}`}}",
-            "phase": "{{`{{inputs.parameters.workflow-phase}}`}}",
-            "labels": {{`{{inputs.parameters.workflow-labels}}`}},
-            "annotations": {{`{{inputs.parameters.workflow-annotations}}`}},
-            "status": {{`{{inputs.parameters.workflow-status}}`}},
-            "target_url": "{{`{{inputs.parameters.target-url}}`}}"
+            "event": "workflow-{{`{{workflow.status.phase}}`}}",
+            "workflowName": "{{`{{workflow.name}}`}}",
+            "namespace": "{{`{{workflow.namespace}}`}}",
+            "phase": "{{`{{workflow.status.phase}}`}}",
+            "labels": {{`{{toJson workflow.labels}}`}},
+            "annotations": {{`{{toJson workflow.annotations}}`}},
+            "status": {{`{{toJson workflow.status}}`}},
+            {{- if $baseUrl }}
+            "target_url": "{{ printf "%s/workflows/%s/%s" $baseUrl "{{workflow.namespace}}" "{{workflow.name}}" }}"
+            {{- else }}
+            "target_url": ""
+            {{- end }}
           }
 
