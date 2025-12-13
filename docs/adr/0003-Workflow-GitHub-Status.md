@@ -65,7 +65,14 @@ spec:
 
 ```
 
-**Implementation Note:** The template references `{{workflow.status.phase}}` directly in the HTTP body rather than accepting it as an input parameter. This is because when referencing ClusterWorkflowTemplates from exit handlers, Argo Workflows validates input parameters at workflow submission time, before `workflow.status` is available. By referencing the status directly in the template body, it gets resolved when the exit handler actually executes, after the workflow has completed.
+**Implementation Note:** Initially, we attempted to use a ClusterWorkflowTemplate referenced via `templateRef` with `clusterScope: true`. However, this approach failed because Argo Workflows validates all template references at workflow submission time, including variables like `{{workflow.status.phase}}` which don't exist until the workflow runs. Even though the template references the status directly in the HTTP body, the validation happens too early.
+
+**Actual Implementation:** The solution is to **inline the HTTP template directly in the exit handler** instead of using `templateRef`. This defers variable resolution until the exit handler executes (after workflow completion), when `workflow.status` is available. See `helm/argo-stack/templates/workflows/per-tenant-workflowtemplates.yaml` for the working implementation.
+
+References:
+- [Argo Workflows Exit Handlers](https://argo-workflows.readthedocs.io/en/latest/walk-through/exit-handlers/) - Documents that exit handlers can use any template type
+- [Argo Workflows HTTP Template](https://argo-workflows.readthedocs.io/en/latest/http-template/) - Shows HTTP templates can access workflow global variables
+- [Argo Workflows Variables](https://argo-workflows.readthedocs.io/en/latest/variables/) - Explains variable resolution in different contexts
 
 ```go
 // WorkflowEvent describes the JSON payload sent by Argo Workflows notifications.
