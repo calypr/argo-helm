@@ -47,30 +47,25 @@ metadata:
 spec:
   templates:
     - name: notify-github-status
-      inputs:
-        parameters:
-          - name: phase
-            description: "Workflow status phase (e.g., Succeeded, Failed, Pending)"
       http:
         url: http://github-status-proxy.argocd.svc.cluster.local/workflow
         method: POST
         body: |
           {
             "kind": "workflow",
-            "event": "workflow-{{inputs.parameters.phase}}",
+            "event": "workflow-{{workflow.status.phase}}",
             "workflowName": "{{workflow.name}}",
             "namespace": "{{workflow.namespace}}",
-            "phase": "{{inputs.parameters.phase}}",
+            "phase": "{{workflow.status.phase}}",
             "labels": {{toJson workflow.labels}},
             "annotations": {{toJson workflow.annotations}},
             "status": {{toJson workflow.status}},
-            "startedAt": "{{workflow.status.startedAt}}",
-            "finishedAt": "{{workflow.status.finishedAt}}"
+            "target_url": "https://<ARGO_WORKFLOWS_BASE_URL>/workflows/{{workflow.namespace}}/{{workflow.name}}"
           }
 
 ```
 
-**Implementation Note:** The template accepts a `phase` parameter (e.g., "Succeeded", "Failed") rather than a complete event name. This is because Argo Workflows doesn't support string concatenation in parameter values (e.g., `"workflow-{{workflow.status.phase}}"` cannot be resolved when passed as a parameter). Instead, the event name is constructed in the HTTP body as `"workflow-{{inputs.parameters.phase}}"`, which resolves correctly.
+**Implementation Note:** The template references `{{workflow.status.phase}}` directly in the HTTP body rather than accepting it as an input parameter. This is because when referencing ClusterWorkflowTemplates from exit handlers, Argo Workflows validates input parameters at workflow submission time, before `workflow.status` is available. By referencing the status directly in the template body, it gets resolved when the exit handler actually executes, after the workflow has completed.
 
 ```go
 // WorkflowEvent describes the JSON payload sent by Argo Workflows notifications.
