@@ -7,7 +7,10 @@ This ensures workflows can reference templates within the same namespace.
 {{- range $reg := .Values.repoRegistrations }}
 {{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
 {{- $repoName := $reg.name }}
-{{- $baseUrl := dig "workflows" "baseUrl" "" $.Values }}
+{{- $baseUrl := "" }}
+{{- if and $.Values.workflows $.Values.workflows.baseUrl }}
+{{- $baseUrl = $.Values.workflows.baseUrl }}
+{{- end }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
