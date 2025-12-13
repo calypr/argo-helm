@@ -72,6 +72,25 @@ spec:
               name: github-status-notify
               template: notify-github-status
               clusterScope: true
+            # Pass workflow metadata/status as parameters because templateRef
+            # cannot access the caller workflow's context implicitly. Argo docs:
+            # https://argo-workflows.readthedocs.io/en/stable/workflow-templates/#referencing-other-templates
+            arguments:
+              parameters:
+                - name: workflow-name
+                  value: "{{`{{workflow.name}}`}}"
+                - name: workflow-namespace
+                  value: "{{`{{workflow.namespace}}`}}"
+                - name: workflow-phase
+                  value: "{{`{{workflow.status.phase}}`}}"
+                - name: workflow-labels
+                  value: "{{`{{toJson workflow.labels}}`}}"
+                - name: workflow-annotations
+                  value: "{{`{{toJson workflow.annotations}}`}}"
+                - name: workflow-status
+                  value: "{{`{{toJson workflow.status}}`}}"
+                - name: target-url
+                  value: "{{ .Values.workflows.baseUrl }}/workflows/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}"
     
     - name: run-nextflow
       metadata:

@@ -18,6 +18,20 @@ metadata:
 spec:
   templates:
     - name: notify-github-status
+      # Inputs are explicitly enumerated so that caller workflows can pass
+      # their metadata/status when invoking this ClusterWorkflowTemplate via
+      # templateRef. Argo requires parameters to be provided by the caller; they
+      # cannot be resolved from the callee's context. See Argo docs:
+      # https://argo-workflows.readthedocs.io/en/stable/workflow-templates/#referencing-other-templates
+      inputs:
+        parameters:
+          - name: workflow-name
+          - name: workflow-namespace
+          - name: workflow-phase
+          - name: workflow-labels
+          - name: workflow-annotations
+          - name: workflow-status
+          - name: target-url
       http:
         url: http://github-status-proxy.{{ .Values.namespaces.argocd }}.svc.cluster.local/workflow
         method: POST
@@ -27,13 +41,13 @@ spec:
         body: |
           {
             "kind": "workflow",
-            "event": "workflow-{{`{{workflow.status.phase}}`}}",
-            "workflowName": "{{`{{workflow.name}}`}}",
-            "namespace": "{{`{{workflow.namespace}}`}}",
-            "phase": "{{`{{workflow.status.phase}}`}}",
-            "labels": {{`{{toJson workflow.labels}}`}},
-            "annotations": {{`{{toJson workflow.annotations}}`}},
-            "status": {{`{{toJson workflow.status}}`}},
-            "target_url": "{{ .Values.workflows.baseUrl }}/workflows/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}"
+            "event": "workflow-{{`{{inputs.parameters.workflow-phase}}`}}",
+            "workflowName": "{{`{{inputs.parameters.workflow-name}}`}}",
+            "namespace": "{{`{{inputs.parameters.workflow-namespace}}`}}",
+            "phase": "{{`{{inputs.parameters.workflow-phase}}`}}",
+            "labels": {{`{{inputs.parameters.workflow-labels}}`}},
+            "annotations": {{`{{inputs.parameters.workflow-annotations}}`}},
+            "status": {{`{{inputs.parameters.workflow-status}}`}},
+            "target_url": "{{`{{inputs.parameters.target-url}}`}}"
           }
 
