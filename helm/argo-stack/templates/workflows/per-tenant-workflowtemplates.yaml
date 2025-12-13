@@ -7,6 +7,10 @@ This ensures workflows can reference templates within the same namespace.
 {{- range $reg := .Values.repoRegistrations }}
 {{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
 {{- $repoName := $reg.name }}
+{{- $baseUrl := "" }}
+{{- if and $.Values.workflows $.Values.workflows.baseUrl }}
+{{- $baseUrl = $.Values.workflows.baseUrl }}
+{{- end }}
 ---
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
@@ -64,29 +68,39 @@ spec:
   onExit: notify-github-exit
 
   templates:
+    # Inline notification step so workflow.status.* is resolved inside the caller workflow
+    # See Argo variables reference: https://argo-workflows.readthedocs.io/en/stable/variables/#workflow
+    # See exit handler behavior: https://argo-workflows.readthedocs.io/en/stable/exit-handlers/
+    - name: notify-github-status
+      http:
+        url: http://github-status-proxy.{{ $.Values.namespaces.argocd }}.svc.cluster.local/workflow
+        method: POST
+        headers:
+          - name: Content-Type
+            value: "application/json"
+        body: |
+          {
+            "kind": "workflow",
+            "event": "workflow-{{ `{{workflow.status.phase}}` }}",
+            "workflowName": "{{ `{{workflow.name}}` }}",
+            "namespace": "{{ `{{workflow.namespace}}` }}",
+            "phase": "{{ `{{workflow.status.phase}}` }}",
+            "labels": {{ `{{toJson workflow.labels}}` }},
+            "annotations": {{ `{{toJson workflow.annotations}}` }},
+            "status": {{ `{{toJson workflow.status}}` }},
+            {{- if $baseUrl }}
+            "target_url": "{{ printf "%s/workflows/%s/%s" $baseUrl "{{workflow.namespace}}" "{{workflow.name}}" }}"
+            {{- else }}
+            "target_url": ""
+            {{- end }}
+          }
+
     # Exit handler template for GitHub notifications
     - name: notify-github-exit
       steps:
         - - name: notify-status
-            templateRef:
-              name: github-status-notify
-              template: notify-github-status
-              clusterScope: true
-            arguments:
-              parameters:
-                - name: workflow-name
-                  value: "{{ `{{workflow.name}}` }}"
-                - name: workflow-namespace
-                  value: "{{ `{{workflow.namespace}}` }}"
-                - name: workflow-phase
-                  value: "{{ `{{workflow.status.phase}}` }}"
-                - name: workflow-labels
-                  value: "{{ `{{toJson workflow.labels}}` }}"
-                - name: workflow-annotations
-                  value: "{{ `{{toJson workflow.annotations}}` }}"
-                - name: workflow-status
-                  value: "{{ `{{toJson workflow.status}}` }}"
-    
+            template: notify-github-status
+
     - name: run-nextflow
       metadata:
         labels:
