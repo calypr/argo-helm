@@ -33,7 +33,7 @@ spec:
           - name: workflow-status
           - name: target-url
       http:
-        url: http://github-status-proxy.{{ .Values.namespaces.argocd }}.svc.cluster.local/workflow
+        url: http://github-status-proxy.{{ $.Values.namespaces.argocd }}.svc.cluster.local/workflow
         method: POST
         headers:
           - name: Content-Type
