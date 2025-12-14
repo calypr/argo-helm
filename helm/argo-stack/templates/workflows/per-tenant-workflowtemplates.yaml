@@ -65,16 +65,38 @@ spec:
 
   templates:
     # Exit handler template for GitHub notifications
-    # Uses a steps template to wrap the HTTP call, allowing proper variable resolution
+    # Passes workflow.status as arguments to avoid early validation at submission time
     # workflow.status is only available at exit time, not at submission time
     - name: notify-github-exit
       steps:
       - - name: send-notification
           template: send-github-status
+          arguments:
+            parameters:
+            - name: phase
+              value: "{{`{{workflow.status.phase}}`}}"
+            - name: workflow-name
+              value: "{{`{{workflow.name}}`}}"
+            - name: namespace
+              value: "{{`{{workflow.namespace}}`}}"
+            - name: labels
+              value: "{{`{{toJson workflow.labels}}`}}"
+            - name: annotations
+              value: "{{`{{toJson workflow.annotations}}`}}"
+            - name: status
+              value: "{{`{{toJson workflow.status}}`}}"
     
     # HTTP template for sending GitHub status notification
-    # Variables like workflow.status.phase are resolved when this template executes (after workflow completion)
+    # Receives workflow data as inputs to avoid validation errors at submission time
     - name: send-github-status
+      inputs:
+        parameters:
+        - name: phase
+        - name: workflow-name
+        - name: namespace
+        - name: labels
+        - name: annotations
+        - name: status
       http:
         url: http://github-status-proxy.{{ $.Values.namespaces.argocd }}.svc.cluster.local/workflow
         method: POST
@@ -84,14 +106,14 @@ spec:
         body: |
           {
             "kind": "workflow",
-            "event": "workflow-{{`{{workflow.status.phase}}`}}",
-            "workflowName": "{{`{{workflow.name}}`}}",
-            "namespace": "{{`{{workflow.namespace}}`}}",
-            "phase": "{{`{{workflow.status.phase}}`}}",
-            "labels": {{`{{toJson workflow.labels}}`}},
-            "annotations": {{`{{toJson workflow.annotations}}`}},
-            "status": {{`{{toJson workflow.status}}`}},
-            "target_url": "{{ $.Values.workflows.baseUrl }}/workflows/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}"
+            "event": "workflow-{{`{{inputs.parameters.phase}}`}}",
+            "workflowName": "{{`{{inputs.parameters.workflow-name}}`}}",
+            "namespace": "{{`{{inputs.parameters.namespace}}`}}",
+            "phase": "{{`{{inputs.parameters.phase}}`}}",
+            "labels": {{`{{inputs.parameters.labels}}`}},
+            "annotations": {{`{{inputs.parameters.annotations}}`}},
+            "status": {{`{{inputs.parameters.status}}`}},
+            "target_url": "{{ $.Values.workflows.baseUrl }}/workflows/{{`{{inputs.parameters.namespace}}`}}/{{`{{inputs.parameters.workflow-name}}`}}"
           }
     
     - name: run-nextflow
