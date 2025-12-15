@@ -89,6 +89,8 @@ spec:
               value: "{{`{{workflow.name}}`}}"
             - name: namespace
               value: "{{`{{workflow.namespace}}`}}"
+            - name: repo-url
+              value: "{{`{{workflow.parameters.repo-url}}`}}"
             - name: labels
               value: "{{`{{workflow.labels}}`}}"
             - name: annotations
@@ -108,6 +110,7 @@ spec:
         parameters:
         - name: workflow-name
         - name: namespace
+        - name: repo-url
         - name: labels
         - name: annotations
         - name: status
@@ -125,6 +128,7 @@ spec:
             "kind": "workflow",
             "workflowName": "{{`{{inputs.parameters.workflow-name}}`}}",
             "namespace": "{{`{{inputs.parameters.namespace}}`}}",
+            "repoURL": "{{`{{inputs.parameters.repo-url}}`}}",          
             "installationId": "{{`{{inputs.parameters.installation-id}}`}}",
             "commitSha": "{{`{{inputs.parameters.commit-sha}}`}}",
             "labels": {{`{{inputs.parameters.labels}}`}},
