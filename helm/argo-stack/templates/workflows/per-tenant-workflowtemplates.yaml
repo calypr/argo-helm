@@ -74,17 +74,17 @@ spec:
           arguments:
             parameters:
             - name: phase
-              value: "{{`{{workflow.status.phase}}`}}"
+              value: "unknown"
             - name: workflow-name
               value: "{{`{{workflow.name}}`}}"
             - name: namespace
               value: "{{`{{workflow.namespace}}`}}"
             - name: labels
-              value: "{{`{{toJson workflow.labels}}`}}"
+              value: "{{`{{workflow.labels}}`}}"
             - name: annotations
-              value: "{{`{{toJson workflow.annotations}}`}}"
+              value: "{{`{{workflow.annotations}}`}}"
             - name: status
-              value: "{{`{{toJson workflow.status}}`}}"
+              value: "{{`{{workflow.status}}`}}"
     
     # HTTP template for sending GitHub status notification
     # Receives workflow data as inputs to avoid validation errors at submission time
@@ -98,7 +98,7 @@ spec:
         - name: annotations
         - name: status
       http:
-        url: http://github-status-proxy.{{ $.Values.namespaces.argocd }}.svc.cluster.local/workflow
+        url: http://github-status-proxy.{{ $.Values.githubStatusProxy.namespace | default $.Values.namespaces.argocd }}.svc.cluster.local:8080/workflow
         method: POST
         headers:
           - name: Content-Type
@@ -112,7 +112,7 @@ spec:
             "phase": "{{`{{inputs.parameters.phase}}`}}",
             "labels": {{`{{inputs.parameters.labels}}`}},
             "annotations": {{`{{inputs.parameters.annotations}}`}},
-            "status": {{`{{inputs.parameters.status}}`}},
+            "status": "{{`{{inputs.parameters.status}}`}}",
             "target_url": "{{ $.Values.workflows.baseUrl }}/workflows/{{`{{inputs.parameters.namespace}}`}}/{{`{{inputs.parameters.workflow-name}}`}}"
           }
     
