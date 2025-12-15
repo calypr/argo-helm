@@ -36,6 +36,8 @@ type WorkflowEvent struct {
 	Event       string            `json:"event"`       // "workflow-pending" | "workflow-succeeded" | "workflow-failed"
 	Workflow    string            `json:"workflowName"`
 	Namespace   string            `json:"namespace"`
+	InstallationId string         `json:"installationId, omitempty"` // Optional GitHub App installation ID
+	CommitSha   string            `json:"commitSha, omitempty"`     // Optional commit SHA (redundant if in labels)
 	Phase       string            `json:"phase"`
 	StartedAt   string            `json:"startedAt,omitempty"`
 	FinishedAt  string            `json:"finishedAt,omitempty"`
@@ -232,6 +234,11 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
 		return
 	}
+
+    // Compute if missing or wrong
+    phase := normalizeWorkflowPhase(event.Labels, event.Status)
+    event.Phase = phase
+    event.Event = eventFromPhase(phase)
 
 	// Debug log parsed request
 	if debugLogging {
@@ -678,4 +685,40 @@ func logOutgoingResponse(resp *http.Response, description string) {
 		}
 	}
 	log.Printf("DEBUG: === End Response ===")
+}
+
+// normalizeWorkflowPhase derives a lowercase phase from either labels or status.
+// Priority:
+//  1) labels["workflows.argoproj.io/phase"]
+//  2) status if it's a string (e.g. "Succeeded")
+//  3) fallback "unknown"
+func normalizeWorkflowPhase(labels map[string]string, status any) string {
+	if labels != nil {
+		if v := strings.TrimSpace(labels["workflows.argoproj.io/phase"]); v != "" {
+			return strings.ToLower(v)
+		}
+	}
+
+	// Your payload currently sends: "status": "Succeeded"
+	if s, ok := status.(string); ok {
+		if v := strings.TrimSpace(s); v != "" {
+			return strings.ToLower(v)
+		}
+	}
+
+	return "unknown"
+}
+
+// eventFromPhase maps normalized phase to the workflow event string.
+func eventFromPhase(phase string) string {
+	switch strings.ToLower(strings.TrimSpace(phase)) {
+	case "running", "pending":
+		return "workflow-pending"
+	case "succeeded":
+		return "workflow-succeeded"
+	case "failed", "error":
+		return "workflow-failed"
+	default:
+		return "workflow-unknown"
+	}
 }

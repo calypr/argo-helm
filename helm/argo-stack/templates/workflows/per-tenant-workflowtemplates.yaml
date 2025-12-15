@@ -123,12 +123,10 @@ spec:
         body: |
           {
             "kind": "workflow",
-            "event": "workflow-{{`{{ default \"unknown\" (lower workflow.status.phase) }}`}}",
             "workflowName": "{{`{{inputs.parameters.workflow-name}}`}}",
             "namespace": "{{`{{inputs.parameters.namespace}}`}}",
             "installationId": "{{`{{inputs.parameters.installation-id}}`}}",
             "commitSha": "{{`{{inputs.parameters.commit-sha}}`}}",
-            "phase": "{{`{{ default \"unknown\" (lower workflow.status.phase) }}`}}",
             "labels": {{`{{inputs.parameters.labels}}`}},
             "annotations": {{`{{inputs.parameters.annotations}}`}},
             "status": "{{`{{inputs.parameters.status}}`}}",
