@@ -33,11 +33,11 @@ spec:
         description: "Git repo containing the Nextflow pipeline."
         value: {{ $reg.repoUrl | quote }}
       - name: revision
-        description: "Git revision (branch, tag, or SHA) to run."
+        description: "Git revision (branch, tag, or SHA) to run. If git-ref is provided, it takes precedence."
         value: {{ $reg.defaultBranch | default "main" | quote }}
       - name: commit-sha
-        description: "Git commit SHA that the workflow is executing."
-        value: ""
+        description: "Git commit SHA that the workflow is executing. If set, takes precedence over git-ref and revision."
+        value: "{{`{{workflow.parameters.git-after}}`}}"
       - name: pipeline-file
         description: "Nextflow pipeline entry point file (e.g., main.nf, workflow.nf, pipeline.nf)."
         value: "pipelines/push/main.nf"
@@ -59,6 +59,18 @@ spec:
         {{- if $reg.artifactBucket }}
         value: {{ $reg.artifactBucket.region | quote }}
         {{- end }}
+      - name: installation-id
+        description: "GitHub App installation ID from webhook (installation.id)."
+        value: ""
+      - name: git-ref
+        description: "Git ref from webhook (ref), e.g. refs/heads/main."
+        value: ""
+      - name: git-before
+        description: "Previous commit SHA from webhook (before)."
+        value: ""
+      - name: git-after
+        description: "New commit SHA from webhook (after)."
+        value: ""
 
   # Exit handler for GitHub status notifications
   onExit: notify-github-exit
@@ -73,6 +85,7 @@ spec:
           template: send-github-status
           arguments:
             parameters:
+            # TODO fix phase extraction from labels/phase
             - name: phase
               value: "unknown"
             - name: workflow-name
@@ -120,6 +133,9 @@ spec:
       metadata:
         labels:
           calypr.io/commit-sha: "{{`{{workflow.parameters.commit-sha}}`}}"
+          calypr.io/git-before: "{{`{{workflow.parameters.git-before}}`}}"
+          calypr.io/git-after: "{{`{{workflow.parameters.git-after}}`}}"
+          calypr.io/github-installation-id: "{{`{{workflow.parameters.installation-id}}`}}"
           calypr.io/repo: {{ $repoName }}
         annotations:
           calypr.io/repo-url: {{ $reg.repoUrl | quote }}
@@ -142,8 +158,19 @@ spec:
             
             echo "Cloning repo: {{ "{{workflow.parameters.repo-url}}" }}"
             git clone {{ "{{workflow.parameters.repo-url}}" }} repo
+
             cd repo
-            git checkout {{ "{{workflow.parameters.revision}}" }}
+            # Prefer an explicit commit SHA (git-after) if provided, otherwise git-ref, otherwise revision
+            if [ -n "{{ "{{workflow.parameters.commit-sha}}" }}" ]; then
+              echo "Checking out commit SHA: {{ "{{workflow.parameters.commit-sha}}" }}"
+              git checkout "{{ "{{workflow.parameters.commit-sha}}" }}"
+            elif [ -n "{{ "{{workflow.parameters.git-ref}}" }}" ]; then
+              echo "Checking out git ref: {{ "{{workflow.parameters.git-ref}}" }}"
+              git checkout "{{ "{{workflow.parameters.git-ref}}" }}"
+            else
+              echo "Checking out revision: {{ "{{workflow.parameters.revision}}" }}"
+              git checkout "{{ "{{workflow.parameters.revision}}" }}"
+            fi
 
             echo "Artifact bucket: {{ "{{workflow.parameters.artifact-bucket}}" }}"
 
@@ -171,3 +198,4 @@ spec:
             value: "https://{{ "{{workflow.parameters.artifact-endpoint}}" }}"            
 {{- end }}
 {{- end }}
+
