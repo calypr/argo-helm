@@ -85,9 +85,8 @@ spec:
           template: send-github-status
           arguments:
             parameters:
-            # TODO fix phase extraction from labels/phase
             - name: phase
-              value: "unknown"
+              value: "{{`{{ index workflow.labels \"workflows.argoproj.io/phase\" | lower | default \"unknown\" }}`}}"
             - name: workflow-name
               value: "{{`{{workflow.name}}`}}"
             - name: namespace
@@ -98,6 +97,11 @@ spec:
               value: "{{`{{workflow.annotations}}`}}"
             - name: status
               value: "{{`{{workflow.status}}`}}"
+            - name: installation-id
+              value: "{{`{{workflow.parameters.installation-id}}`}}"
+            - name: commit-sha
+              value: "{{`{{workflow.parameters.commit-sha}}`}}"
+
     
     # HTTP template for sending GitHub status notification
     # Receives workflow data as inputs to avoid validation errors at submission time
@@ -110,6 +114,9 @@ spec:
         - name: labels
         - name: annotations
         - name: status
+        - name: installation-id
+        - name: commit-sha
+
       http:
         url: http://github-status-proxy.{{ $.Values.githubStatusProxy.namespace | default $.Values.namespaces.argocd }}.svc.cluster.local:8080/workflow
         method: POST
@@ -122,13 +129,15 @@ spec:
             "event": "workflow-{{`{{inputs.parameters.phase}}`}}",
             "workflowName": "{{`{{inputs.parameters.workflow-name}}`}}",
             "namespace": "{{`{{inputs.parameters.namespace}}`}}",
+            "installationId": "{{`{{inputs.parameters.installation-id}}`}}",
+            "commitSha": "{{`{{inputs.parameters.commit-sha}}`}}",
             "phase": "{{`{{inputs.parameters.phase}}`}}",
             "labels": {{`{{inputs.parameters.labels}}`}},
             "annotations": {{`{{inputs.parameters.annotations}}`}},
             "status": "{{`{{inputs.parameters.status}}`}}",
             "target_url": "{{ $.Values.workflows.baseUrl }}/workflows/{{`{{inputs.parameters.namespace}}`}}/{{`{{inputs.parameters.workflow-name}}`}}"
           }
-    
+
     - name: run-nextflow
       metadata:
         labels:
