@@ -574,6 +574,7 @@ func createCommitStatus(installationToken, owner, repo string, req *StatusReques
 func respondError(w http.ResponseWriter, statusCode int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
+	log.Printf("ERROR: respondError statusCode: %d message %s", statusCode, message)
 	if err := json.NewEncoder(w).Encode(StatusResponse{
 		Success: false,
 		Message: message,
