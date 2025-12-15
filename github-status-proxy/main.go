@@ -37,8 +37,8 @@ type WorkflowEvent struct {
 	Workflow    string            `json:"workflowName"`
 	Namespace   string            `json:"namespace"`
 	InstallationId string         `json:"installationId, omitempty"` // Optional GitHub App installation ID
-	CommitSha   string            `json:"commitSha, omitempty"`     // Optional commit SHA (redundant if in labels)
-	Phase       string            `json:"phase"`
+	CommitSha   string            `json:"commitSha"`
+	Phase       string            `json:"phase,omitempty"` // calculated if missing from labels/status
 	StartedAt   string            `json:"startedAt,omitempty"`
 	FinishedAt  string            `json:"finishedAt,omitempty"`
 	Labels      map[string]string `json:"labels"`
@@ -252,12 +252,18 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract commit SHA from labels
-	commitSHA, ok := event.Labels["calypr.io/commit-sha"]
-	if !ok || commitSHA == "" {
+// 	// Extract commit SHA from labels
+// 	commitSHA, ok := event.Labels["calypr.io/commit-sha"]
+// 	if !ok || commitSHA == "" {
+// 		respondError(w, http.StatusBadRequest, "Missing or empty calypr.io/commit-sha label")
+// 		return
+// 	}
+
+    if event.CommitSha == "" {
 		respondError(w, http.StatusBadRequest, "Missing or empty calypr.io/commit-sha label")
 		return
-	}
+    }
+    commitSHA := event.CommitSha
 
 	// Extract repo URL from annotations (preferred) or construct from labels
 	// Annotations are used because Kubernetes labels cannot contain : or / characters
