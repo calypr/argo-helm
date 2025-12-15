@@ -86,7 +86,7 @@ spec:
           arguments:
             parameters:
             - name: phase
-              value: "{{`{{ index workflow.labels \"workflows.argoproj.io/phase\" | lower | default \"unknown\" }}`}}"
+              value: "{{`{{= sprig.default \"unknown\" (sprig.lower (sprig.index workflow.labels \"workflows.argoproj.io/phase\")) }}`}}"
             - name: workflow-name
               value: "{{`{{workflow.name}}`}}"
             - name: namespace
