@@ -29,6 +29,25 @@ type StatusRequest struct {
 	Description string `json:"description"`
 }
 
+// WorkflowEvent describes the JSON payload sent by Argo Workflows notifications.
+// It matches the ClusterWorkflowTemplate defined in ADR 0003.
+type WorkflowEvent struct {
+	Kind        string            `json:"kind"`        // "workflow"
+	Event       string            `json:"event"`       // "workflow-pending" | "workflow-succeeded" | "workflow-failed"
+	Workflow    string            `json:"workflowName"`
+	Namespace   string            `json:"namespace"`
+	RepoURL     string            `json:"repoURL"`
+	InstallationId string         `json:"installationId, omitempty"` // Optional GitHub App installation ID
+	CommitSha   string            `json:"commitSha"`
+	Phase       string            `json:"phase,omitempty"` // calculated if missing from labels/status
+	StartedAt   string            `json:"startedAt,omitempty"`
+	FinishedAt  string            `json:"finishedAt,omitempty"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
+	TargetURL   string            `json:"target_url,omitempty"` // URL to the workflow in Argo Workflows UI (optional, composed in template)
+	Status      string            `json:"status"`
+}
+
 type StatusResponse struct {
 	Success bool   `json:"success"`
 	Message string `json:"message"`
@@ -49,6 +68,7 @@ func main() {
 
 	// Setup HTTP server
 	http.HandleFunc("/status", handleStatus)
+	http.HandleFunc("/workflow", handleWorkflow)
 	http.HandleFunc("/healthz", handleHealthz)
 
 	port := os.Getenv("PORT")
@@ -192,6 +212,185 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("Successfully created commit status for %s/%s@%s (state: %s, context: %s)", owner, repo, req.SHA, req.State, req.Context)
 	respondSuccess(w, "Commit status created successfully")
+}
+
+func handleWorkflow(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		respondError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	// Debug log incoming request
+	if debugLogging {
+		logIncomingRequest(r)
+	}
+
+	// Limit request body size to prevent DoS attacks (1MB max)
+	r.Body = http.MaxBytesReader(w, r.Body, 1<<20)
+
+	// Parse request body
+	var event WorkflowEvent
+	if err := json.NewDecoder(r.Body).Decode(&event); err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid request body: %v", err))
+		return
+	}
+
+    // Compute if missing or wrong
+    phase := normalizeWorkflowPhase(event.Labels, event.Status)
+    event.Phase = phase
+    event.Event = eventFromPhase(phase)
+
+	// Debug log parsed request
+	if debugLogging {
+		eventJSON, _ := json.MarshalIndent(event, "", "  ")
+		log.Printf("DEBUG: Parsed workflow event:\n%s", string(eventJSON))
+	}
+
+	// Validate workflow event
+	if err := validateWorkflowEvent(&event); err != nil {
+		respondError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+
+    if event.CommitSha == "" {
+		respondError(w, http.StatusBadRequest, "Missing or empty calypr.io/commit-sha label")
+		return
+    }
+    commitSHA := event.CommitSha
+
+	// Extract repo URL from annotations (preferred) or construct from labels
+	// Annotations are used because Kubernetes labels cannot contain : or / characters
+	repoURL := strings.TrimSpace(event.RepoURL)
+	if repoURL == "" {
+		respondError(w, http.StatusBadRequest, "Missing repoURL in workflow event payload")
+		return
+	}
+
+	// Map workflow phase to GitHub status state
+	state := mapWorkflowToGitHubState(event.Phase, event.Status)
+	
+	// Create context based on workflow name and namespace
+	context := fmt.Sprintf("workflows/%s/%s", event.Namespace, event.Workflow)
+	
+	// Create description based on event type
+	description := fmt.Sprintf("Workflow %s", strings.ToLower(event.Status))
+	
+	// Use target URL from event payload (composed in the ClusterWorkflowTemplate)
+	// If empty, the GitHub status will be created without a link to the workflow UI
+	targetURL := event.TargetURL
+	if targetURL == "" && debugLogging {
+		log.Printf("DEBUG: target_url is empty in workflow event, status will not have a link to workflow UI")
+	}
+
+	// Create status request from workflow event
+	statusReq := StatusRequest{
+		RepoURL:     repoURL,
+		SHA:         commitSHA,
+		State:       state,
+		Context:     context,
+		TargetURL:   targetURL,
+		Description: description,
+	}
+
+	// Parse owner and repo from repo_url
+	owner, repo, err := parseRepoURL(statusReq.RepoURL)
+	if err != nil {
+		respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid repo_url: %v", err))
+		return
+	}
+
+	if debugLogging {
+		log.Printf("DEBUG: Workflow event mapped to status: owner=%s, repo=%s, sha=%s, state=%s, context=%s",
+			owner, repo, commitSHA, state, context)
+	}
+
+	// Create GitHub App JWT
+	appJWT, err := createGitHubAppJWT()
+	if err != nil {
+		log.Printf("Failed to create GitHub App JWT: %v", err)
+		respondError(w, http.StatusInternalServerError, "Failed to authenticate with GitHub")
+		return
+	}
+
+	// Get installation ID for the repository
+	installationID, err := getInstallationID(appJWT, owner, repo)
+	if err != nil {
+		log.Printf("Failed to get installation ID for %s/%s: %v", owner, repo, err)
+		respondError(w, http.StatusNotFound, fmt.Sprintf("GitHub App not installed on repository %s/%s", owner, repo))
+		return
+	}
+
+	if debugLogging {
+		log.Printf("DEBUG: Found installation ID: %d for %s/%s", installationID, owner, repo)
+	}
+
+	// Get installation access token
+	installationToken, err := getInstallationToken(appJWT, installationID)
+	if err != nil {
+		log.Printf("Failed to get installation token for installation %d: %v", installationID, err)
+		respondError(w, http.StatusInternalServerError, "Failed to get installation token")
+		return
+	}
+
+	// Create commit status
+	if err := createCommitStatus(installationToken, owner, repo, &statusReq); err != nil {
+		log.Printf("Failed to create commit status for %s/%s@%s: %v", owner, repo, commitSHA, err)
+		respondError(w, http.StatusInternalServerError, fmt.Sprintf("Failed to create commit status: %v", err))
+		return
+	}
+
+	log.Printf("Successfully created commit status for workflow %s/%s: %s/%s@%s (state: %s, context: %s)",
+		event.Namespace, event.Workflow, owner, repo, commitSHA, state, context)
+	respondSuccess(w, "Workflow notification processed successfully")
+}
+
+func validateWorkflowEvent(event *WorkflowEvent) error {
+	if event.Kind != "workflow" {
+		return fmt.Errorf("kind must be 'workflow'")
+	}
+	if event.Event == "" {
+		return fmt.Errorf("event is required")
+	}
+	if event.Workflow == "" {
+		return fmt.Errorf("workflowName is required")
+	}
+	if event.Namespace == "" {
+		return fmt.Errorf("namespace is required")
+	}
+	if event.Phase == "" {
+		return fmt.Errorf("phase is required")
+	}
+	if event.Labels == nil {
+		return fmt.Errorf("labels is required")
+	}
+	if strings.TrimSpace(event.RepoURL) == "" {
+		return fmt.Errorf("repoURL is required")
+	}
+	return nil
+}
+
+func mapWorkflowToGitHubState(phase string, status string) string {
+    // Priority: check status first
+	switch strings.ToLower(status) {
+	case "succeeded":
+		return "success"
+	case "failed", "error":
+		return "failure"
+	case "running", "pending":
+		return "pending"
+	// If status is unrecognized, fall back to phase mapping (no default here)
+	}
+	switch strings.ToLower(phase) {
+	case "succeeded":
+		return "success"
+	case "failed", "error":
+		return "failure"
+	case "running", "pending":
+		return "pending"
+	default:
+		return "error"
+	}
+
 }
 
 func validateRequest(req *StatusRequest) error {
@@ -377,6 +576,7 @@ func createCommitStatus(installationToken, owner, repo string, req *StatusReques
 func respondError(w http.ResponseWriter, statusCode int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
+	log.Printf("ERROR: respondError statusCode: %d message %s", statusCode, message)
 	if err := json.NewEncoder(w).Encode(StatusResponse{
 		Success: false,
 		Message: message,
@@ -480,4 +680,40 @@ func logOutgoingResponse(resp *http.Response, description string) {
 		}
 	}
 	log.Printf("DEBUG: === End Response ===")
+}
+
+// normalizeWorkflowPhase derives a lowercase phase from either labels or status.
+// Priority:
+//  1) labels["workflows.argoproj.io/phase"]
+//  2) status if it's a string (e.g. "Succeeded")
+//  3) fallback "unknown"
+func normalizeWorkflowPhase(labels map[string]string, status any) string {
+	if labels != nil {
+		if v := strings.TrimSpace(labels["workflows.argoproj.io/phase"]); v != "" {
+			return strings.ToLower(v)
+		}
+	}
+
+	// Your payload currently sends: "status": "Succeeded"
+	if s, ok := status.(string); ok {
+		if v := strings.TrimSpace(s); v != "" {
+			return strings.ToLower(v)
+		}
+	}
+
+	return "unknown"
+}
+
+// eventFromPhase maps normalized phase to the workflow event string.
+func eventFromPhase(phase string) string {
+	switch strings.ToLower(strings.TrimSpace(phase)) {
+	case "running", "pending":
+		return "workflow-pending"
+	case "succeeded":
+		return "workflow-succeeded"
+	case "failed", "error":
+		return "workflow-failed"
+	default:
+		return "workflow-unknown"
+	}
 }

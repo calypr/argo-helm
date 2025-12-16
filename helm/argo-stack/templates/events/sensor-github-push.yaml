@@ -60,9 +60,15 @@ spec:
                     value: {{ $reg.name | quote }}
                   - name: repo-url
                     value: {{ $reg.repoUrl | quote }}
-                  # TODO - read from event
-                  # - name: revision
-                  #  value: main
+                  # Populated from GitHub webhook
+                  - name: installation-id
+                    value: ""          # body.installation.id
+                  - name: git-ref
+                    value: ""          # body.ref
+                  - name: git-before
+                    value: ""          # body.before
+                  - name: git-after
+                    value: ""          # body.after (commit SHA)
                   {{- if $reg.artifactBucket }}
                   - name: artifact-bucket
                     value: {{ $reg.artifactBucket.bucket | quote }}
@@ -71,6 +77,35 @@ spec:
                   - name: artifact-region
                     value: {{ $reg.artifactBucket.region | quote }}
                   {{- end }}
+        parameters:
+          # Map GitHub webhook -> workflow arguments
+          # index 0: repo-name (static)
+          # index 1: repo-url (static)
+
+          # installation.id -> parameters[2].value
+          - src:
+              dependencyName: {{ $eventName | quote }}
+              dataKey: body.installation.id
+            dest: spec.arguments.parameters.2.value
+
+          # ref -> parameters[3].value
+          - src:
+              dependencyName: {{ $eventName | quote }}
+              dataKey: body.ref
+            dest: spec.arguments.parameters.3.value
+
+          # before -> parameters[4].value
+          - src:
+              dependencyName: {{ $eventName | quote }}
+              dataKey: body.before
+            dest: spec.arguments.parameters.4.value
+
+          # after -> parameters[5].value
+          - src:
+              dependencyName: {{ $eventName | quote }}
+              dataKey: body.after
+            dest: spec.arguments.parameters.5.value
   {{- end }}
 {{- end }}
 {{- end }}
+
