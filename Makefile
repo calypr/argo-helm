@@ -180,7 +180,8 @@ argo-stack:
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
 		--wait --atomic --timeout 10m0s \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
-		--set-string events.github.webhook.url=https://${ARGO_HOSTNAME}/events\
+		--set-string events.github.webhook.url=https://${ARGO_HOSTNAME}/events \
+		--set-string workflows.baseUrl=https://${ARGO_HOSTNAME} \
 		--set-string s3.enabled=${S3_ENABLED} \
 		--set-string s3.bucket=${S3_BUCKET} \
 		--set-string s3.pathStyle=true \
