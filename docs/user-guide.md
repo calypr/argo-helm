@@ -34,8 +34,8 @@ This makes collaboration easier, keeps your project reproducible, and ensures th
    - **Personal account** or **Organization**
 4. Choose repositories:
    - **Recommended:** Select **only the repo(s)** you want Calypr to manage.
-5. Confirm permissions (read-only access to code/metadata; write commit status).
-6. Complete registration screen:
+5. Confirm permissions (read-only access to code/metadata; write commit status).  [...](#githubapp)
+6. Complete registration screen: [...](#registration)
   - User access controls (admin and read-only users)
   - Optional dedicated S3 buckets for artifacts and data
 
@@ -50,6 +50,7 @@ When you push to **main**:
 - ✅ **Workflow runs:** The Nextflow/Argo workflow is triggered automatically.
 - ✅ **Application updates (if applicable):** If your repo defines an app, Calypr deploys the new version.
 - ✅ **Portal updates:** The Calypr portal reflects the latest files, configs, and metadata.
+- ✅ **Git commit status update:** [...](#commitstatus)
 
 ---
 
@@ -97,3 +98,17 @@ s3://calypr-nextflow-hello/workflows/nextflow-hello-abc123/
 - [Vault Integration Guide](./secrets-with-vault.md)
 - [Admin Guide - Managing RepoRegistrations](./admin-guide.md)
 - [Workflow Troubleshooting](./workflow-troubleshooting.md)
+
+## 6) Examples
+
+---
+### GitHubApp
+<img width="574" height="638" alt="image" src="https://github.com/user-attachments/assets/0bc96e93-8c12-41fb-8f09-8750cbc8784c" />
+
+---
+### Registration
+<img width="537" height="512" alt="image" src="https://github.com/user-attachments/assets/0d9c16a6-6c0d-4e6c-8b81-5792d8f0c38b" />
+
+---
+### CommitStatus
+<img width="583" height="471" alt="image" src="https://github.com/user-attachments/assets/b1344b7e-5edf-4066-965c-43b041960d3a" />
