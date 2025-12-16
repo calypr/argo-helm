@@ -65,14 +65,57 @@ spec:
 
 ```
 
-**Implementation Note:** Initially, we attempted to use a ClusterWorkflowTemplate referenced via `templateRef` with `clusterScope: true`. However, this approach failed because Argo Workflows validates all template references at workflow submission time, including variables like `{{workflow.status.phase}}` which don't exist until the workflow runs. Even though the template references the status directly in the HTTP body, the validation happens too early.
+**Implementation Note:** Initially, we attempted to use a ClusterWorkflowTemplate referenced via `templateRef` with `clusterScope: true`. However, this approach failed because Argo Workflows validates all template references at workflow submission time, including variables like `{{workflow.status.phase}}` which don't exist until the workflow runs.
 
-**Actual Implementation:** The solution is to **inline the HTTP template directly in the exit handler** instead of using `templateRef`. This defers variable resolution until the exit handler executes (after workflow completion), when `workflow.status` is available. See `helm/argo-stack/templates/workflows/per-tenant-workflowtemplates.yaml` for the working implementation.
+**Solution Progression:**
+1. **First attempt**: Use `templateRef` to ClusterWorkflowTemplate - Failed due to early variable validation at submission time
+2. **Second attempt**: Inline HTTP template directly as the exit handler - Still failed with "failed to resolve {{workflow.status.phase}}" at submission time
+3. **Third attempt**: Wrap the HTTP template call in a `steps` template - Still failed because Argo validates ALL templates in the workflow at submission time, even those only called from exit handlers
+4. **Final Solution**: Use **inputs/parameters** to pass workflow.status data to the HTTP template. The exit handler resolves `{{workflow.status.phase}}` when creating the arguments, and passes these as input parameters to the HTTP template. This way, the HTTP template body only references `{{inputs.parameters.*}}` which doesn't trigger validation errors at submission time.
+
+**Working Pattern:**
+```yaml
+onExit: notify-github-exit
+
+templates:
+  # Exit handler passes workflow.status as arguments
+  - name: notify-github-exit
+    steps:
+    - - name: send-notification
+        template: send-github-status
+        arguments:
+          parameters:
+          - name: phase
+            value: "{{workflow.status.phase}}"
+          - name: workflow-name
+            value: "{{workflow.name}}"
+  
+  # HTTP template receives data via inputs, avoiding direct workflow.status references
+  - name: send-github-status
+    inputs:
+      parameters:
+      - name: phase
+      - name: workflow-name
+    http:
+      body: |
+        {
+          "phase": "{{inputs.parameters.phase}}",
+          "workflowName": "{{inputs.parameters.workflow-name}}"
+        }
+```
+
+**Key Insight**: Argo Workflows validates ALL templates at submission time, including templates only called from exit handlers. Direct references to `{{workflow.status.*}}` in template bodies (especially HTTP templates) cause validation failures. The solution is to pass workflow.status data as **arguments** in the steps template, which are evaluated at runtime, and receive them as **inputs** in the HTTP template.
+
+This pattern is inspired by how the official [exit-handlers.yaml](https://github.com/argoproj/argo-workflows/blob/master/examples/exit-handlers.yaml) example uses `{{workflow.status}}` in container **args** (which are runtime-evaluated) rather than in template definitions.
+
+See `helm/argo-stack/templates/workflows/per-tenant-workflowtemplates.yaml` for the complete implementation.
 
 References:
-- [Argo Workflows Exit Handlers](https://argo-workflows.readthedocs.io/en/latest/walk-through/exit-handlers/) - Documents that exit handlers can use any template type
-- [Argo Workflows HTTP Template](https://argo-workflows.readthedocs.io/en/latest/http-template/) - Shows HTTP templates can access workflow global variables
-- [Argo Workflows Variables](https://argo-workflows.readthedocs.io/en/latest/variables/) - Explains variable resolution in different contexts
+- [Argo Workflows Exit Handlers Example](https://github.com/argoproj/argo-workflows/blob/master/examples/exit-handlers.yaml) - Official example showing exit handler pattern with workflow.status variables in args
+- [Argo Workflows Exit Handlers Documentation](https://argo-workflows.readthedocs.io/en/latest/walk-through/exit-handlers/) - Documents that exit handlers can access workflow.status
+- [Argo Workflows HTTP Template](https://argo-workflows.readthedocs.io/en/latest/http-template/) - Shows HTTP templates can use inputs/parameters
+- [Argo Workflows Variables](https://argo-workflows.readthedocs.io/en/latest/variables/) - Explains variable resolution contexts and when variables are available
+- [Argo Workflows Template Inputs](https://argo-workflows.readthedocs.io/en/latest/walk-through/parameters/) - Documents how to pass data between templates using inputs/parameters
 
 ```go
 // WorkflowEvent describes the JSON payload sent by Argo Workflows notifications.

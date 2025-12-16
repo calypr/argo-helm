@@ -36,14 +36,16 @@ type WorkflowEvent struct {
 	Event       string            `json:"event"`       // "workflow-pending" | "workflow-succeeded" | "workflow-failed"
 	Workflow    string            `json:"workflowName"`
 	Namespace   string            `json:"namespace"`
-	Phase       string            `json:"phase"`
+	RepoURL     string            `json:"repoURL"`
+	InstallationId string         `json:"installationId, omitempty"` // Optional GitHub App installation ID
+	CommitSha   string            `json:"commitSha"`
+	Phase       string            `json:"phase,omitempty"` // calculated if missing from labels/status
 	StartedAt   string            `json:"startedAt,omitempty"`
 	FinishedAt  string            `json:"finishedAt,omitempty"`
 	Labels      map[string]string `json:"labels"`
 	Annotations map[string]string `json:"annotations"`
 	TargetURL   string            `json:"target_url,omitempty"` // URL to the workflow in Argo Workflows UI (optional, composed in template)
-	// Status is intentionally left as raw JSON so we don't need a full struct.
-	Status any `json:"status"`
+	Status      string            `json:"status"`
 }
 
 type StatusResponse struct {
@@ -233,6 +235,11 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+    // Compute if missing or wrong
+    phase := normalizeWorkflowPhase(event.Labels, event.Status)
+    event.Phase = phase
+    event.Event = eventFromPhase(phase)
+
 	// Debug log parsed request
 	if debugLogging {
 		eventJSON, _ := json.MarshalIndent(event, "", "  ")
@@ -245,47 +252,28 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Extract commit SHA from labels
-	commitSHA, ok := event.Labels["calypr.io/commit-sha"]
-	if !ok || commitSHA == "" {
+    if event.CommitSha == "" {
 		respondError(w, http.StatusBadRequest, "Missing or empty calypr.io/commit-sha label")
 		return
-	}
+    }
+    commitSHA := event.CommitSha
 
 	// Extract repo URL from annotations (preferred) or construct from labels
 	// Annotations are used because Kubernetes labels cannot contain : or / characters
-	repoURL, ok := event.Annotations["calypr.io/repo-url"]
-	if !ok || repoURL == "" {
-		// Fallback: try labels (for backward compatibility)
-		repoURL, ok = event.Labels["calypr.io/repo-url"]
-		if !ok || repoURL == "" {
-			// Fallback: construct from repo name label
-			repoName, ok := event.Labels["calypr.io/repo"]
-			if !ok || repoName == "" {
-				respondError(w, http.StatusBadRequest, "Missing repo URL in annotations and calypr.io/repo label")
-				return
-			}
-			// Validate repo name is in "owner/repo" format
-			if !strings.Contains(repoName, "/") {
-				respondError(w, http.StatusBadRequest, fmt.Sprintf("Invalid repo name format: %s (expected 'owner/repo')", repoName))
-				return
-			}
-			// Construct URL from repo name
-			repoURL = fmt.Sprintf("https://github.com/%s", repoName)
-			if debugLogging {
-				log.Printf("DEBUG: Constructed repo URL from repo name: %s", repoURL)
-			}
-		}
+	repoURL := strings.TrimSpace(event.RepoURL)
+	if repoURL == "" {
+		respondError(w, http.StatusBadRequest, "Missing repoURL in workflow event payload")
+		return
 	}
 
 	// Map workflow phase to GitHub status state
-	state := mapWorkflowPhaseToGitHubState(event.Phase)
+	state := mapWorkflowToGitHubState(event.Phase, event.Status)
 	
 	// Create context based on workflow name and namespace
-	context := fmt.Sprintf("argo-workflows/%s/%s", event.Namespace, event.Workflow)
+	context := fmt.Sprintf("workflows/%s/%s", event.Namespace, event.Workflow)
 	
 	// Create description based on event type
-	description := fmt.Sprintf("Workflow %s", strings.ToLower(event.Phase))
+	description := fmt.Sprintf("Workflow %s", strings.ToLower(event.Status))
 	
 	// Use target URL from event payload (composed in the ClusterWorkflowTemplate)
 	// If empty, the GitHub status will be created without a link to the workflow UI
@@ -375,10 +363,23 @@ func validateWorkflowEvent(event *WorkflowEvent) error {
 	if event.Labels == nil {
 		return fmt.Errorf("labels is required")
 	}
+	if strings.TrimSpace(event.RepoURL) == "" {
+		return fmt.Errorf("repoURL is required")
+	}
 	return nil
 }
 
-func mapWorkflowPhaseToGitHubState(phase string) string {
+func mapWorkflowToGitHubState(phase string, status string) string {
+    // Priority: check status first
+	switch strings.ToLower(status) {
+	case "succeeded":
+		return "success"
+	case "failed", "error":
+		return "failure"
+	case "running", "pending":
+		return "pending"
+	// If status is unrecognized, fall back to phase mapping (no default here)
+	}
 	switch strings.ToLower(phase) {
 	case "succeeded":
 		return "success"
@@ -389,6 +390,7 @@ func mapWorkflowPhaseToGitHubState(phase string) string {
 	default:
 		return "error"
 	}
+
 }
 
 func validateRequest(req *StatusRequest) error {
@@ -574,6 +576,7 @@ func createCommitStatus(installationToken, owner, repo string, req *StatusReques
 func respondError(w http.ResponseWriter, statusCode int, message string) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(statusCode)
+	log.Printf("ERROR: respondError statusCode: %d message %s", statusCode, message)
 	if err := json.NewEncoder(w).Encode(StatusResponse{
 		Success: false,
 		Message: message,
@@ -677,4 +680,40 @@ func logOutgoingResponse(resp *http.Response, description string) {
 		}
 	}
 	log.Printf("DEBUG: === End Response ===")
+}
+
+// normalizeWorkflowPhase derives a lowercase phase from either labels or status.
+// Priority:
+//  1) labels["workflows.argoproj.io/phase"]
+//  2) status if it's a string (e.g. "Succeeded")
+//  3) fallback "unknown"
+func normalizeWorkflowPhase(labels map[string]string, status any) string {
+	if labels != nil {
+		if v := strings.TrimSpace(labels["workflows.argoproj.io/phase"]); v != "" {
+			return strings.ToLower(v)
+		}
+	}
+
+	// Your payload currently sends: "status": "Succeeded"
+	if s, ok := status.(string); ok {
+		if v := strings.TrimSpace(s); v != "" {
+			return strings.ToLower(v)
+		}
+	}
+
+	return "unknown"
+}
+
+// eventFromPhase maps normalized phase to the workflow event string.
+func eventFromPhase(phase string) string {
+	switch strings.ToLower(strings.TrimSpace(phase)) {
+	case "running", "pending":
+		return "workflow-pending"
+	case "succeeded":
+		return "workflow-succeeded"
+	case "failed", "error":
+		return "workflow-failed"
+	default:
+		return "workflow-unknown"
+	}
 }
