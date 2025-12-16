@@ -273,7 +273,7 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 	context := fmt.Sprintf("workflows/%s/%s", event.Namespace, event.Workflow)
 	
 	// Create description based on event type
-	description := fmt.Sprintf("Workflow %s", strings.ToLower(event.Phase))
+	description := fmt.Sprintf("Workflow %s", strings.ToLower(event.Status))
 	
 	// Use target URL from event payload (composed in the ClusterWorkflowTemplate)
 	// If empty, the GitHub status will be created without a link to the workflow UI
