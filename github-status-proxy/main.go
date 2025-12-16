@@ -45,8 +45,7 @@ type WorkflowEvent struct {
 	Labels      map[string]string `json:"labels"`
 	Annotations map[string]string `json:"annotations"`
 	TargetURL   string            `json:"target_url,omitempty"` // URL to the workflow in Argo Workflows UI (optional, composed in template)
-	// Status is intentionally left as raw JSON so we don't need a full struct.
-	Status any `json:"status"`
+	Status      string            `json:"status"`
 }
 
 type StatusResponse struct {
