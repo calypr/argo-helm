@@ -107,7 +107,7 @@ s3://calypr-nextflow-hello/workflows/nextflow-hello-abc123/
 
 ---
 ### Registration
-<img width="537" height="512" alt="image" src="https://github.com/user-attachments/assets/0d9c16a6-6c0d-4e6c-8b81-5792d8f0c38b" />
+<img width="392" height="512" alt="image" src="https://github.com/user-attachments/assets/510b820c-7a71-45f8-9ffa-649c1572d935" />
 
 ---
 ### CommitStatus
