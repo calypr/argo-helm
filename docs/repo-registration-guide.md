@@ -1,3 +1,4 @@
+
 [Home](index.md) > User Guides
 
 # 📝 RepoRegistration Guide — Self-Service Repository Onboarding
@@ -22,11 +23,9 @@ graph LR
     A --> C[Argo Events GitHub]
     A --> D[ExternalSecrets]
     D --> E[S3 Credentials Secret]
-    D --> F[GitHub Token Secret]
-    B --> G[Workflow Execution]
-    C --> G
-    E --> G
-    F --> C
+    B --> F[Workflow Execution]
+    C --> F
+    E --> F
 ```
 
 ---
@@ -35,11 +34,11 @@ graph LR
 
 Before creating a `RepoRegistration`, ensure you have:
 
-1. **GitHub Repository** with Nextflow pipeline or workflows
-2. **GitHub Personal Access Token** (PAT) stored in Vault
-3. **S3 Bucket Credentials** stored in Vault (for artifact and data storage)
+1. **GitHub Repository** with a Nextflow pipeline or workflows to onboard
+2. **GitHub App Installation Flow** (for example, through the `gitapp-callback` service) that captures the GitHub App `installation_id` for the repository
+3. **S3 Bucket Credentials** stored in Vault for artifact and/or data storage
 4. **Namespace** where workflows will run (e.g., `wf-poc`)
-5. **Vault Paths** configured for your secrets
+5. **Vault Paths** configured for the S3 credentials you plan to reference
 
 ---
 
@@ -47,6 +46,27 @@ Before creating a `RepoRegistration`, ensure you have:
 
 ### 1. Create a RepoRegistration
 
+See `gitapp-callback` service for a user-friendly way to create RepoRegistrations via GitHub App installation.
+- **GitHub App Integration**: Handles post-installation callbacks with `installation_id` parameter
+- **User-Friendly Form**: Clean, modern UI following calypr-public.ohsu.edu design patterns
+- **Repository Configuration**: Collects all required RepoRegistration fields:
+  - Default branch (defaults to `main`)
+  - Data bucket (optional)
+  - Artifact bucket (optional)
+  - Admin users (required, comma-separated emails)
+  - Read-only users (optional, comma-separated emails)
+  - Installation ID (from GitHub callback)
+- **Validation**: Email validation and required field checks
+- **Modern UI**: Left navigation, rounded cards, slate-gray text, blue primary buttons
+
+Controller deployments driven by the `Makefile` (`make template`, `make argo-stack`, etc.) also require the `GITHUBHAPP_INSTALLATION_ID` environment variable, so keep the captured GitHub App installation ID handy before running those targets.
+
+### Mapping host storage to `/var/registrations`
+
+The post-registration controller will maintain a sqlite database to house user inputs.
+See `kind-config.yaml` with `extraMounts` for mapping hostPath or PVC into `/var/registrations`.
+
+For experimentation, you can manually create a `RepoRegistration` YAML file. Below is an example configuration.
 Create a file `my-repo-registration.yaml`:
 
 ```yaml
@@ -59,44 +79,42 @@ spec:
   # Git repository URL
   repoUrl: https://github.com/myorg/my-nextflow-project.git
   defaultBranch: main
-  
+  installationId: 123456
+
   # Tenant identifier
   tenant: myorg-team
-  
-  # WorkflowTemplate to use for running workflows
-  workflowTemplateRef: nextflow-repo-runner
-  
+
   # S3 bucket for workflow artifacts
   artifactBucket:
-    hostname: https://s3.us-west-2.amazonaws.com
-    bucket: my-project-artifacts
-    region: us-west-2
-    insecure: false
-    pathStyle: false
+    hostname: minio.minio-system.svc.cluster.local:9000
+    bucket: argo-artifacts
+    region: us-east-1
+    insecure: true
+    pathStyle: true
+    keyPrefix: my-nextflow-project-workflows/
+    # Vault path for S3 credentials (relative to kv/)
     externalSecretPath: argo/apps/my-nextflow-project/s3/artifacts
-  
-  # S3 bucket for primary data
+
+  # S3 bucket for primary data (optional)
   dataBucket:
-    hostname: https://s3.us-west-2.amazonaws.com
-    bucket: my-project-data
-    region: us-west-2
-    insecure: false
-    pathStyle: false
+    hostname: minio.minio-system.svc.cluster.local:9000
+    bucket: argo-data
+    region: us-east-1
+    insecure: true
+    pathStyle: true
+    keyPrefix: my-nextflow-project-data/
     externalSecretPath: argo/apps/my-nextflow-project/s3/data
-  
-  # GitHub secret reference
-  githubSecretName: github-secret-my-project
-  
+
   # Admin users (Fence-authenticated emails)
   adminUsers:
     - alice@example.com
     - bob@example.com
-  
+
   # Read-only users (Fence-authenticated emails)
   readUsers:
     - viewer@example.com
     - analyst@example.com
-  
+
   # Public visibility
   isPublic: false
 ```
@@ -106,6 +124,8 @@ spec:
 ```bash
 kubectl apply -f my-repo-registration.yaml
 ```
+
+See Makefile `make argo-stack` target for deploying the entire Argo stack including RepoRegistration controller.
 
 ### 3. Verify the Registration
 
@@ -120,9 +140,24 @@ kubectl get application my-nextflow-project -n argocd
 kubectl get externalsecret -n wf-poc
 
 # Verify secrets are synced
-kubectl get secret github-secret-my-project -n wf-poc
 kubectl get secret s3-credentials-my-project -n wf-poc
 ```
+
+---
+
+## ⚙️ Controller Deployment Notes
+
+### Ephemeral workspace via `emptyDir`
+
+The RepoRegistration controller now provisions an `emptyDir` volume for its working directory so that generated manifests are isolated per pod restart without requiring a persistent volume claim.
+
+### Mapping host storage to `/var/registrations`
+
+If the controller must read or write registration bundles that already live on the node, configure the chart's `extraMounts` to project the desired hostPath or PVC into `/var/registrations`. This path is the default lookup location for pre-seeded repos.
+
+### Helm ingress safety guard
+
+Helm templates now enforce a nil check on `.Values.ingress`. Ensure the ingress block exists in `values.yaml` before enabling ingress-related resources to avoid rendering errors.
 
 ---
 
@@ -136,219 +171,231 @@ kubectl get secret s3-credentials-my-project -n wf-poc
 - **Description:** Git repository URL to onboard
 - **Example:** `https://github.com/myorg/my-repo.git`
 
+#### `spec.installationId`
+- **Type:** `integer`
+- **Minimum:** `1`
+- **Description:** GitHub App installation ID associated with the onboarding event. Registrations fail validation when this value is absent.
+- **Example:** `123456`
+
+### Optional Fields
+
 #### `spec.tenant`
 - **Type:** `string`
 - **Description:** Tenant identifier (program/project or org short code)
 - **Example:** `genomics-team`, `cancer-research`
 
-#### `spec.workflowTemplateRef`
-- **Type:** `string`
-- **Description:** Argo WorkflowTemplate name used to run this repo's workflows
-- **Example:** `nextflow-repo-runner`, `nextflow-runner`
-
-#### `spec.githubSecretName`
-- **Type:** `string`
-- **Description:** Name of the Kubernetes Secret containing GitHub credentials (PAT or GitHub App token, webhook secret)
-- **Example:** `github-secret-my-project`
-
-### Optional Fields
-
 #### `spec.defaultBranch`
 - **Type:** `string`
 - **Default:** `main`
-- **Description:** Default branch to track
-- **Example:** `main`, `master`, `develop`
+- **Description:** Default branch to track and use for workflows
+- **Example:** `main`, `develop`, `production`
 
 #### `spec.artifactBucket`
 - **Type:** `object`
 - **Description:** S3-compatible artifact bucket configuration for workflow outputs
 - **Properties:**
-  - `hostname` (string): S3 endpoint URL (e.g., `https://s3.us-west-2.amazonaws.com`, `https://minio.example.org:9000`)
-  - `bucket` (string): Bucket name for storing workflow artifacts
-  - `region` (string): Object store region
-  - `insecure` (boolean): Use HTTP instead of HTTPS
-  - `pathStyle` (boolean): Force path-style requests (`s3.amazonaws.com/bucket`)
-  - `externalSecretPath` (string): Vault KV v2 path for S3 credentials (e.g., `argo/apps/my-repo/s3/artifacts`)
+  - `hostname`: S3 endpoint URL (e.g., `minio.minio-system.svc.cluster.local:9000`)
+  - `bucket`: Bucket name for storing workflow artifacts
+  - `region`: Object store region (e.g., `us-east-1`)
+  - `insecure`: Use HTTP instead of HTTPS (boolean)
+  - `pathStyle`: Force path-style requests (boolean)
+  - `keyPrefix`: Prefix for all artifact keys (optional)
+  - `externalSecretPath`: Vault KV v2 path for S3 credentials (e.g., `argo/apps/my-project/s3/artifacts`)
 
 #### `spec.dataBucket`
 - **Type:** `object`
-- **Description:** S3-compatible data bucket configuration for primary data
+- **Description:** S3-compatible data bucket configuration for primary data storage
 - **Properties:** Same as `artifactBucket`
 
 #### `spec.adminUsers`
 - **Type:** `array` of `string` (email format)
-- **Description:** Administrator user email addresses (must be Fence-authenticated and Arborist-authorized)
-- **Example:** `["admin@example.com", "lead@example.com"]`
+- **Description:** Administrator user email addresses. These must correspond to Fence-authenticated and Arborist-authorized identities with admin-level access to workflows, logs, and configuration.
+- **Example:**
+  ```yaml
+  adminUsers:
+    - alice@example.com
+    - bob@example.com
+  ```
 
 #### `spec.readUsers`
 - **Type:** `array` of `string` (email format)
-- **Description:** Read-only user email addresses (must be Fence-authenticated and Arborist-authorized)
-- **Example:** `["viewer@example.com", "analyst@example.com"]`
+- **Description:** Read-only user email addresses. These correspond to Fence-authenticated, Arborist-authorized users with viewer access to workflow logs, metadata, and outputs.
+- **Example:**
+  ```yaml
+  readUsers:
+    - viewer@example.com
+    - analyst@example.com
+  ```
 
 #### `spec.isPublic`
 - **Type:** `boolean`
 - **Default:** `false`
-- **Description:** If true, workflow UIs and metadata may be visible without Fence login
+- **Description:** Public visibility flag. When `true`, workflows are viewable without login authentication.
+- **Example:** `false`
 
 ---
 
 ## 🔐 Vault Secret Configuration
 
-Before creating a `RepoRegistration`, ensure your secrets are stored in Vault.
+### GitHub App Installation ID
 
-### GitHub Credentials
+The controller authenticates to GitHub through the GitHub App that initiates onboarding. Capture the `installation_id` provided by the callback (the `gitapp-callback` service does this automatically) and set `spec.installationId` to that integer. Personal access tokens and manually managed GitHub secrets are no longer required for RepoRegistrations, and the Makefile targets enforce the same requirement via the `GITHUBHAPP_INSTALLATION_ID` environment variable.
 
-Store your GitHub Personal Access Token in Vault:
+### S3 Credentials
+
+Before creating a `RepoRegistration`, ensure your S3 credentials are stored in Vault at the path specified in `externalSecretPath`.
+
+Store your S3 credentials in Vault:
 
 ```bash
 # Using Vault CLI
-vault kv put kv/argo/apps/my-nextflow-project/github \
-  token=github_pat_XXXXXXXXXX
+vault kv put kv/argo/apps/my-nextflow-project/s3/artifacts \
+  AWS_ACCESS_KEY_ID=minioadmin \
+  AWS_SECRET_ACCESS_KEY=minioadmin
 
 # Or using Vault API
 curl -X POST \
   -H "X-Vault-Token: $VAULT_TOKEN" \
-  -d '{"data": {"token": "github_pat_XXXXXXXXXX"}}' \
-  http://vault.example.com:8200/v1/kv/data/argo/apps/my-nextflow-project/github
+  -d '{"data": {"AWS_ACCESS_KEY_ID": "minioadmin", "AWS_SECRET_ACCESS_KEY": "minioadmin"}}' \
+  http://vault.example.com:8200/v1/kv/data/argo/apps/my-nextflow-project/s3/artifacts
 ```
 
-The `githubSecretName` field in your `RepoRegistration` will reference the Kubernetes Secret created by ESO from this Vault path.
-
-### S3 Credentials
-
-Store your S3 access credentials in Vault:
-
-```bash
-# Artifact bucket credentials
-vault kv put kv/argo/apps/my-nextflow-project/s3/artifacts \
-  AWS_ACCESS_KEY_ID=AKIAXXXXXXXX \
-  AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxx
-
-# Data bucket credentials (if using separate credentials)
-vault kv put kv/argo/apps/my-nextflow-project/s3/data \
-  AWS_ACCESS_KEY_ID=AKIAXXXXXXXX \
-  AWS_SECRET_ACCESS_KEY=xxxxxxxxxxxxxxxxxxxxx
-```
-
-The `externalSecretPath` in `artifactBucket` and `dataBucket` should point to these Vault paths (relative to the Vault KV mount point).
+The `externalSecretPath` in `artifactBucket` and `dataBucket` should point to the appropriate Vault KV v2 paths containing the S3 credentials. External Secrets Operator will automatically sync these to Kubernetes Secrets in your namespace.
 
 ---
 
-## 📝 Complete Examples
+## 📚 Real-World Examples
 
-### Example 1: Basic Repository with Single S3 Bucket
+### Example 1: Simple Nextflow Project
 
 ```yaml
 apiVersion: platform.calypr.io/v1alpha1
 kind: RepoRegistration
 metadata:
-  name: simple-pipeline
+  name: nextflow-hello-project
   namespace: wf-poc
 spec:
-  repoUrl: https://github.com/myorg/simple-pipeline.git
+  repoUrl: https://github.com/bwalsh/nextflow-hello-project.git
+  defaultBranch: main
+  installationId: 456789
   tenant: myorg
-  workflowTemplateRef: nextflow-repo-runner
-  githubSecretName: github-secret-simple
+
   artifactBucket:
-    hostname: https://s3.amazonaws.com
-    bucket: simple-pipeline-artifacts
+    hostname: minio.minio-system.svc.cluster.local:9000
+    bucket: argo-artifacts
     region: us-east-1
-    externalSecretPath: argo/apps/simple-pipeline/s3
-  adminUsers:
-    - admin@myorg.com
-```
+    insecure: true
+    pathStyle: true
+    keyPrefix: nextflow-hello-workflows/
+    externalSecretPath: argo/apps/bwalsh/nextflow-hello-project/s3/artifacts
 
-### Example 2: Project with Separate Artifact and Data Buckets
-
-```yaml
-apiVersion: platform.calypr.io/v1alpha1
-kind: RepoRegistration
-metadata:
-  name: genomics-analysis
-  namespace: wf-poc
-spec:
-  repoUrl: https://github.com/genomics-lab/variant-calling.git
-  defaultBranch: develop
-  tenant: genomics-lab
-  workflowTemplateRef: nextflow-repo-runner
-  githubSecretName: github-secret-genomics
-  
-  # Artifacts bucket for workflow outputs
-  artifactBucket:
-    hostname: https://s3.us-west-2.amazonaws.com
-    bucket: genomics-workflow-artifacts
-    region: us-west-2
-    externalSecretPath: argo/apps/genomics/s3/artifacts
-  
-  # Data bucket for reference genomes and samples
-  dataBucket:
-    hostname: https://s3.us-west-2.amazonaws.com
-    bucket: genomics-reference-data
-    region: us-west-2
-    externalSecretPath: argo/apps/genomics/s3/data
-  
-  # Access control
   adminUsers:
-    - pi@genomics.edu
-    - bioinformatician@genomics.edu
+    - pi@research.edu
+    - lead-scientist@research.edu
+
   readUsers:
-    - postdoc@genomics.edu
-    - student@genomics.edu
-  
+    - postdoc@research.edu
+    - student@research.edu
+
   isPublic: false
 ```
 
-### Example 3: Using MinIO (Self-Hosted S3)
+### Example 2: Genomics Variant Calling Pipeline
 
 ```yaml
 apiVersion: platform.calypr.io/v1alpha1
 kind: RepoRegistration
 metadata:
-  name: local-workflows
+  name: genomics-variant-calling
   namespace: wf-poc
 spec:
-  repoUrl: https://github.com/internal/workflows.git
-  tenant: internal-team
-  workflowTemplateRef: nextflow-repo-runner
-  githubSecretName: github-secret-internal
-  
+  repoUrl: https://github.com/genomics-lab/variant-calling-pipeline.git
+  defaultBranch: main
+  installationId: 789012
+  tenant: genomics-lab
+
   artifactBucket:
-    hostname: https://minio.storage.local:9000
-    bucket: workflow-artifacts
-    region: us-east-1
-    insecure: true      # Using HTTP for local development
-    pathStyle: true     # MinIO uses path-style by default
-    externalSecretPath: argo/apps/internal/minio
-  
+    hostname: s3.us-west-2.amazonaws.com
+    bucket: genomics-lab-artifacts
+    region: us-west-2
+    insecure: false
+    pathStyle: false
+    keyPrefix: variant-calling/
+    externalSecretPath: argo/apps/genomics/s3/artifacts
+
+  dataBucket:
+    hostname: s3.us-west-2.amazonaws.com
+    bucket: genomics-lab-data
+    region: us-west-2
+    insecure: false
+    pathStyle: false
+    keyPrefix: reference-genomes/
+    externalSecretPath: argo/apps/genomics/s3/data
+
   adminUsers:
-    - devops@company.com
+    - genomics-lead@organization.edu
+    - senior-scientist@organization.edu
+
+  readUsers:
+    - researcher@organization.edu
+    - data-analyst@organization.edu
+
+  isPublic: false
 ```
 
-### Example 4: Public Repository (View-Only Access)
+### Example 3: Internal Development Workflows
 
 ```yaml
 apiVersion: platform.calypr.io/v1alpha1
 kind: RepoRegistration
 metadata:
-  name: public-demo
+  name: local-dev-workflows
   namespace: wf-poc
 spec:
-  repoUrl: https://github.com/demos/public-workflows.git
-  tenant: demos
-  workflowTemplateRef: nextflow-repo-runner
-  githubSecretName: github-secret-demo
-  
+  repoUrl: https://github.com/internal-org/dev-workflows.git
+  defaultBranch: develop
+  installationId: 246810
+  tenant: internal-team
+
   artifactBucket:
-    hostname: https://s3.amazonaws.com
-    bucket: demo-public-artifacts
+    hostname: minio.minio-system.svc.cluster.local:9000
+    bucket: argo-artifacts
     region: us-east-1
-    externalSecretPath: argo/apps/demo/s3
-  
-  # Admin access for maintainers
+    insecure: true
+    pathStyle: true
+    externalSecretPath: argo/apps/internal-dev/s3/artifacts
+
   adminUsers:
-    - maintainer@example.com
-  
-  # Public visibility enabled
+    - devops-team@internal.org
+
+  isPublic: false
+```
+
+### Example 4: Public Demo Project
+
+```yaml
+apiVersion: platform.calypr.io/v1alpha1
+kind: RepoRegistration
+metadata:
+  name: public-demo-workflows
+  namespace: wf-poc
+spec:
+  repoUrl: https://github.com/demo-org/public-workflows.git
+  defaultBranch: main
+  installationId: 135790
+  tenant: demos
+
+  artifactBucket:
+    hostname: minio.minio-system.svc.cluster.local:9000
+    bucket: argo-artifacts
+    region: us-east-1
+    insecure: true
+    pathStyle: true
+    externalSecretPath: argo/apps/demos/s3/artifacts
+
+  adminUsers:
+    - admin@demo.org
+
   isPublic: true
 ```
 
@@ -356,30 +403,24 @@ spec:
 
 ## 🔍 Troubleshooting
 
-### RepoRegistration Not Creating Resources
+### Registration Status Check
 
-1. **Check CRD Installation:**
-   ```bash
-   kubectl get crd reporegistrations.platform.calypr.io
-   ```
+```bash
+# Get detailed status
+kubectl get reporegistration -n wf-poc -o wide
 
-2. **Check RepoRegistration Status:**
-   ```bash
-   kubectl get reporegistration -A
-   kubectl describe reporegistration my-repo -n wf-poc
-   ```
+# Describe a specific registration
+kubectl describe reporegistration my-nextflow-project -n wf-poc
 
-3. **Check Controller Logs** (if using a controller/operator):
-   ```bash
-   kubectl logs -n argo-system deployment/repo-registration-controller
-   ```
+# Check controller logs
+kubectl logs -n argocd -l app=repo-registration-controller -f
+```
 
-### ExternalSecret Not Syncing
+### ExternalSecret Issues
 
 1. **Check ExternalSecret Status:**
    ```bash
-   kubectl get externalsecret -n wf-poc
-   kubectl describe externalsecret github-secret-my-project -n wf-poc
+   kubectl describe externalsecret s3-credentials-my-project -n wf-poc
    ```
 
 2. **Verify Vault Path:**
@@ -387,91 +428,59 @@ spec:
    vault kv get kv/argo/apps/my-nextflow-project/s3/artifacts
    ```
 
-3. **Check ESO Logs:**
+3. **Check ESO Pod Logs:**
    ```bash
-   kubectl logs -n external-secrets-system deployment/external-secrets
+   kubectl logs -n external-secrets-system -l app.kubernetes.io/name=external-secrets
    ```
 
-### Workflow Fails to Access S3
-
-1. **Verify Secret Exists:**
-   ```bash
-   kubectl get secret s3-credentials-my-project -n wf-poc -o yaml
-   ```
-
-2. **Check Secret Contents:**
-   ```bash
-   kubectl get secret s3-credentials-my-project -n wf-poc -o jsonpath='{.data}'
-   ```
-
-3. **Test S3 Access:**
-   ```bash
-   # Create a test pod with the secret
-   kubectl run s3-test --rm -it --image=amazon/aws-cli \
-     --env AWS_ACCESS_KEY_ID=$(kubectl get secret s3-credentials-my-project -o jsonpath='{.data.AWS_ACCESS_KEY_ID}' | base64 -d) \
-     --env AWS_SECRET_ACCESS_KEY=$(kubectl get secret s3-credentials-my-project -o jsonpath='{.data.AWS_SECRET_ACCESS_KEY}' | base64 -d) \
-     -- s3 ls s3://my-bucket/
-   ```
-
----
-
-## 🔄 Updating a RepoRegistration
-
-To update an existing registration:
+### ArgoCD Application Issues
 
 ```bash
-# Edit the YAML file
-vim my-repo-registration.yaml
+# Check if Application was created
+kubectl get application -n argocd
 
-# Apply the changes
-kubectl apply -f my-repo-registration.yaml
+# Get Application details
+kubectl describe application my-nextflow-project -n argocd
 
-# Verify the update
-kubectl get reporegistration my-nextflow-project -n wf-poc -o yaml
+# Check ArgoCD server logs
+kubectl logs -n argocd -l app.kubernetes.io/name=argocd-server
 ```
 
----
-
-## 🗑️ Deleting a RepoRegistration
-
-To remove a repository registration:
+### GitHub Webhook Issues
 
 ```bash
-kubectl delete reporegistration my-nextflow-project -n wf-poc
+# Verify Argo Events EventSource
+kubectl get eventsource -n argo-events
+
+# Check webhook deliveries in GitHub
+# Navigate to repository Settings → Webhooks in GitHub UI
 ```
 
-**Note:** Depending on the controller configuration, this may or may not automatically clean up the associated ArgoCD Application, EventSource, and secrets. Check with your platform administrator for the cleanup policy.
+### Common Issues and Solutions
+
+| Issue | Cause | Solution |
+|-------|-------|----------|
+| RepoRegistration shows `Failed` phase | Missing or invalid `installationId` | Capture `installation_id` from GitHub App callback and set in `spec.installationId` |
+| ExternalSecret not syncing | Vault path doesn't exist | Verify S3 credentials exist at the Vault path specified in `externalSecretPath` |
+| Application not synced | Missing S3 or GitHub credentials | Ensure ExternalSecret has synced successfully (`kubectl get secret`) |
+| Workflow can't access artifacts | S3 bucket misconfigured | Verify `hostname`, `bucket`, `region`, and credentials in Vault |
 
 ---
 
-## 🔗 Related Documentation
+## 📝 Next Steps
 
-- [User Guide — Running Nextflow Workflows from GitHub](./user-guide.md)
-- [Secrets with Vault](./secrets-with-vault.md)
-- [Debugging Vault and External Secrets](./debugging-vault-external-secrets.md)
-- [Per-Repository Artifacts Configuration](../examples/per-repo-artifacts-values.yaml)
-
----
-
-## 💡 Best Practices
-
-1. **Use Separate Buckets per Project:** Isolate artifacts and data for security and cost tracking
-2. **Store Secrets in Vault:** Never commit credentials to Git repositories
-3. **Use Email-Based Access Control:** Align with Fence/Arborist for consistent authorization
-4. **Set `isPublic: false` for Sensitive Data:** Require authentication for private workflows
-5. **Use Descriptive Names:** Name your `RepoRegistration` to match your repository or project
-6. **Configure Both Artifact and Data Buckets:** Separate workflow outputs from input data
-7. **Test with Minimal Permissions First:** Start with limited access and expand as needed
+1. **Prepare Your Repository**: Ensure your repository contains Nextflow pipelines or workflow definitions
+2. **Capture Installation ID**: Use the GitHub App callback or manual installation to get the `installation_id`
+3. **Store S3 Credentials**: Place S3 credentials in Vault at appropriate paths
+4. **Create RepoRegistration**: Apply your `RepoRegistration` YAML to the cluster
+5. **Verify Setup**: Check that all resources are created and synced properly
+6. **Run Workflows**: Use Argo Workflows or Argo Events to trigger your pipelines
 
 ---
 
-## 📚 Schema Reference
+## 📖 Related Documentation
 
-The complete schema is defined in the CRD at `helm/argo-stack/crds/repo-registration-crd.yaml`.
-
-For the latest schema documentation:
-```bash
-kubectl explain reporegistration.spec
-kubectl explain reporegistration.spec.artifactBucket
-kubectl explain reporegistration.spec.dataBucket
-```
+- [Argo Workflows Documentation](https://argoproj.github.io/argo-workflows/)
+- [Argo CD Documentation](https://argo-cd.readthedocs.io/)
+- [Argo Events Documentation](https://argoproj.github.io/argo-events/)
+- [External Secrets Operator](https://external-secrets.io/)
