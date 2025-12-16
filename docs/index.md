@@ -17,7 +17,6 @@ structure, development workflows, testing, and troubleshooting.
 ## 2. Operations and Administration
 - [Repo Registration Guide](repo-registration-guide.md) - Self-service repository onboarding
 - [Tenant Onboarding](tenant-onboarding.md) - Step-by-step tenant setup
-- [GitHub Integration Guide](github.md) - GitHub webhook and integration setup
 - [Admin Guide](admin-guide.md) - Platform administration and operations
 - [Secrets With Vault](secrets-with-vault.md) - Complete Vault + External Secrets Operator guide
 - [Troubleshooting](troubleshooting.md) - Comprehensive troubleshooting for all components
@@ -51,8 +50,6 @@ structure, development workflows, testing, and troubleshooting.
 **[Repo Registration Guide](repo-registration-guide.md)** - Details on the RepoRegistration custom resource, required fields, and how it automates namespace, RBAC, workflow templates, and artifact repository wiring.
 
 **[Tenant Onboarding](tenant-onboarding.md)** - Step-by-step checklist for onboarding a new GitHub repository as a tenant.
-
-**[GitHub Integration Guide](github.md)** - GitHub webhook configuration, expected payloads, and event flow into Argo Events and Argo Workflows.
 
 **[Admin Guide](admin-guide.md)** - Operational guidance for platform administrators managing the Argo Stack, including deployment, monitoring, and maintenance.
 
