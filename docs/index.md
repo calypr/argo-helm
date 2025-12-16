@@ -22,10 +22,9 @@ structure, development workflows, testing, and troubleshooting.
 - [Troubleshooting](troubleshooting.md) - Comprehensive troubleshooting for all components
 
 ## 3. Architecture and Design
-- [ADR Multi Tenant Namespaces](adr-multi-tenant-namespaces.md) - Multi-tenancy architecture decisions
-- [Artifact Repository Reference](artifact-repository-ref.md) - Artifact storage configuration
+- [ADR Multi Tenant Namespaces](adr/adr-multi-tenant-namespaces.md) - Multi-tenancy architecture decisions
+- [Artifact Repository Reference](adr/artifact-repository-ref.md) - Artifact storage configuration
 - [Templates Reference](templates.md) - Helm template documentation
-- [Template Overlap Analysis](template-overlap-analysis.md) - Template usage analysis
 - [Vault Architecture Diagrams](vault-architecture-diagrams.md) - Vault integration diagrams
 - [Vault Seeding Strategy](vault-seeding-strategy.md) - Vault initialization strategy
 - [Vault Integration Summary](vault-integration-summary.md) - High-level Vault integration overview
@@ -64,8 +63,6 @@ structure, development workflows, testing, and troubleshooting.
 **[Artifact Repository Reference](artifact-repository-ref.md)** - How artifact repository references are resolved at global, app, and tenant levels.
 
 **[Templates Reference](templates.md)** - Complete reference for all Helm templates in helm/argo-stack/templates.
-
-**[Template Overlap Analysis](template-overlap-analysis.md)** - Analysis of template usage before and after the repo registration refactor.
 
 **[Vault Architecture Diagrams](vault-architecture-diagrams.md)** - Collection of diagrams showing Vault, SecretStore, ExternalSecret, and controller interactions.
 
