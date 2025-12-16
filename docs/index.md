@@ -13,11 +13,11 @@ structure, development workflows, testing, and troubleshooting.
 
 ## 1. User Guides
 - [User Guide](user-guide.md) - Comprehensive guide for running Nextflow workflows from GitHub
+
+## 2. Operations and Administration
 - [Repo Registration Guide](repo-registration-guide.md) - Self-service repository onboarding
 - [Tenant Onboarding](tenant-onboarding.md) - Step-by-step tenant setup
 - [GitHub Integration Guide](github.md) - GitHub webhook and integration setup
-
-## 2. Operations and Administration
 - [Admin Guide](admin-guide.md) - Platform administration and operations
 - [Secrets With Vault](secrets-with-vault.md) - Complete Vault + External Secrets Operator guide
 - [Troubleshooting](troubleshooting.md) - Comprehensive troubleshooting for all components
