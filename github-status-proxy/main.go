@@ -253,13 +253,6 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-// 	// Extract commit SHA from labels
-// 	commitSHA, ok := event.Labels["calypr.io/commit-sha"]
-// 	if !ok || commitSHA == "" {
-// 		respondError(w, http.StatusBadRequest, "Missing or empty calypr.io/commit-sha label")
-// 		return
-// 	}
-
     if event.CommitSha == "" {
 		respondError(w, http.StatusBadRequest, "Missing or empty calypr.io/commit-sha label")
 		return
@@ -275,10 +268,10 @@ func handleWorkflow(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Map workflow phase to GitHub status state
-	state := mapWorkflowPhaseToGitHubState(event.Phase)
+	state := mapWorkflowToGitHubState(event.Phase, event.Status)
 	
 	// Create context based on workflow name and namespace
-	context := fmt.Sprintf("argo-workflows/%s/%s", event.Namespace, event.Workflow)
+	context := fmt.Sprintf("workflows/%s/%s", event.Namespace, event.Workflow)
 	
 	// Create description based on event type
 	description := fmt.Sprintf("Workflow %s", strings.ToLower(event.Phase))
@@ -377,7 +370,17 @@ func validateWorkflowEvent(event *WorkflowEvent) error {
 	return nil
 }
 
-func mapWorkflowPhaseToGitHubState(phase string) string {
+func mapWorkflowToGitHubState(phase string, status string) string {
+    // Priority: check status first
+	switch strings.ToLower(status) {
+	case "succeeded":
+		return "success"
+	case "failed", "error":
+		return "failure"
+	case "running", "pending":
+		return "pending"
+	// If status is unrecognized, fall back to phase mapping (no default here)
+	}
 	switch strings.ToLower(phase) {
 	case "succeeded":
 		return "success"
@@ -388,6 +391,7 @@ func mapWorkflowPhaseToGitHubState(phase string) string {
 	default:
 		return "error"
 	}
+
 }
 
 func validateRequest(req *StatusRequest) error {
