@@ -9,101 +9,92 @@ spec:
     plural: reporegistrations
     singular: reporegistration
     kind: RepoRegistration
-    shortNames:
-      - rr
+    shortNames: [rr]
   versions:
     - name: v1alpha1
       served: true
       storage: true
+      subresources:
+        status: {}
       schema:
         openAPIV3Schema:
           type: object
           description: RepoRegistration defines self-service onboarding for Git repos.
           properties:
-            apiVersion:
-              type: string
-            kind:
-              type: string
-            metadata:
-              type: object
             spec:
               type: object
+              description: "Specification of the desired behavior of the RepoRegistration"
               required:
                 - repoUrl
-                - tenant
-                - workflowTemplateRef
-                - githubSecretName
+                - installationId
               properties:
                 repoUrl:
                   type: string
                   description: "Git repository URL to onboard (https://github.com/org/repo.git)"
                   pattern: '^https://.+\.git$'
+
                 defaultBranch:
                   type: string
                   description: "Default branch to track (e.g. main)"
+                  default: "main"
+
                 tenant:
                   type: string
                   description: "Tenant identifier, e.g. program/project or org short code."
-                workflowTemplateRef:
-                  type: string
-                  description: "Argo WorkflowTemplate name used to run this repo's workflows."
+
+                installationId:
+                  type: integer
+                  minimum: 1
+                  description: >
+                    GitHub App installation_id for the repository. Required when onboarding
+                    using GitHub App authentication.
+
                 artifactBucket:
                   type: object
-                  description: >
-                    S3-compatible artifact bucket configuration. Credentials are discovered
-                    via Vault using externalSecretPath and injected by External Secrets Operator.
+                  description: "S3-compatible artifact bucket configuration for workflow outputs"
                   properties:
                     hostname:
                       type: string
-                      description: "S3 endpoint hostname or URL (e.g. https://minio.example.org:9000)"
+                      description: "S3 endpoint URL (e.g., https://s3.us-west-2.amazonaws.com)"
                     bucket:
                       type: string
-                      description: "Bucket name for storing workflow artifacts."
+                      description: "Bucket name for storing workflow artifacts"
                     region:
                       type: string
-                      description: "Object store region (AWS-compatible semantics)."
+                      description: "Object store region"
                     insecure:
                       type: boolean
-                      description: "Use HTTP instead of HTTPS when connecting to the bucket."
+                      description: "Use HTTP instead of HTTPS"
                     pathStyle:
                       type: boolean
-                      description: "If true, forces path-style requests (s3.amazonaws.com/bucket)."
+                      description: "Force path-style requests (s3.amazonaws.com/bucket)"
                     externalSecretPath:
                       type: string
-                      description: >
-                        Vault KV v2 path holding S3 credentials for this artifact bucket
-                        (e.g. argo/apps/my-repo/s3/artifacts).
+                      description: "Vault KV v2 path for S3 credentials"
+
                 dataBucket:
                   type: object
-                  description: >
-                    S3-compatible data bucket configuration. Credentials are discovered
-                    via Vault using externalSecretPath and injected by External Secrets Operator.
+                  description: "S3-compatible data bucket configuration for primary data"
                   properties:
                     hostname:
                       type: string
-                      description: "S3 endpoint hostname or URL (e.g. https://minio.example.org:9000)"
+                      description: "S3 endpoint URL (e.g., https://s3.us-west-2.amazonaws.com)"
                     bucket:
                       type: string
-                      description: "Bucket name for storing primary data."
+                      description: "Bucket name for storing primary data"
                     region:
                       type: string
-                      description: "Object store region (AWS-compatible semantics)."
+                      description: "Object store region"
                     insecure:
                       type: boolean
-                      description: "Use HTTP instead of HTTPS when connecting to the bucket."
+                      description: "Use HTTP instead of HTTPS"
                     pathStyle:
                       type: boolean
-                      description: "If true, forces path-style requests (s3.amazonaws.com/bucket)."
+                      description: "Force path-style requests (s3.amazonaws.com/bucket)"
                     externalSecretPath:
                       type: string
-                      description: >
-                        Vault KV v2 path holding S3 credentials for this data bucket
-                        (e.g. argo/apps/my-repo/s3/data).
-                githubSecretName:
-                  type: string
-                  description: >
-                    Name of the Kubernetes Secret or ExternalSecret target that contains
-                    GitHub credentials (PAT or GitHub App token, webhook secret, etc.).
+                      description: "Vault KV v2 path for S3 credentials"
+
                 adminUsers:
                   type: array
                   description: >
@@ -113,6 +104,7 @@ spec:
                   items:
                     type: string
                     format: email
+
                 readUsers:
                   type: array
                   description: >
@@ -122,22 +114,22 @@ spec:
                   items:
                     type: string
                     format: email
+
                 isPublic:
                   type: boolean
-                  description: >
-                    If true, Argo workflow UIs and metadata for this repo may be visible
-                    without Fence login, depending on ingress and authorization policy.
+                  default: false
+                  description: "Public visibility flag - workflows viewable without login"
             status:
               type: object
-              description: Current reconciliation state of the RepoRegistration.
+              description: "Status of the RepoRegistration"
               properties:
                 phase:
                   type: string
-                  description: "Simple phase indicator (Pending, Ready, Error)."
+                  description: "Current phase of the registration (e.g., Pending, Active, Failed)"
                 message:
                   type: string
-                  description: "Human-readable status message for debugging."
+                  description: "Human-readable message about the current status"
                 lastReconciled:
                   type: string
                   format: date-time
-                  description: "Timestamp of last successful reconciliation."
+                  description: "Timestamp of last reconciliation"

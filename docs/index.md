@@ -13,11 +13,11 @@ structure, development workflows, testing, and troubleshooting.
 
 ## 1. User Guides
 - [User Guide](user-guide.md) - Comprehensive guide for running Nextflow workflows from GitHub
+
+## 2. Operations and Administration
 - [Repo Registration Guide](repo-registration-guide.md) - Self-service repository onboarding
 - [Tenant Onboarding](tenant-onboarding.md) - Step-by-step tenant setup
 - [GitHub Integration Guide](github.md) - GitHub webhook and integration setup
-
-## 2. Operations and Administration
 - [Admin Guide](admin-guide.md) - Platform administration and operations
 - [Secrets With Vault](secrets-with-vault.md) - Complete Vault + External Secrets Operator guide
 - [Troubleshooting](troubleshooting.md) - Comprehensive troubleshooting for all components
@@ -46,13 +46,13 @@ structure, development workflows, testing, and troubleshooting.
 
 **[User Guide](user-guide.md)** - Comprehensive guide for data managers and developers to run Nextflow workflows from GitHub, including GitHub integration, artifact storage, and self-service repository registration.
 
+### Operations and Administration
+
 **[Repo Registration Guide](repo-registration-guide.md)** - Details on the RepoRegistration custom resource, required fields, and how it automates namespace, RBAC, workflow templates, and artifact repository wiring.
 
 **[Tenant Onboarding](tenant-onboarding.md)** - Step-by-step checklist for onboarding a new GitHub repository as a tenant.
 
 **[GitHub Integration Guide](github.md)** - GitHub webhook configuration, expected payloads, and event flow into Argo Events and Argo Workflows.
-
-### Operations and Administration
 
 **[Admin Guide](admin-guide.md)** - Operational guidance for platform administrators managing the Argo Stack, including deployment, monitoring, and maintenance.
 

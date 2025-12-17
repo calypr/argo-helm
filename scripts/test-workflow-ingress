@@ -1,0 +1,7 @@
+set -x #echo on
+
+kubectl get svc argo-stack-argo-workflows-server-proxy -n argo-stack -o yaml | grep externalName
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never --   curl -v http://argo-stack-argo-workflows-server.argo-workflows:2746/
+kubectl run -it --rm debug --image=curlimages/curl --restart=Never --   curl -v http://argo-stack-argo-workflows-server-proxy.argo-stack:2746/
+curl https://calypr-demo.ddns.net/workflows
+

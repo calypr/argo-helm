@@ -1,0 +1,132 @@
+{{- if .Values.githubStatusProxy.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-notifications-cm
+  namespace: {{ .Values.namespaces.argocd }}
+  labels:
+    app.kubernetes.io/name: argocd-notifications-cm
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/managed-by: {{ .Release.Service }}
+data:
+  # ============================================================================
+  # GitHub Status Proxy Service Configuration
+  # ============================================================================
+  service.webhook.github-status-proxy: |
+    url: http://github-status-proxy.{{ .Values.githubStatusProxy.namespace | default .Values.namespaces.argocd }}.svc.cluster.local:8080
+    headers:
+    - name: Content-Type
+      value: application/json
+
+  # ============================================================================
+  # Notification Templates
+  # ============================================================================
+
+  {{- /* derive base URL once */ -}}
+  {{- $argocdUrl := .Values.notifications.argocdUrl | default "https://calypr-demo.ddns.net/applications" }}
+
+  # Template for successful sync
+  template.app-sync-succeeded: |
+    webhook:
+      github-status-proxy:
+        method: POST
+        path: /status
+        body: |
+          {
+            "repo_url": "{{`{{.app.spec.source.repoURL}}`}}",
+            "sha": "{{`{{.app.status.sync.revision}}`}}",
+            "state": "success",
+            "context": "applications/{{`{{.app.metadata.name}}`}}",
+            "target_url": "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}",
+            "description": "Application synced successfully"
+          }
+
+  # Template for failed sync
+  template.app-sync-failed: |
+    webhook:
+      github-status-proxy:
+        method: POST
+        path: /status
+        body: |
+          {
+            "repo_url": "{{`{{.app.spec.source.repoURL}}`}}",
+            "sha": "{{`{{.app.status.sync.revision}}`}}",
+            "state": "failure",
+            "context": "applications/{{`{{.app.metadata.name}}`}}",
+            "target_url": "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}",
+            "description": "Application sync failed"
+          }
+
+  # Template for running sync
+  template.app-sync-running: |
+    webhook:
+      github-status-proxy:
+        method: POST
+        path: /status
+        body: |
+          {
+            "repo_url": "{{`{{.app.spec.source.repoURL}}`}}",
+            "sha": "{{`{{.app.status.sync.revision}}`}}",
+            "state": "pending",
+            "context": "applications/{{`{{.app.metadata.name}}`}}",
+            "target_url": "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}",
+            "description": "Application sync in progress"
+          }
+
+  # Template for deployment
+  template.app-deployed: |
+    webhook:
+      github-status-proxy:
+        method: POST
+        path: /status
+        body: |
+          {
+            "repo_url": "{{`{{.app.spec.source.repoURL}}`}}",
+            "sha": "{{`{{.app.status.sync.revision}}`}}",
+            "state": "success",
+            "context": "applications/{{`{{.app.metadata.name}}`}}/deployed",
+            "target_url": "{{ $argocdUrl }}/{{`{{.app.metadata.name}}`}}",
+            "description": "Application deployed successfully"
+          }
+
+  # ============================================================================
+  # Triggers - When to send notifications
+  # ============================================================================
+  trigger.on-sync-succeeded: |
+    - when: app.status.sync.status == 'Synced' && app.status.health.status == 'Healthy'
+      oncePer: app.status.sync.revision
+      send:
+        - app-sync-succeeded
+        - app-deployed      
+
+  trigger.on-sync-failed: |
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Error', 'Failed']
+      send: [app-sync-failed]
+
+  trigger.on-sync-running: |
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Running']
+      send: [app-sync-running]
+
+  trigger.on-deployed: |
+    - when: app.status.operationState != nil && app.status.operationState.phase in ['Succeeded'] && app.status.health.status == 'Healthy'
+      send: [app-deployed]
+
+  # ============================================================================
+  # Default Subscriptions
+  # ============================================================================
+  # Apply these triggers to all applications by default.
+  # IMPORTANT: This is commented out by default to prevent unintended notifications.
+  # Uncomment ONLY if you want ALL applications to automatically send GitHub statuses
+  # without requiring per-application subscription annotations.
+  #
+  # Without this, applications must explicitly subscribe using annotations like:
+  #   annotations:
+  #     notifications.argoproj.io/subscribe.on-sync-succeeded.github-status-proxy: ""
+  #     notifications.argoproj.io/subscribe.on-sync-failed.github-status-proxy: ""
+  #
+  # defaultTriggers: |
+  #   - on-sync-succeeded
+  #   - on-sync-failed
+  #   - on-sync-running
+{{- end }}
+

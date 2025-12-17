@@ -8,9 +8,11 @@
 namespaces:
   argo: argo-workflows
   argocd: argocd
-  tenant: wf-poc
+  calypr-tenants: calypr-tenants
   security: security
   argo-events: argo-events
+  argo-stack: argo-stack
+  calypr-api: calypr-api
 
 # ============================================================================
 # External Secrets Operator (ESO) and Vault Integration
@@ -141,9 +143,11 @@ argo-workflows:
     namespaced: true
     extraArgs:
       - --auth-mode=server
+    # UI/API lives under /workflows
+    baseHref: "/workflows/"
   controller:
     workflowNamespaces:
-      - wf-poc
+      - argo-workflows
     # Ensure controller uses correct namespace
     namespaceInstallMode: true
     # Enable log archiving for all workflows
@@ -159,26 +163,171 @@ argo-cd:
     enabled: true
     namespace: argocd                       # where Argo CD runs
   namespaceOverride: argocd
+  admin.enabled: "false"                    # turn off login screen
   configs:
     secret:
       create: true
       # provide a strong random key (hex or base64 is fine)
-      extra: {}  # MUST be a map, not a string/boolean
+      extra: # MUST be a map, not a string/boolean
+        # any sufficiently random string; 32+ chars is nice
+        server.secretkey: "some-long-random-string-change-me"
       # Never commit your real token in a Git repo. instead, override it at deploy time using:
       # export ARGO_CD_SECRET=replace with output of: openssl rand -hex 32
       # helm upgrade --install ... argo-cd.configs.secret.extra."server\.secretkey"="${ARGOCD_SECRET_KEY}"
       # server.secretkey: "<?= replace with output of: openssl rand -hex 32 ?>"
+    cm:
+      # External URL including the sub-path
+      url: https://calypr-demo.ddns.net/applications
+      dex.config: |
+        enablePasswordDB: false
+        oauth2:
+          alwaysShowLoginScreen: false
+        connectors:
+          - type: authproxy
+            id: authproxy
+            name: Auth Proxy
+            config:
+              userHeader: "X-Auth-Request-User"
+              groupHeader: "X-Auth-Request-Groups"      
+    params:
+      # Argo CD is behind ingress that terminates TLS
+      server.insecure: true
+      # Tell ArgoCD UI/API it’s under /applications
+      server.basehref: "/applications"
+      # server.rootpath: "/applications"
+  notifications:
+    enabled: true
+    cm:
+      create: false  # don't create default configmap, we will override settings below
 
 # ============================================================================
 # Authorization Adapter Settings (Arborist Integration)
 # ============================================================================
 
 authzAdapter:
-  image: ghcr.io/calypr/argo-helm:latest
+  image:
+    repository: authz-adapter
+    pullPolicy: IfNotPresent
+    tag: v0.0.1
   fenceBase: "https://calypr-dev.ohsu.edu/user"
   replicas: 2
   # Ensure adapter uses security namespace
   namespace: security
+  # Debug mode settings (for development/testing only)
+  # When debugEmail is set, enables debug mode and allows debug_email/debug_groups query params
+  debugEmail: brian@bwalsh.com
+  # Comma-separated list of groups to assign to the debug user
+  debugGroups: wf-admins
+
+# ============================================================================
+# Landing Page Configuration
+# ============================================================================
+# A simple static landing page that renders markdown files at the root path (/)
+# Content is sourced from a host-mounted directory containing markdown files.
+
+landingPage:
+  # Enable the landing page deployment
+  enabled: true
+  # Container image configuration
+  image:
+    repository: landing-page
+    tag: v3
+    pullPolicy: IfNotPresent
+  # Page title
+  title: "Welcome"
+  # --------------------------------------------------------------------------
+  # docsPath - Host path to mount for markdown content (optional)
+  # --------------------------------------------------------------------------
+  # This is a Kubernetes hostPath volume that mounts a directory from the
+  # node's filesystem into the landing-page container at /docs.
+  #
+  # For kind clusters:
+  #   - The path refers to a directory inside the kind-control-plane container
+  #   - To mount a host directory, use kind's extraMounts in kind-config.yaml:
+  #       extraMounts:
+  #         - hostPath: /path/on/your/host
+  #           containerPath: /var/www/docs
+  #   - Then set docsPath: "/var/www/docs"
+  #
+  # Content updates:
+  #   - Changes to markdown files are picked up on browser refresh (no restart needed)
+  #   - The page fetches markdown via JavaScript on each page load
+  #   - nginx serves files directly from the mounted directory
+  #
+  # If not set, shows a default "no content available" message.
+  # SECURITY: Only expose a dedicated docs directory, not sensitive host paths
+  # Example: "/var/www/docs"
+  docsPath: "/var/www/docs"
+
+# ============================================================================
+# GitHub App Callback Service Configuration
+# ============================================================================
+# Handles GitHub App post-installation callbacks and provides a web form
+# for users to configure repository registration settings.
+
+gitappCallback:
+  # Enable the GitHub App callback service deployment
+  enabled: true
+  # Container image configuration
+  image:
+    repository: gitapp-callback
+    tag: v1.0.0
+    pullPolicy: IfNotPresent
+  # Number of replicas
+  replicas: 2
+  # Flask secret key for session management
+  # IMPORTANT: Override this in production with a secure random value
+  # Recommended: Use Vault with External Secrets Operator
+  # Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'
+  secretKey: "REPLACE_ME_WITH_SECURE_RANDOM_VALUE"
+  # GitHub App name (displayed in the UI)
+  githubAppName: "calypr-workflows"
+  # Persistence configuration for registration database
+  persistence:
+    # Enable persistent storage for SQLite database (uses PVC or host mount based on useExtraMounts)
+    enabled: true
+    # Use host-mounted volumes for persistence (for kind clusters with extraMounts)
+    # When true, uses hostPath volume. When false and enabled=true, uses PVC.
+    # Must match the extraMounts configuration in kind-config.yaml:
+    #   - hostPath: $PWD/registrations
+    #     containerPath: /var/registrations
+    useExtraMounts: true
+    # Host path to mount for registrations data (when useExtraMounts is true)
+    # This should match the containerPath in kind-config.yaml extraMounts
+    # Example: "/var/registrations"
+    registrationsPath: "/var/registrations"
+    # Use an existing PVC (if not specified and useExtraMounts=false, a new one will be created)
+    existingClaim: ""
+    # Storage class for PVC (if empty, uses cluster default)
+    storageClass: ""
+    # Storage size
+    size: "10Mi" # Requests 10 Megabytes of storage
+
+# ============================================================================
+# GitHub Status Proxy Settings
+# ============================================================================
+
+githubStatusProxy:
+  enabled: false
+  image:
+    repository: github-status-proxy
+    tag: latest
+    pullPolicy: IfNotPresent  
+  replicas: 2
+  namespace: argocd
+  # GitHub App configuration
+  # The App ID can be found in your GitHub App settings
+  githubAppId: ""
+  # Reference to a secret containing the GitHub App private key
+  # This should typically reference the same secret created by the githubApp ExternalSecret
+  # When using vault/external-secrets: set githubApp.privateKeyVaultPath and this will
+  # automatically reference the secret created by externalsecret-github-app.yaml
+  privateKeySecret:
+    name: github-app-private-key
+    key: privateKey  # Key name in the secret (matches ExternalSecret output)
+  # Log level: INFO or DEBUG
+  # DEBUG will log incoming/outgoing HTTP requests and responses
+  logLevel: "INFO"
 
 # ============================================================================
 # Artifact Storage Configuration ( Results of Workflows )
@@ -194,26 +343,102 @@ s3:
   accessKey: ""
   secretKey: ""
 
-# Ingresses we ship (toggle/hosts)
-ingress:
-  argoWorkflows:
-    enabled: true
-    host: "argo.localtest.me"
-    tls:
-      enabled: false
-      secretName: ""
-  argocd:
-    enabled: true
-    host: "argocd.localtest.me"
-    tls:
-      enabled: false
-      secretName: ""
 
 # NGINX auth to the adapter
 ingressAuth:
   enabled: true
   authURL: "http://authz-adapter.security.svc.cluster.local:8080/check"
   passAuthorization: true
+
+# ============================================================================
+# Ingress Configuration
+# ============================================================================
+
+ingress:
+  # Argo Workflows ingress
+  argoWorkflows:
+    enabled: false
+    host: ""
+    tls:
+      enabled: false
+      secretName: ""
+  
+  # Argo CD ingress
+  argocd:
+    enabled: false
+    host: ""
+    tls:
+      enabled: false
+      secretName: ""
+  
+  # GitHub App Callback ingress
+  gitappCallback:
+    enabled: false
+    host: ""
+    tls:
+      enabled: false
+      secretName: ""
+
+# ============================================================================
+# Ingress AuthZ Overlay - Unified Path-Based Routing with Centralized Auth
+# ============================================================================
+# Enable this overlay to provide a single host, path-based ingress for all
+# major UIs and APIs, protected by the authz-adapter.
+# See: helm/argo-stack/overlays/ingress-authz-overlay/docs/authz-ingress-user-guide.md
+#
+# To use the overlay, install it separately:
+#   helm upgrade --install ingress-authz-overlay \
+#     helm/argo-stack/overlays/ingress-authz-overlay \
+#     --values helm/argo-stack/values.yaml \
+#     --set ingressAuthzOverlay.enabled=true
+
+ingressAuthzOverlay:
+  enabled: true
+  host: calypr-demo.ddns.net
+  tls:
+    secretName: calypr-demo-tls
+  authzAdapter:
+    # Use centralized adapter from security namespace
+    deploy: false
+    serviceName: authz-adapter
+    namespace: security
+    port: 8080
+    path: /check
+    signinUrl: https://calypr-demo.ddns.net/tenants/login
+    responseHeaders: X-User, X-Email, X-Groups
+  routes:
+    landing:
+      namespace: security
+      service: landing-page
+      port: 80
+      pathPrefix: /
+    workflows:
+      namespace: argo-stack
+      service: argo-stack-argo-workflows-server
+      port: 2746
+      pathPrefix: /workflows
+    applications:
+      namespace: argo-stack
+      service: argo-stack-argocd-server
+      port: 8080
+      pathPrefix: /applications
+      # ArgoCD server uses HTTPS by default
+      backendProtocol: HTTPS      
+    registrations:
+      namespace: argo-stack
+      service: github-repo-registrations-eventsource-svc
+      port: 12000
+      pathPrefix: /events
+    api:
+      namespace: calypr-api
+      service: calypr-api
+      port: 3000
+      pathPrefix: /api
+    tenants:
+      namespace: calypr-tenants
+      service: calypr-tenants
+      port: 3001
+      pathPrefix: /tenants
 
 # ============================================================================
 # Argo CD Applications - Multi-Application Support (REMOVED)
@@ -320,6 +545,10 @@ workflows:
   # ServiceAccount name used by workflow pods in tenant namespaces
   # This is created automatically per tenant by repoRegistrations
   runnerServiceAccount: wf-runner
+  
+  # Base URL for Argo Workflows UI - used in GitHub commit status target URLs
+  # This should point to your Argo Workflows ingress/UI endpoint
+  baseUrl: "https://argo-workflows.example.com"
 
 # ============================================================================
 # RepoRegistration - Self-Service Repository Onboarding (DECLARATIVE)
@@ -385,3 +614,116 @@ repoRegistrations: []
   #     - admin@myorg.com
   #
   # See examples/repo-registrations-example.yaml and docs/repo-registration-guide.md
+
+
+# for roles
+# Namespace where Argo CD is installed
+argocdNamespace: argocd
+
+# Prefix for workflow namespaces. For a repoUrl https://github.com/<org>/<repo>.git,
+# the workflow namespace is assumed to be: <workflowNamespacePrefix><org>-<repo>
+workflowNamespacePrefix: wf-
+
+# Global group that should have full Argo CD admin privileges
+adminGroup: wf-admins
+
+
+# ============================================================================
+# GitHub App Authentication for Repository Access
+# ============================================================================
+# Use GitHub App for secure, auditable, least-privilege repository access.
+# This replaces Personal Access Tokens (PATs) or SSH keys with short-lived
+# installation tokens that are automatically rotated.
+#
+# See docs/github-app-setup.md for detailed setup instructions.
+
+githubApp:
+  # Enable GitHub App authentication for Argo CD repositories
+  enabled: true
+
+  # GitHub App ID (found in the GitHub App settings)
+  appId: $GITHUBHAPP_APP_ID
+
+  # GitHub App Installation ID (found in the installation settings)
+  installationId: $GITHUBHAPP_INSTALLATION_ID
+
+  # Name of the Kubernetes Secret containing the GitHub App private key
+  # The secret should contain a key named 'privateKey' with the PEM-formatted key
+  privateKeySecretName: $GITHUBHAPP_PRIVATE_KEY_SECRET_NAME
+
+  # Vault path for the GitHub App private key (when using External Secrets)
+  # Format: "path#key" where path is relative to vault.kv.defaultPathPrefix
+  privateKeyVaultPath: $GITHUBHAPP_PRIVATE_KEY_VAULT_PATH
+
+  # Repository credential scope
+  # Use this to grant access to all repositories under an organization
+  # Example: "https://github.com/your-org" grants access to all repos in the org
+  # repoCredsUrl: ""
+
+  # Additional annotations for the repo-creds secret
+  annotations: {}
+
+# ============================================================================
+# Argo CD Notifications - GitHub Status Integration
+# ============================================================================
+# Configure Argo CD to post deployment status updates back to GitHub.
+# This enables developers to see sync status directly in pull requests
+# and commit statuses without switching to the Argo CD UI.
+#
+# See docs/github-app-setup.md for GitHub App permissions setup.
+
+notifications:
+  # Enable Argo CD Notifications controller
+  enabled: true
+  cm:
+    create: false  # don't create default configmap, we will override settings below
+  # for status templates
+  argocdUrl: https://calypr-demo.ddns.net/applications
+  # turn on debugging
+  # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/templates/argocd-notifications/deployment.yaml#L76-L77
+  logLevel: debug
+  # https://github.com/argoproj/argo-helm/blob/main/charts/argo-cd/templates/argocd-notifications/deployment.yaml#L86-L88
+  extraEnv:
+    - name: ARGOCD_NOTIFICATIONS_HTTP_DEBUG
+      value: "true"
+    - name: GODEBUG
+      value: "http2debug=2"
+  # GitHub notification service configuration
+  github:
+    # Enable GitHub status updates
+    enabled: true
+
+    # Use GitHub App for notifications (recommended)
+    # When enabled, uses the same GitHub App as repository authentication
+    useGithubApp: true
+
+    # GitHub App ID (defaults to githubApp.appId if not set)
+    # appId: ""
+
+    # GitHub App Installation ID (defaults to githubApp.installationId if not set)
+    # installationId: ""
+
+    # Private key secret reference (defaults to githubApp.privateKeySecretName if not set)
+    # privateKeySecretName: ""
+
+  # Default notification triggers
+  # These define when notifications are sent
+  triggers:
+    # Notify on successful sync
+    onSyncSucceeded: true
+    # Notify on failed sync
+    onSyncFailed: true
+    # Notify when sync is running
+    onSyncRunning: false
+    # Notify on health degraded
+    onHealthDegraded: false
+
+  # Application annotations to subscribe to notifications
+  # Add these annotations to your Argo CD Applications to enable notifications:
+  #   notifications.argoproj.io/subscribe.on-sync-succeeded.github: ""
+  #   notifications.argoproj.io/subscribe.on-sync-failed.github: ""
+  defaultSubscriptions:
+    # Automatically add notification subscriptions to applications
+    # created from repoRegistrations
+    autoSubscribe: true
+

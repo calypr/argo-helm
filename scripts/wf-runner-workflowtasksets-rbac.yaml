@@ -1,0 +1,35 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: wf-runner-workflowtasksets
+  namespace: wf-bwalsh-nextflow-hello-project
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources:
+      - workflowtasksets
+      - workflowtasksets/status
+    verbs:
+      - get
+      - list
+      - watch
+      - patch
+      - update
+      # you generally don't need create/delete from the runner,
+      # but it's harmless if you include them:
+      # - create
+      # - delete
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: wf-runner-workflowtasksets-binding
+  namespace: wf-bwalsh-nextflow-hello-project
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: wf-runner-workflowtasksets
+subjects:
+  - kind: ServiceAccount
+    name: wf-runner
+    namespace: wf-bwalsh-nextflow-hello-project
+
