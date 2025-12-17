@@ -1,4 +1,4 @@
-[Home](index.md) > Architecture and Design
+[Home](../index.md) > Architecture and Design
 
 Here’s the regenerated ADR with full text **and** an inline Mermaid diagram you can drop straight into `docs/adr/NN-namespace-strategy-for-multi-tenant-argo-workflows.md`.
 

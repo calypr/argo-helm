@@ -19,16 +19,19 @@ structure, development workflows, testing, and troubleshooting.
 - [Tenant Onboarding](tenant-onboarding.md) - Step-by-step tenant setup
 - [Admin Guide](admin-guide.md) - Platform administration and operations
 - [Secrets With Vault](secrets-with-vault.md) - Complete Vault + External Secrets Operator guide
-- [Troubleshooting](troubleshooting.md) - Comprehensive troubleshooting for all components
+- [Trouble Shooting](troubleshooting.md) - Comprehensive troubleshooting for all components
 
 ## 3. Architecture and Design
-- [ADR Multi Tenant Namespaces](adr/adr-multi-tenant-namespaces.md) - Multi-tenancy architecture decisions
-- [Artifact Repository Reference](adr/artifact-repository-ref.md) - Artifact storage configuration
 - [Templates Reference](templates.md) - Helm template documentation
 - [Vault Architecture Diagrams](vault-architecture-diagrams.md) - Vault integration diagrams
 - [Vault Seeding Strategy](vault-seeding-strategy.md) - Vault initialization strategy
 - [Vault Integration Summary](vault-integration-summary.md) - High-level Vault integration overview
-
+- [ADR GitHub status proxy for multi tenant github apps](adr/0001-github-status-proxy-for-multi-tenant-github-apps.md) - Design decision for GitHub status proxy
+- [ADR GitHub app secrets handling](adr/0002-github-app-secrets-handling.md) - Design decision for GitHub App secret management
+- [ADR Workflow GitHub Status](adr/0003-Workflow-GitHub-Status.md) - Authenticating and posting status updates from workflows
+- [ADR Multi Tenant Namespaces](adr/0004-multi-tenant-namespaces.md) - Multi-tenancy architecture decisions
+- [ADR Authz Adapter](adr/0005-authz-adapter.md) - Fence-based authorization adapter design
+ 
 ## 4. Development
 - [Development Guide](development.md) - Developer setup and workflows
 - [Testing Guide](testing.md) - Testing strategies and procedures
