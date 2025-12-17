@@ -28,10 +28,10 @@ structure, development workflows, testing, and troubleshooting.
 - [Vault Integration Summary](vault-integration-summary.md) - High-level Vault integration overview
 - [ADR GitHub status proxy for multi tenant github apps](adr/0001-github-status-proxy-for-multi-tenant-github-apps.md) - Design decision for GitHub status proxy
 - [ADR GitHub app secrets handling](adr/0002-github-app-secrets-handling.md) - Design decision for GitHub App secret management
-- [ADR Workflow GitHub Status](adr/0003-Workflow-GitHub-Status.md) - Authenticating and posting status updates from workflows
+- [ADR Workflow GitHub Status](adr/0003-workflow-github-status.md) - Authenticating and posting status updates from workflows
 - [ADR Multi Tenant Namespaces](adr/0004-multi-tenant-namespaces.md) - Multi-tenancy architecture decisions
 - [ADR Authz Adapter](adr/0005-authz-adapter.md) - Fence-based authorization adapter design
- 
+
 ## 4. Development
 - [Development Guide](development.md) - Developer setup and workflows
 - [Testing Guide](testing.md) - Testing strategies and procedures
