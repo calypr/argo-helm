@@ -12,3 +12,7 @@ helm/argo-stack/charts/external-secrets-*.tgz
 .coverage
 htmlcov/
 .pytest_cache/
+
+# Vault cluster keys created from `make vault-init`
+secrets/
+cluster-keys.json

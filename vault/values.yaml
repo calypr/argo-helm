@@ -1,0 +1,32 @@
+injector:
+  enabled: false
+
+ui:
+  enabled: true
+
+server:
+  dev:
+    enabled: false
+
+  ha:
+    enabled: true
+    replicas: 3
+
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        ui = true
+        listener "tcp" {
+          tls_disable = 1
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+        }
+        storage "raft" {
+          path = "/vault/data"
+        }
+
+  dataStorage:
+    enabled: true
+    size: 10Gi
+    mountPath: "/vault/data"
