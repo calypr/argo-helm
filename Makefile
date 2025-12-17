@@ -121,7 +121,7 @@ show-limits:
 
 
 kind:
-	kind delete cluster || true
+# 	kind delete cluster || true
 	envsubst < kind-config.yaml | kind create cluster --config -
 
 minio:
@@ -385,15 +385,25 @@ help:
 # Vault Development Targets (Helm-based in-cluster deployment)
 # ============================================================================
 
+vault-init:
+	@echo "🌱 Initializing Vault..."
+	@mkdir -p secrets
+	@kubectl exec -n vault vault-0 -- vault operator init -key-shares=1 -key-threshold=1 -format=json > secrets/cluster-keys.json
+	@echo "🔓 Unsealing Vault..."
+	@kubectl exec -n vault vault-0 -- vault operator unseal $$(jq -r ".unseal_keys_b64[0]" secrets/cluster-keys.json)
+	@echo "🔑 Root Token: $$(jq -r ".root_token" cluster-keys.json)"
+
 vault-dev:
 	@echo "🔐 Installing Vault dev server in Kubernetes cluster..."
 	@helm repo add hashicorp https://helm.releases.hashicorp.com 2>/dev/null || true
 	@helm repo update hashicorp
+	
 	@kubectl create namespace vault 2>/dev/null || true
 	@helm upgrade --install vault hashicorp/vault \
 		--namespace vault \
 		--values vault/values.yaml \
 		--wait --timeout 2m
+
 	@echo "⏳ Waiting for Vault to be ready..."
 	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=vault -n vault --timeout=120s
 	@echo "✅ Vault dev server running in cluster"
@@ -522,6 +532,7 @@ vault-auth:
                 ttl=1h
 	@kubectl exec -n vault vault-0 -- vault read auth/kubernetes/role/argo-stack
 	@echo "✅ Service account to Vault dev server added"
+
 vault-shell:
 	@echo "🐚 Opening shell in Vault pod..."
 	@kubectl exec -it -n vault vault-0 -- /bin/sh
