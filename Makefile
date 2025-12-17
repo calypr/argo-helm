@@ -229,11 +229,7 @@ vault-dev:
 	@kubectl create namespace vault 2>/dev/null || true
 	@helm upgrade --install vault hashicorp/vault \
 		--namespace vault \
-		--set server.dev.enabled=true \
-		--set server.dev.devRootToken=$(VAULT_TOKEN) \
-		--set injector.enabled=false \
-		--set ui.enabled=true \
-		--set server.dataStorage.enabled=false \
+		--values vault/values.yaml \
 		--wait --timeout 2m
 	@echo "⏳ Waiting for Vault to be ready..."
 	@kubectl wait --for=condition=Ready pod -l app.kubernetes.io/name=vault -n vault --timeout=120s
