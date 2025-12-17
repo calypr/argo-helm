@@ -17,19 +17,20 @@ structure, development workflows, testing, and troubleshooting.
 ## 2. Operations and Administration
 - [Repo Registration Guide](repo-registration-guide.md) - Self-service repository onboarding
 - [Tenant Onboarding](tenant-onboarding.md) - Step-by-step tenant setup
-- [GitHub Integration Guide](github.md) - GitHub webhook and integration setup
 - [Admin Guide](admin-guide.md) - Platform administration and operations
 - [Secrets With Vault](secrets-with-vault.md) - Complete Vault + External Secrets Operator guide
 - [Troubleshooting](troubleshooting.md) - Comprehensive troubleshooting for all components
 
 ## 3. Architecture and Design
-- [ADR Multi Tenant Namespaces](adr-multi-tenant-namespaces.md) - Multi-tenancy architecture decisions
-- [Artifact Repository Reference](artifact-repository-ref.md) - Artifact storage configuration
 - [Templates Reference](templates.md) - Helm template documentation
-- [Template Overlap Analysis](template-overlap-analysis.md) - Template usage analysis
 - [Vault Architecture Diagrams](vault-architecture-diagrams.md) - Vault integration diagrams
 - [Vault Seeding Strategy](vault-seeding-strategy.md) - Vault initialization strategy
 - [Vault Integration Summary](vault-integration-summary.md) - High-level Vault integration overview
+- [ADR GitHub status proxy for multi tenant github apps](adr/0001-github-status-proxy-for-multi-tenant-github-apps.md) - Design decision for GitHub status proxy
+- [ADR GitHub app secrets handling](adr/0002-github-app-secrets-handling.md) - Design decision for GitHub App secret management
+- [ADR Workflow GitHub Status](adr/0003-workflow-github-status.md) - Authenticating and posting status updates from workflows
+- [ADR Multi Tenant Namespaces](adr/0004-multi-tenant-namespaces.md) - Multi-tenancy architecture decisions
+- [ADR Authz Adapter](adr/0005-authz-adapter.md) - Fence-based authorization adapter design
 
 ## 4. Development
 - [Development Guide](development.md) - Developer setup and workflows
@@ -52,8 +53,6 @@ structure, development workflows, testing, and troubleshooting.
 
 **[Tenant Onboarding](tenant-onboarding.md)** - Step-by-step checklist for onboarding a new GitHub repository as a tenant.
 
-**[GitHub Integration Guide](github.md)** - GitHub webhook configuration, expected payloads, and event flow into Argo Events and Argo Workflows.
-
 **[Admin Guide](admin-guide.md)** - Operational guidance for platform administrators managing the Argo Stack, including deployment, monitoring, and maintenance.
 
 **[Secrets With Vault](secrets-with-vault.md)** - Complete guide to managing secrets using HashiCorp Vault and External Secrets Operator, including authentication methods, secret rotation, and troubleshooting.
@@ -67,8 +66,6 @@ structure, development workflows, testing, and troubleshooting.
 **[Artifact Repository Reference](artifact-repository-ref.md)** - How artifact repository references are resolved at global, app, and tenant levels.
 
 **[Templates Reference](templates.md)** - Complete reference for all Helm templates in helm/argo-stack/templates.
-
-**[Template Overlap Analysis](template-overlap-analysis.md)** - Analysis of template usage before and after the repo registration refactor.
 
 **[Vault Architecture Diagrams](vault-architecture-diagrams.md)** - Collection of diagrams showing Vault, SecretStore, ExternalSecret, and controller interactions.
 

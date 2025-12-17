@@ -1,4 +1,4 @@
-[Home](index.md) > Architecture and Design
+[Home](../index.md) > Architecture and Design
 
 # ADR: Namespace Strategy for Multi-Tenant Argo Workflows
 
