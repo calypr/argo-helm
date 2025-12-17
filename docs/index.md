@@ -19,7 +19,7 @@ structure, development workflows, testing, and troubleshooting.
 - [Tenant Onboarding](tenant-onboarding.md) - Step-by-step tenant setup
 - [Admin Guide](admin-guide.md) - Platform administration and operations
 - [Secrets With Vault](secrets-with-vault.md) - Complete Vault + External Secrets Operator guide
-- [Trouble Shooting](troubleshooting.md) - Comprehensive troubleshooting for all components
+- [Troubleshooting](troubleshooting.md) - Comprehensive troubleshooting for all components
 
 ## 3. Architecture and Design
 - [Templates Reference](templates.md) - Helm template documentation

@@ -841,12 +841,12 @@ kubectl cluster-info >/dev/null 2>&1 && echo "✅ Cluster OK" || echo "❌ Clust
 
 echo ""
 echo "Component status:"
-kubectl get pods -n argocd -q >/dev/null 2>&1 && echo "✅ ArgoCD running" || echo "❌ ArgoCD not found"
-kubectl get pods -n argo-workflows -q >/dev/null 2>&1 && echo "✅ Argo Workflows running" || echo "❌ Argo Workflows not found"
-kubectl get pods -n argo-events -q >/dev/null 2>&1 && echo "✅ Argo Events running" || echo "❌ Argo Events not found"
-kubectl get pods -n vault -q >/dev/null 2>&1 && echo "✅ Vault running" || echo "❌ Vault not found"
-kubectl get pods -n minio-system -q >/dev/null 2>&1 && echo "✅ MinIO running" || echo "❌ MinIO not found"
-kubectl get pods -n external-secrets-system -q >/dev/null 2>&1 && echo "✅ ESO running" || echo "❌ ESO not found"
+kubectl get pods -n argocd >/dev/null 2>&1 && echo "✅ ArgoCD running" || echo "❌ ArgoCD not found"
+kubectl get pods -n argo-workflows >/dev/null 2>&1 && echo "✅ Argo Workflows running" || echo "❌ Argo Workflows not found"
+kubectl get pods -n argo-events >/dev/null 2>&1 && echo "✅ Argo Events running" || echo "❌ Argo Events not found"
+kubectl get pods -n vault >/dev/null 2>&1 && echo "✅ Vault running" || echo "❌ Vault not found"
+kubectl get pods -n minio-system >/dev/null 2>&1 && echo "✅ MinIO running" || echo "❌ MinIO not found"
+kubectl get pods -n external-secrets-system >/dev/null 2>&1 && echo "✅ ESO running" || echo "❌ ESO not found"
 
 echo ""
 echo "Secrets status:"
