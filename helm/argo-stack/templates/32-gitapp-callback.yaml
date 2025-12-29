@@ -33,6 +33,11 @@ spec:
           value: {{ .Values.gitappCallback.githubAppName | quote }}
         - name: DB_PATH
           value: "/var/registrations/registrations.sqlite"
+        - name: GITHUB_APP_ID
+          value: {{ .Values.gitappCallback.appId }}
+        - name: GITHUB_APP_PRIVATE_KEY_PATH
+          value: /etc/github/private-key.pem
+
         ports:
         - containerPort: 8080
         volumeMounts:
@@ -43,13 +48,13 @@ spec:
             path: /healthz
             port: 8080
           initialDelaySeconds: 5
-          periodSeconds: 10
+          periodSeconds: 30
         readinessProbe:
           httpGet:
             path: /healthz
             port: 8080
-          initialDelaySeconds: 2
-          periodSeconds: 5
+          initialDelaySeconds: 5
+          periodSeconds: 30
       volumes:
       - name: registrations-data
         {{- if and .Values.gitappCallback.persistence.enabled .Values.gitappCallback.persistence.useExtraMounts }}
@@ -64,6 +69,13 @@ spec:
         {{- else }}
         emptyDir: {}
         {{- end }}
+      - name: github-app-key
+        secret:
+          secretName: {{ .Values.githubStatusProxy.privateKeySecret.name }}
+          items:
+          - key: {{ .Values.githubStatusProxy.privateKeySecret.key }}
+            path: private-key.pem
+          optional: false
 ---
 apiVersion: v1
 kind: Service
