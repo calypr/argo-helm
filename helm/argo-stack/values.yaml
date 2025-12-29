@@ -281,7 +281,7 @@ gitappCallback:
   # Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'
   secretKey: "REPLACE_ME_WITH_SECURE_RANDOM_VALUE"
   # GitHub App name (displayed in the UI)
-  githubAppName: "calypr-workflows"
+  githubAppName: "calypr-demo"
   # Persistence configuration for registration database
   persistence:
     # Enable persistent storage for SQLite database (uses PVC or host mount based on useExtraMounts)
