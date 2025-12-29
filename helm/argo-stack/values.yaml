@@ -314,7 +314,7 @@ githubStatusProxy:
     tag: latest
     pullPolicy: IfNotPresent  
   replicas: 2
-  namespace: argocd
+  namespace: security
   # GitHub App configuration
   # The App ID can be found in your GitHub App settings
   githubAppId: ""
