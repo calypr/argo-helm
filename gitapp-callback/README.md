@@ -216,6 +216,10 @@ spec:
 2. Set "Post-installation redirect URL" to: `https://your-domain.com/registrations`
 3. GitHub will append `?installation_id=XXX&setup_action=install` automatically
 
+
+## References
+https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/about-the-user-authorization-callback-url
+
 ## Future Enhancements
 
 - [ ] Persist configuration to Kubernetes CRD (RepoRegistration)
