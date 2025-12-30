@@ -97,15 +97,44 @@ def parse_repo_owner_name(repo_url: str) -> Tuple[str, str]:
     return owner, repo
 
 
-def ensure_repo_registration_submodule() -> None:
+def ensure_repo_registration() -> None:
     """
-    Ensure the REPO_REGISTRATION repository is checked out as a submodule.
+    Ensure the REPO_REGISTRATION repository is checked out.
     """
     if not REPO_REGISTRATION:
-        logger.info("REPO_REGISTRATION not set; skipping submodule initialization.")
+        logger.info("REPO_REGISTRATION not set; skipping registrations checkout.")
         return
     if not GITHUB_PAT:
         raise ValueError("GITHUB_PAT environment variable not set")
+
+    if not (REPO_ROOT / ".git").exists():
+        if not REGISTRATIONS_PATH.exists():
+            logger.info("Cloning registrations repository without submodule.")
+            run_git_command(
+                ["clone", REPO_REGISTRATION, str(REGISTRATIONS_PATH)],
+                REPO_ROOT,
+                use_auth=True,
+            )
+            return
+        if (REGISTRATIONS_PATH / ".git").exists():
+            logger.info("Updating registrations repository checkout.")
+            run_git_command(
+                ["fetch", "origin", "--prune"],
+                REGISTRATIONS_PATH,
+                use_auth=True,
+            )
+            default_branch = get_default_branch(REGISTRATIONS_PATH)
+            run_git_command(["checkout", default_branch], REGISTRATIONS_PATH)
+            run_git_command(
+                ["reset", "--hard", f"origin/{default_branch}"],
+                REGISTRATIONS_PATH,
+            )
+            return
+        if any(REGISTRATIONS_PATH.iterdir()):
+            logger.warning(
+                "Registrations path exists and is not a git repo; skipping checkout."
+            )
+        return
 
     gitmodules_path = REPO_ROOT / ".gitmodules"
     submodule_declared = False
@@ -161,7 +190,7 @@ def create_registration_pull_request(
     if not repositories:
         raise ValueError("No repositories available to generate registration file.")
 
-    ensure_repo_registration_submodule()
+    ensure_repo_registration()
 
     if len(repositories) > 1:
         logging.warning("Multiple repositories found for installation; using the first one.")
