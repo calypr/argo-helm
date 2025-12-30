@@ -56,6 +56,10 @@ spec:
           value: {{ .Values.gitappCallback.githubAppName | quote }}
         - name: DB_PATH
           value: "/var/registrations/registrations.sqlite"
+        - name: GITHUB_APP_ID
+          value: {{ .Values.githubApp.appId | quote }}
+        - name: GITHUB_PRIVATE_KEY_PATH
+          value: /etc/github/private-key.pem          
         ports:
         - containerPort: 8080
         volumeMounts:
@@ -102,7 +106,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: gitapp-callback
-  namespace: {{ .Values.namespaces.security }}
+  namespace: {{ .Values.namespaces.argocd }}
   labels:
     app: gitapp-callback
     app.kubernetes.io/name: gitapp-callback

@@ -210,6 +210,10 @@ spec:
     app: gitapp-callback
 ```
 
+## References
+https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/about-the-user-authorization-callback-url
+
+
 ### GitHub App Configuration
 
 1. Go to your GitHub App settings

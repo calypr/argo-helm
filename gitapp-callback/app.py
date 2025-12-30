@@ -20,6 +20,10 @@ import json
 from pathlib import Path
 from flask import Flask, request, render_template, jsonify, redirect, url_for
 import logging
+import jwt
+import time
+import requests
+from typing import List, Dict, Optional
 
 # Configure logging
 logging.basicConfig(
@@ -32,10 +36,118 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-producti
 
 # Configuration
 GITHUB_APP_NAME = os.environ.get("GITHUB_APP_NAME", "calypr-workflows")
+GITHUB_APP_ID = os.environ.get("GITHUB_APP_ID")
+GITHUB_PRIVATE_KEY_PATH = os.environ.get("GITHUB_PRIVATE_KEY_PATH", "/var/secrets/github-app-key.pem")
+
 
 # Default to /tmp in development/test, /var/registrations in production
 DEFAULT_DB_PATH = "/tmp/registrations.sqlite" if os.environ.get("FLASK_ENV") == "development" or os.environ.get("TESTING") else "/var/registrations/registrations.sqlite"
 DB_PATH = os.environ.get("DB_PATH", DEFAULT_DB_PATH)
+
+
+def get_github_app_jwt() -> str:
+    """
+    Generate a JWT for GitHub App authentication.
+
+    Returns:
+        JWT token string for authenticating as the GitHub App
+
+    Raises:
+        ValueError: If GITHUB_APP_ID is not set
+        FileNotFoundError: If private key file doesn't exist
+    """
+    if not GITHUB_APP_ID:
+        raise ValueError("GITHUB_APP_ID environment variable not set")
+
+    # Read private key
+    with open(GITHUB_PRIVATE_KEY_PATH, 'rb') as key_file:
+        private_key = key_file.read()
+
+    # Create JWT payload
+    payload = {
+        'iat': int(time.time()),
+        'exp': int(time.time()) + 600,  # 10 minutes
+        'iss': GITHUB_APP_ID
+    }
+
+    # Generate JWT
+    token = jwt.encode(payload, private_key, algorithm='RS256')
+    return token
+
+
+def get_installation_access_token(installation_id: str) -> str:
+    """
+    Get an installation access token for API calls.
+
+    Args:
+        installation_id: GitHub installation ID
+
+    Returns:
+        Access token for the installation
+
+    Raises:
+        requests.HTTPError: If GitHub API request fails
+    """
+    jwt_token = get_github_app_jwt()
+
+    url = f"https://api.github.com/app/installations/{installation_id}/access_tokens"
+    headers = {
+        "Authorization": f"Bearer {jwt_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    response = requests.post(url, headers=headers)
+    response.raise_for_status()
+
+    return response.json()['token']
+
+
+def get_installation_repositories(installation_id: str) -> List[Dict[str, any]]:
+    """
+    Retrieve repositories for a GitHub App installation.
+
+    Args:
+        installation_id: GitHub installation ID
+
+    Returns:
+        List of repository dictionaries with keys like:
+        - 'id': Repository ID
+        - 'name': Repository name
+        - 'full_name': Owner/repo format
+        - 'private': Boolean for private/public
+        - 'html_url': Repository URL
+
+    Raises:
+        requests.HTTPError: If GitHub API request fails
+    """
+    access_token = get_installation_access_token(installation_id)
+
+    url = "https://api.github.com/installation/repositories"
+    headers = {
+        "Authorization": f"token {access_token}",
+        "Accept": "application/vnd.github.v3+json"
+    }
+
+    repositories = []
+    page = 1
+
+    while True:
+        response = requests.get(
+            url,
+            headers=headers,
+            params={"per_page": 100, "page": page}
+        )
+        response.raise_for_status()
+
+        data = response.json()
+        repositories.extend(data.get('repositories', []))
+
+        # Check if there are more pages
+        if len(data.get('repositories', [])) < 100:
+            break
+        page += 1
+
+    return repositories
 
 
 def init_db():
@@ -96,13 +208,14 @@ def get_registration(installation_id):
     return None
 
 
-def save_registration(installation_id, registration_data):
+def save_registration(installation_id, registration_data, repositories):
     """
     Save or update a registration in the database.
     
     Args:
         installation_id: The GitHub installation ID
         registration_data: The RepoRegistration configuration dict
+        repositories: List of repositories associated with the installation
     """
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -158,6 +271,10 @@ def registrations_form():
     installation_id = request.args.get("installation_id")
     setup_action = request.args.get("setup_action", "install")
 
+    # retrieve the repository this installation is for
+    # installation_id is required
+
+
     # Validate installation_id is present
     if not installation_id:
         logger.warning("Missing installation_id in callback")
@@ -183,7 +300,32 @@ def registrations_form():
             ),
             400,
         )
-    
+
+    # Retrieve repositories for this installation
+    try:
+        repositories = get_installation_repositories(installation_id)
+        logger.info(f"Retrieved {len(repositories)} repositories for installation {installation_id}")
+    except requests.HTTPError as e:
+        logger.error(f"Failed to retrieve repositories: {e}")
+        return (
+            render_template(
+                "error.html",
+                error_message="Failed to retrieve repository information from GitHub. Please try again.",
+                github_app_name=GITHUB_APP_NAME,
+            ),
+            500,
+        )
+    except Exception as e:
+        logger.exception("Unexpected error retrieving repositories")
+        return (
+            render_template(
+                "error.html",
+                error_message="An unexpected error occurred. Please try again.",
+                github_app_name=GITHUB_APP_NAME,
+            ),
+            500,
+        )
+
     # Validate setup_action is valid
     if setup_action not in ["install", "update"]:
         logger.warning(f"Invalid setup_action: {setup_action[:50]}")
@@ -381,10 +523,35 @@ def registrations_submit():
             "readUsers": read_users,
         }
 
-        logger.info(f"Repository registration submitted: installation_id={installation_id}")
+        # Retrieve repositories for this installation
+        try:
+            repositories = get_installation_repositories(installation_id)
+            logger.info(f"Retrieved {len(repositories)} repositories for installation {installation_id}")
+        except requests.HTTPError as e:
+            logger.error(f"Failed to retrieve repositories: {e}")
+            return (
+                render_template(
+                    "error.html",
+                    error_message="Failed to retrieve repository information from GitHub. Please try again.",
+                    github_app_name=GITHUB_APP_NAME,
+                ),
+                500,
+            )
+        except Exception as e:
+            logger.exception("Unexpected error retrieving repositories")
+            return (
+                render_template(
+                    "error.html",
+                    error_message="An unexpected error occurred. Please try again.",
+                    github_app_name=GITHUB_APP_NAME,
+                ),
+                500,
+            )
+
+        logger.info(f"Repository registration submitted: installation_id={installation_id} repositories={repositories}")
 
         # Save configuration to database
-        save_registration(installation_id, registration_config)
+        save_registration(installation_id, registration_config, repositories)
 
         # Return success response
         if request.headers.get("Accept") == "application/json":
@@ -418,3 +585,4 @@ if __name__ == "__main__":
         GITHUB_APP_NAME: Name of the GitHub App (default: calypr-workflows)
     """
     app.run(host="0.0.0.0", port=8080, debug=True)
+

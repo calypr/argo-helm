@@ -168,10 +168,10 @@ ingressAuthzOverlay:
     # GitHubb Callback for Repository Registrations
     registrations:
       enabled: true
-      namespace: security
+      namespace: argocd
       service: gitapp-callback
       # Service is in same namespace as ingress
-      serviceNamespace: security
+      serviceNamespace: argocd
       port: 8080
       pathPrefix: /registrations
         
