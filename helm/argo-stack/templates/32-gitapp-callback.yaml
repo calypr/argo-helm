@@ -80,13 +80,13 @@ spec:
             path: /healthz
             port: 8080
           initialDelaySeconds: 5
-          periodSeconds: 10
+          periodSeconds: 30
         readinessProbe:
           httpGet:
             path: /healthz
             port: 8080
           initialDelaySeconds: 2
-          periodSeconds: 5
+          periodSeconds: 30
       volumes:
       - name: registrations-data
         {{- if and .Values.gitappCallback.persistence.enabled .Values.gitappCallback.persistence.useExtraMounts }}
