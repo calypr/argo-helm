@@ -44,7 +44,35 @@ spec:
         - name: github-app-key
           mountPath: /etc/github
           readOnly: true
-      
+      # Init container to configure git credentials securely
+      - name: gitapp-callback-git-credentials
+        image: alpine/git:2.44.0
+        command:
+        - sh
+        - -c
+        - |
+          set -e
+          if [ -z "$GIT_USERNAME" ] || [ -z "$GIT_PAT" ]; then
+            echo "GIT_USERNAME or GIT_PAT not set"
+            exit 1
+          fi
+          mkdir -p /gitcreds
+          cat <<EOF > /gitcreds/.git-credentials
+https://$GIT_USERNAME:$GIT_PAT@github.com
+EOF
+        env:
+        - name: GIT_USERNAME
+          value: {{ .Values.gitappCallback.githubUserName }}
+        - name: GIT_PAT
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.gitappCallback.githubTokenSecret.name }}
+              key: {{ .Values.gitappCallback.githubTokenSecret.key }}
+        volumeMounts:
+        - name: git-credentials
+          mountPath: /gitcreds
+
+
       containers:
       - name: gitapp-callback
         image: "{{ .Values.gitappCallback.image.repository }}:{{ .Values.gitappCallback.image.tag }}"
@@ -79,6 +107,8 @@ spec:
           value: {{ .Values.gitappCallback.githubUserName }}
         - name: REPO_REGISTRATION
           value: {{ .Values.gitappCallback.githubRepoUrl | quote }}
+        - name: GIT_CREDENTIALS_FILE
+          value: /root/.git-credentials
 
         ports:
         - containerPort: 8080
@@ -87,7 +117,10 @@ spec:
           mountPath: /var/registrations
         - name: github-app-key
           mountPath: /etc/github
-          readOnly: true          
+          readOnly: true
+        - name: git-credentials
+          mountPath: /root
+
         livenessProbe:
           httpGet:
             path: /healthz
