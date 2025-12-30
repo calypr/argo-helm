@@ -57,9 +57,8 @@ spec:
             exit 1
           fi
           mkdir -p /gitcreds
-          cat <<EOF > /gitcreds/.git-credentials
-https://$GIT_USERNAME:$GIT_PAT@github.com
-EOF
+          CRED_STRING="https://${GIT_USERNAME}:${GIT_PAT}@github.com"
+          printf "%s\n" "${CRED_STRING}" | git credential-store store
         env:
         - name: GIT_USERNAME
           value: {{ .Values.gitappCallback.githubUserName }}
