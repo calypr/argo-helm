@@ -1,6 +1,3 @@
-Below is a **concise, implementation-ready Architecture Decision Record (ADR)** you can drop into a repo (e.g., `docs/adr/ADR-00X-ui-secret-handling.md`). It is written to stand up to security review and UX critique and maps cleanly to GitOps / CRD-backed systems.
-
----
 
 # ADR-00X: UI Handling of Secrets on CREATE and UPDATE
 
