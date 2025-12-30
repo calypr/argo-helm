@@ -271,6 +271,7 @@ gitappCallback:
   # Git repository URL for storing repo registration data
   # This repository contains declarative YAML files for each RepoRegistration
   githubRepoUrl: https://github.com/calypr/registrations-test
+  githubUserName: brian@bwalsh.com
   githubTokenSecret:
     vaultPath: argo/events/github#token
     name: github-reg-repo-token

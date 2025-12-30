@@ -75,6 +75,8 @@ spec:
             secretKeyRef:
               name: {{ .Values.gitappCallback.githubTokenSecret.name }}
               key: {{ .Values.gitappCallback.githubTokenSecret.key }}
+        - name: GIT_USERNAME
+          value: {{ .Values.gitappCallback.githubUserName }}
         - name: REPO_REGISTRATION
           value: {{ .Values.gitappCallback.githubRepoUrl | quote }}
 

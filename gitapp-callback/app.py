@@ -554,8 +554,8 @@ def save_registration(installation_id, registration_data, repositories=None):
     logger.info(f"Registration saved for installation_id={installation_id}")
 
 
-# Initialize submodule and database on startup
-ensure_repo_registration_submodule()
+# Initialize module and database on startup
+ensure_repo_registration()
 init_db()
 
 
