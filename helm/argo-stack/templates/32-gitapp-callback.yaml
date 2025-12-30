@@ -50,16 +50,19 @@ spec:
         image: "{{ .Values.gitappCallback.image.repository }}:{{ .Values.gitappCallback.image.tag }}"
         imagePullPolicy: "{{ .Values.gitappCallback.image.pullPolicy }}"
         env:
-        - name: SECRET_KEY
-          value: {{ .Values.gitappCallback.secretKey | quote }}
-        - name: GITHUB_APP_NAME
-          value: {{ .Values.gitappCallback.githubAppName | quote }}
-        - name: DB_PATH
-          value: "/var/registrations/registrations.sqlite"
+        # Environment variables for GitApp Callback
         - name: GITHUB_APP_ID
           value: {{ .Values.githubApp.appId | quote }}
         - name: GITHUB_PRIVATE_KEY_PATH
           value: /etc/github/private-key.pem
+        - name: SECRET_KEY
+          value: {{ .Values.gitappCallback.secretKey | quote }}
+        # for UI
+        - name: GITHUB_APP_NAME
+          value: {{ .Values.gitappCallback.githubAppName | quote }}
+        # for persistence
+        - name: DB_PATH
+          value: "/var/registrations/registrations.sqlite"
         - name: VAULT_ADDR
           value: {{ .Values.gitappCallback.vault.addr | quote }}
         - name: VAULT_TOKEN
@@ -67,6 +70,14 @@ spec:
             secretKeyRef:
               name: {{ .Values.gitappCallback.vault.tokenSecret.name }}
               key: {{ .Values.gitappCallback.vault.tokenSecret.key }}
+        - name: GITHUB_PAT
+        - valueFrom:
+          secretKeyRef:
+            name: {{ .Values.gitappCallback.githubTokenSecret.name }}
+            key: {{ .Values.gitappCallback.githubTokenSecret.key }}
+        - name: REPO_REGISTRATION
+          value: {{ .Values.gitappCallback.githubRepoUrl | quote }}
+
         ports:
         - containerPort: 8080
         volumeMounts:

@@ -17,13 +17,14 @@ import os
 import re
 import sqlite3
 import json
+import subprocess
 from pathlib import Path
 from flask import Flask, request, render_template, jsonify, redirect, url_for
 import logging
 import jwt
 import time
 import requests
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Tuple
 import hvac
 
 
@@ -40,6 +41,8 @@ app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-producti
 GITHUB_APP_NAME = os.environ.get("GITHUB_APP_NAME")
 GITHUB_APP_ID = os.environ.get("GITHUB_APP_ID")
 GITHUB_PRIVATE_KEY_PATH = os.environ.get("GITHUB_PRIVATE_KEY_PATH")
+GITHUB_PAT = os.environ.get("GITHUB_PAT")
+REPO_REGISTRATION = os.environ.get("REPO_REGISTRATION")
 VAULT_ADDR = os.environ.get("VAULT_ADDR")
 VAULT_TOKEN = os.environ.get("VAULT_TOKEN")
 
@@ -48,6 +51,203 @@ VAULT_TOKEN = os.environ.get("VAULT_TOKEN")
 # Default to /tmp in development/test, /var/registrations in production
 DEFAULT_DB_PATH = "/tmp/registrations.sqlite" if os.environ.get("FLASK_ENV") == "development" or os.environ.get("TESTING") else "/var/registrations/registrations.sqlite"
 DB_PATH = os.environ.get("DB_PATH", DEFAULT_DB_PATH)
+REPO_ROOT = Path(__file__).resolve().parents[1]
+REGISTRATIONS_PATH = REPO_ROOT / "registrations"
+
+
+def run_git_command(args: List[str], repo_dir: Path, use_auth: bool = False) -> str:
+    """
+    Run a git command and return stdout.
+
+    Args:
+        args: List of git arguments (without the leading 'git')
+        repo_dir: Working directory to run git in
+        use_auth: Whether to attach the PAT to git HTTP requests
+    """
+    cmd = ["git"]
+    if use_auth:
+        if not GITHUB_PAT:
+            raise ValueError("GITHUB_PAT environment variable not set")
+        cmd.extend(["-c", f"http.extraheader=Authorization: Bearer {GITHUB_PAT}"])
+    cmd.extend(args)
+    result = subprocess.run(
+        cmd,
+        cwd=repo_dir,
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    return result.stdout.strip()
+
+
+def parse_repo_owner_name(repo_url: str) -> Tuple[str, str]:
+    """
+    Parse a GitHub repository URL into owner and repo name.
+    """
+    if repo_url.startswith("git@"):
+        path = repo_url.split(":", 1)[1]
+    elif "github.com/" in repo_url:
+        path = repo_url.split("github.com/", 1)[1]
+    else:
+        path = repo_url
+    path = path.strip("/")
+    if path.endswith(".git"):
+        path = path[:-4]
+    owner, repo = path.split("/", 1)
+    return owner, repo
+
+
+def ensure_repo_registration_submodule() -> None:
+    """
+    Ensure the REPO_REGISTRATION repository is checked out as a submodule.
+    """
+    if not REPO_REGISTRATION:
+        logger.info("REPO_REGISTRATION not set; skipping submodule initialization.")
+        return
+    if not GITHUB_PAT:
+        raise ValueError("GITHUB_PAT environment variable not set")
+
+    gitmodules_path = REPO_ROOT / ".gitmodules"
+    submodule_declared = False
+    if gitmodules_path.exists():
+        submodule_declared = f"path = {REGISTRATIONS_PATH.name}" in gitmodules_path.read_text()
+
+    if not submodule_declared:
+        if REGISTRATIONS_PATH.exists() and any(REGISTRATIONS_PATH.iterdir()):
+            logger.warning(
+                "Registrations path exists and is not a submodule; skipping submodule add."
+            )
+            return
+        logger.info("Adding registrations repository as a git submodule.")
+        run_git_command(
+            ["submodule", "add", REPO_REGISTRATION, REGISTRATIONS_PATH.name],
+            REPO_ROOT,
+            use_auth=True,
+        )
+    else:
+        logger.info("Updating registrations git submodule.")
+        run_git_command(
+            ["submodule", "update", "--init", "--recursive", REGISTRATIONS_PATH.name],
+            REPO_ROOT,
+            use_auth=True,
+        )
+
+
+def get_default_branch(repo_dir: Path) -> str:
+    """
+    Determine the default branch for a repo, falling back to main.
+    """
+    try:
+        ref = run_git_command(
+            ["symbolic-ref", "refs/remotes/origin/HEAD"],
+            repo_dir,
+        )
+        return ref.split("/")[-1]
+    except subprocess.CalledProcessError:
+        return "main"
+
+
+def create_registration_pull_request(
+    installation_id: str, registration_config: Dict[str, any], repositories: List[Dict[str, any]]
+) -> None:
+    """
+    Create or update a RepoRegistration file and open a PR in the registrations repo.
+    """
+    if not REPO_REGISTRATION:
+        logger.info("REPO_REGISTRATION not set; skipping registration PR creation.")
+        return
+    if not GITHUB_PAT:
+        raise ValueError("GITHUB_PAT environment variable not set")
+    if not repositories:
+        raise ValueError("No repositories available to generate registration file.")
+
+    ensure_repo_registration_submodule()
+
+    if len(repositories) > 1:
+        logging.warning("Multiple repositories found for installation; using the first one.")
+
+    full_name = repositories[0]["full_name"]
+    owner, repo_name = full_name.split("/")
+
+    registration_repo_owner, registration_repo_name = parse_repo_owner_name(REPO_REGISTRATION)
+
+    registration_file = REGISTRATIONS_PATH / owner / f"{repo_name}.yaml"
+    branch_action = "update" if registration_file.exists() else "create"
+    branch_name = f"chore/{branch_action}-{owner}-{repo_name}"
+
+    run_git_command(["fetch", "origin", "--prune"], REGISTRATIONS_PATH, use_auth=True)
+    default_branch = get_default_branch(REGISTRATIONS_PATH)
+    run_git_command(
+        ["checkout", "-B", branch_name, f"origin/{default_branch}"],
+        REGISTRATIONS_PATH,
+    )
+
+    registration_file.parent.mkdir(parents=True, exist_ok=True)
+    registration_payload = {
+        "installation_id": installation_id,
+        "registration_config": registration_config,
+    }
+    registration_file.write_text(
+        json.dumps(registration_payload, indent=2, sort_keys=True) + "\n"
+    )
+
+    run_git_command(
+        ["add", str(registration_file.relative_to(REGISTRATIONS_PATH))],
+        REGISTRATIONS_PATH,
+    )
+    run_git_command(
+        ["commit", "--allow-empty", "-m", branch_name],
+        REGISTRATIONS_PATH,
+    )
+
+    run_git_command(["push", "-u", "origin", branch_name], REGISTRATIONS_PATH, use_auth=True)
+
+    pr_body = (
+        f"Automated repo registration for `{owner}/{repo_name}`.\n\n"
+        f"Installation ID: `{installation_id}`."
+    )
+    pr_url = f"https://api.github.com/repos/{registration_repo_owner}/{registration_repo_name}/pulls"
+    headers = {
+        "Authorization": f"token {GITHUB_PAT}",
+        "Accept": "application/vnd.github+json",
+    }
+    response = requests.post(
+        pr_url,
+        headers=headers,
+        json={
+            "title": branch_name,
+            "head": branch_name,
+            "base": default_branch,
+            "body": pr_body,
+        },
+    )
+
+    if response.status_code == 422:
+        existing_response = requests.get(
+            pr_url,
+            headers=headers,
+            params={"state": "open", "head": f"{registration_repo_owner}:{branch_name}"},
+        )
+        existing_response.raise_for_status()
+        pulls = existing_response.json()
+        if pulls:
+            pr_number = pulls[0]["number"]
+        else:
+            response.raise_for_status()
+    else:
+        response.raise_for_status()
+        pr_number = response.json()["number"]
+
+    reviewers_url = (
+        f"https://api.github.com/repos/{registration_repo_owner}/"
+        f"{registration_repo_name}/pulls/{pr_number}/requested_reviewers"
+    )
+    reviewers_response = requests.post(
+        reviewers_url,
+        headers=headers,
+        json={"reviewers": ["co-pilot"]},
+    )
+    reviewers_response.raise_for_status()
 
 
 def get_github_app_jwt() -> str:
@@ -325,7 +525,8 @@ def save_registration(installation_id, registration_data, repositories=None):
     logger.info(f"Registration saved for installation_id={installation_id}")
 
 
-# Initialize database on startup
+# Initialize submodule and database on startup
+ensure_repo_registration_submodule()
 init_db()
 
 
@@ -511,6 +712,18 @@ def registrations_submit():
     Returns:
         JSON response with success/error status or redirect to success page
     """
+    def registration_pr_error(message: str):
+        if request.headers.get("Accept") == "application/json":
+            return jsonify({"success": False, "error": message}), 500
+        return (
+            render_template(
+                "error.html",
+                error_message=message,
+                github_app_name=GITHUB_APP_NAME,
+            ),
+            500,
+        )
+
     try:
         # Extract form data
         installation_id = request.form.get("installation_id", "").strip()
@@ -652,6 +865,17 @@ def registrations_submit():
 
         # Save configuration to database
         save_registration(installation_id, registration_config, repositories)
+
+        try:
+            create_registration_pull_request(
+                installation_id, registration_config, repositories
+            )
+        except Exception:
+            logger.exception("Failed to create registration pull request")
+            return registration_pr_error(
+                "Registration saved, but failed to create a pull request in the "
+                "registrations repository."
+            )
 
         # Return success response
         if request.headers.get("Accept") == "application/json":
