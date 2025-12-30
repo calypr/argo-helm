@@ -71,10 +71,10 @@ spec:
               name: {{ .Values.gitappCallback.vault.tokenSecret.name }}
               key: {{ .Values.gitappCallback.vault.tokenSecret.key }}
         - name: GITHUB_PAT
-        - valueFrom:
-          secretKeyRef:
-            name: {{ .Values.gitappCallback.githubTokenSecret.name }}
-            key: {{ .Values.gitappCallback.githubTokenSecret.key }}
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.gitappCallback.githubTokenSecret.name }}
+              key: {{ .Values.gitappCallback.githubTokenSecret.key }}
         - name: REPO_REGISTRATION
           value: {{ .Values.gitappCallback.githubRepoUrl | quote }}
 
