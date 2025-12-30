@@ -225,6 +225,10 @@ ports:
 	kubectl create secret tls ${TLS_SECRET_NAME}  -n calypr-api     --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
 	kubectl create secret tls ${TLS_SECRET_NAME}  -n calypr-tenants --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
 	sudo rm /tmp/fullchain.pem /tmp/privkey.pem
+	#
+	kubectl create secret generic gitapp-vault-token \
+  		--from-literal=token=$(VAULT_TOKEN) \
+  		-n argocd
 	# install ingress
 	helm upgrade --install ingress-authz-overlay \
 	  helm/argo-stack/overlays/ingress-authz-overlay \

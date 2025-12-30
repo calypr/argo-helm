@@ -24,6 +24,8 @@ import jwt
 import time
 import requests
 from typing import List, Dict, Optional
+import hvac
+
 
 # Configure logging
 logging.basicConfig(
@@ -35,9 +37,12 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
 # Configuration
-GITHUB_APP_NAME = os.environ.get("GITHUB_APP_NAME", "calypr-workflows")
+GITHUB_APP_NAME = os.environ.get("GITHUB_APP_NAME")
 GITHUB_APP_ID = os.environ.get("GITHUB_APP_ID")
-GITHUB_PRIVATE_KEY_PATH = os.environ.get("GITHUB_PRIVATE_KEY_PATH", "/var/secrets/github-app-key.pem")
+GITHUB_PRIVATE_KEY_PATH = os.environ.get("GITHUB_PRIVATE_KEY_PATH")
+VAULT_ADDR = os.environ.get("VAULT_ADDR")
+VAULT_TOKEN = os.environ.get("VAULT_TOKEN")
+
 
 
 # Default to /tmp in development/test, /var/registrations in production
@@ -217,9 +222,47 @@ def save_registration(installation_id, registration_data, repositories):
         registration_data: The RepoRegistration configuration dict
         repositories: List of repositories associated with the installation
     """
+
+    if len(repositories) > 1:
+        logging.warning("Multiple repositories found for installation; using the first one.")
+
+    full_name = repositories[0]['full_name']
+    owner, repo_name = full_name.split('/')
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
-    
+
+    data_bucket = registration_data.get("dataBucket", None)
+    artifact_bucket = registration_data.get("artifactBucket", None)
+    if "dataBucket" in registration_data:
+        del registration_data["dataBucket"]
+    if "artifactBucket" in registration_data:
+        del registration_data["artifactBucket"]
+
+    # Save bucket configurations to Vault
+    try:
+        client = hvac.Client(url=VAULT_ADDR, token=VAULT_TOKEN)
+
+        if data_bucket:
+            data_vault_path = f"kv/argo/apps/{owner}/{repo_name}/dataBucket"
+            client.secrets.kv.v2.create_or_update_secret(
+                path=data_vault_path,
+                secret_data=data_bucket
+            )
+            logger.info(f"Saved dataBucket to Vault at {data_vault_path}")
+
+        if artifact_bucket:
+            artifact_vault_path = f"kv/argo/apps/{owner}/{repo_name}/artifactBucket"
+            client.secrets.kv.v2.create_or_update_secret(
+                path=artifact_vault_path,
+                secret_data=artifact_bucket
+            )
+            logger.info(f"Saved artifactBucket to Vault at {artifact_vault_path}")
+
+    except Exception as e:
+        logger.error(f"Failed to save bucket configurations to Vault: {e}")
+        raise
+
     data_json = json.dumps(registration_data)
     
     cursor.execute("""
@@ -544,6 +587,17 @@ def registrations_submit():
                     "error.html",
                     error_message="An unexpected error occurred. Please try again.",
                     github_app_name=GITHUB_APP_NAME,
+                ),
+                500,
+            )
+
+        if not repositories or len(repositories) == 0:
+            return (
+                jsonify(
+                    {
+                        "success": False,
+                        "error": "No repositories found for this installation",
+                    }
                 ),
                 500,
             )

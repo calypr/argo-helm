@@ -59,7 +59,14 @@ spec:
         - name: GITHUB_APP_ID
           value: {{ .Values.githubApp.appId | quote }}
         - name: GITHUB_PRIVATE_KEY_PATH
-          value: /etc/github/private-key.pem          
+          value: /etc/github/private-key.pem
+        - name: VAULT_ADDR
+          value: {{ .Values.gitappCallback.vault.addr | quote }}
+        - name: VAULT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.gitappCallback.vault.tokenSecret.name }}
+              key: {{ .Values.gitappCallback.vault.tokenSecret.key }}
         ports:
         - containerPort: 8080
         volumeMounts:
