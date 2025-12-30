@@ -187,13 +187,13 @@ def init_db():
     logger.info(f"Database initialized at {DB_PATH}")
 
 
-def get_registration(installation_id, repositories):
+def get_registration(installation_id, repositories=None):
     """
     Get a registration from the database.
     
     Args:
         installation_id: The GitHub installation ID
-        repositories: List of repositories associated with the installation
+        repositories: Optional list of repositories associated with the installation
         
     Returns:
         dict: The registration data or None if not found
@@ -213,46 +213,59 @@ def get_registration(installation_id, repositories):
     if row:
         registration_data = json.loads(row[0])
 
-        if len(repositories) > 1:
-            logging.warning("Multiple repositories found for installation; using the first one.")
+        if repositories and VAULT_ADDR and VAULT_TOKEN:
+            if len(repositories) > 1:
+                logging.warning("Multiple repositories found for installation; using the first one.")
 
-        full_name = repositories[0]['full_name']
-        owner, repo_name = full_name.split('/')
-        data_vault_path = f"argo/apps/{owner}/{repo_name}/dataBucket"
-        artifact_vault_path = f"argo/apps/{owner}/{repo_name}/artifactBucket"
-        try:
-            client = hvac.Client(url=VAULT_ADDR, token=VAULT_TOKEN)
-            dataBucket = client.secrets.kv.v2.read_secret_version(path=data_vault_path, mount_point="kv")
-            artifactBucket = client.secrets.kv.v2.read_secret_version(path=artifact_vault_path, mount_point="kv")
-            registration_data["dataBucket"] = {}
-            registration_data["artifactBucket"] = {}
-            if dataBucket:
-                registration_data["dataBucket"] = dataBucket['data']['data']
-            if artifactBucket:
-                registration_data["artifactBucket"] = artifactBucket['data']['data']
-        except Exception as e:
-            logger.warning(f"Failed to retrieve bucket configurations from Vault: {e}")
+            full_name = repositories[0]['full_name']
+            owner, repo_name = full_name.split('/')
+            data_vault_path = f"argo/apps/{owner}/{repo_name}/dataBucket"
+            artifact_vault_path = f"argo/apps/{owner}/{repo_name}/artifactBucket"
+            try:
+                client = hvac.Client(url=VAULT_ADDR, token=VAULT_TOKEN)
+                data_bucket_response = client.secrets.kv.v2.read_secret_version(
+                    path=data_vault_path,
+                    mount_point="kv"
+                )
+                artifact_bucket_response = client.secrets.kv.v2.read_secret_version(
+                    path=artifact_vault_path,
+                    mount_point="kv"
+                )
+                if data_bucket_response:
+                    created_time = (
+                        data_bucket_response
+                        .get("data", {})
+                        .get("metadata", {})
+                        .get("created_time")
+                    )
+                    if created_time:
+                        registration_data["dataBucketCreatedTime"] = created_time
+                if artifact_bucket_response:
+                    created_time = (
+                        artifact_bucket_response
+                        .get("data", {})
+                        .get("metadata", {})
+                        .get("created_time")
+                    )
+                    if created_time:
+                        registration_data["artifactBucketCreatedTime"] = created_time
+            except Exception as e:
+                logger.warning(f"Failed to retrieve bucket configurations from Vault: {e}")
 
         return registration_data
     
     return None
 
 
-def save_registration(installation_id, registration_data, repositories):
+def save_registration(installation_id, registration_data, repositories=None):
     """
     Save or update a registration in the database.
     
     Args:
         installation_id: The GitHub installation ID
         registration_data: The RepoRegistration configuration dict
-        repositories: List of repositories associated with the installation
+        repositories: Optional list of repositories associated with the installation
     """
-
-    if len(repositories) > 1:
-        logging.warning("Multiple repositories found for installation; using the first one.")
-
-    full_name = repositories[0]['full_name']
-    owner, repo_name = full_name.split('/')
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -265,30 +278,36 @@ def save_registration(installation_id, registration_data, repositories):
         del registration_data["artifactBucket"]
 
     # Save bucket configurations to Vault
-    try:
-        client = hvac.Client(url=VAULT_ADDR, token=VAULT_TOKEN)
+    if repositories:
+        if len(repositories) > 1:
+            logging.warning("Multiple repositories found for installation; using the first one.")
 
-        if data_bucket:
-            data_vault_path = f"argo/apps/{owner}/{repo_name}/dataBucket"
-            client.secrets.kv.v2.create_or_update_secret(
-                path=data_vault_path,
-                secret=data_bucket,
-                mount_point="kv"
-            )
-            logger.info(f"Saved dataBucket to Vault at {data_vault_path}")
+        full_name = repositories[0]['full_name']
+        owner, repo_name = full_name.split('/')
+        try:
+            client = hvac.Client(url=VAULT_ADDR, token=VAULT_TOKEN)
 
-        if artifact_bucket:
-            artifact_vault_path = f"argo/apps/{owner}/{repo_name}/artifactBucket"
-            client.secrets.kv.v2.create_or_update_secret(
-                path=artifact_vault_path,
-                secret=artifact_bucket,
-                mount_point="kv"
-            )
-            logger.info(f"Saved artifactBucket to Vault at {artifact_vault_path}")
+            if data_bucket:
+                data_vault_path = f"argo/apps/{owner}/{repo_name}/dataBucket"
+                client.secrets.kv.v2.create_or_update_secret(
+                    path=data_vault_path,
+                    secret=data_bucket,
+                    mount_point="kv"
+                )
+                logger.info(f"Saved dataBucket to Vault at {data_vault_path}")
 
-    except Exception as e:
-        logger.error(f"Failed to save bucket configurations to Vault: {e}")
-        raise
+            if artifact_bucket:
+                artifact_vault_path = f"argo/apps/{owner}/{repo_name}/artifactBucket"
+                client.secrets.kv.v2.create_or_update_secret(
+                    path=artifact_vault_path,
+                    secret=artifact_bucket,
+                    mount_point="kv"
+                )
+                logger.info(f"Saved artifactBucket to Vault at {artifact_vault_path}")
+
+        except Exception as e:
+            logger.error(f"Failed to save bucket configurations to Vault: {e}")
+            raise
 
     data_json = json.dumps(registration_data)
     
@@ -666,4 +685,3 @@ if __name__ == "__main__":
         GITHUB_APP_NAME: Name of the GitHub App (default: calypr-workflows)
     """
     app.run(host="0.0.0.0", port=8080, debug=True)
-

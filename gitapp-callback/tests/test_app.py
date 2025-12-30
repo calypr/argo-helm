@@ -390,12 +390,7 @@ def test_update_form_prepopulates_data(client):
     existing_data = {
         'installation_id': '11100001',
         'defaultBranch': 'staging',
-        'dataBucket': {
-            'bucket': 'my-data',
-            'accessKey': 'AKIATEST',
-            'secretKey': 'secretTest123',
-            'is_aws': True
-        },
+        'dataBucket': None,
         'artifactBucket': None,
         'adminUsers': ['user1@example.com', 'user2@example.com'],
         'readUsers': ['viewer@example.com']
@@ -407,7 +402,6 @@ def test_update_form_prepopulates_data(client):
     
     assert response.status_code == 200
     assert b'staging' in response.data
-    assert b'my-data' in response.data
     assert b'user1@example.com' in response.data
     assert b'user2@example.com' in response.data
     assert b'viewer@example.com' in response.data
