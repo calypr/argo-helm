@@ -274,7 +274,7 @@ gitappCallback:
     tag: v1.0.0
     pullPolicy: IfNotPresent
   # Number of replicas
-  replicas: 2
+  replicas: 1
   # Flask secret key for session management
   # IMPORTANT: Override this in production with a secure random value
   # Recommended: Use Vault with External Secrets Operator
@@ -313,7 +313,7 @@ githubStatusProxy:
     repository: github-status-proxy
     tag: latest
     pullPolicy: IfNotPresent  
-  replicas: 2
+  replicas: 1
   namespace: argocd
   # GitHub App configuration
   # The App ID can be found in your GitHub App settings
