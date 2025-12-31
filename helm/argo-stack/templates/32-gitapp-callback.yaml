@@ -152,7 +152,10 @@ spec:
           items:
           - key: {{ .Values.githubStatusProxy.privateKeySecret.key }}
             path: private-key.pem
-          optional: false        
+          optional: false
+      - name: git-credentials
+        emptyDir: {}
+          
 ---
 apiVersion: v1
 kind: Service
