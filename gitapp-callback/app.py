@@ -51,11 +51,11 @@ VAULT_TOKEN = os.environ.get("VAULT_TOKEN")
 # Default to /tmp in development/test, /var/registrations in production
 DEFAULT_DB_PATH = "/tmp/registrations.sqlite" if os.environ.get("FLASK_ENV") == "development" or os.environ.get("TESTING") else "/var/registrations/registrations.sqlite"
 DB_PATH = os.environ.get("DB_PATH", DEFAULT_DB_PATH)
-REPO_ROOT = Path(__file__).resolve().parents[1]
-REGISTRATIONS_PATH = REPO_ROOT / "registrations"
+# ??? REPO_ROOT = Path(__file__).resolve().parents[1]
+REGISTRATIONS_PATH = Path("/tmp") / "registrations"
 
 
-def run_git_command(args: List[str], repo_dir: Path, use_auth: bool = False) -> str:
+def run_git_command(args: List[str], repo_dir: Path) -> str:
     """
     Run a git command and return stdout.
 
@@ -65,10 +65,6 @@ def run_git_command(args: List[str], repo_dir: Path, use_auth: bool = False) -> 
         use_auth: Whether to attach the PAT to git HTTP requests
     """
     cmd = ["git"]
-    if use_auth:
-        if not GITHUB_PAT:
-            raise ValueError("GITHUB_PAT environment variable not set")
-        cmd.extend(["-c", f"http.extraheader=Authorization: Bearer {GITHUB_PAT}"])
     cmd.extend(args)
     result = subprocess.run(
         cmd,
@@ -113,7 +109,6 @@ def ensure_repo_registration() -> None:
             run_git_command(
                 ["clone", REPO_REGISTRATION, str(REGISTRATIONS_PATH)],
                 REPO_ROOT,
-                use_auth=True,
             )
             return
         if (REGISTRATIONS_PATH / ".git").exists():
@@ -121,7 +116,6 @@ def ensure_repo_registration() -> None:
             run_git_command(
                 ["fetch", "origin", "--prune"],
                 REGISTRATIONS_PATH,
-                use_auth=True,
             )
             default_branch = get_default_branch(REGISTRATIONS_PATH)
             run_git_command(["checkout", default_branch], REGISTRATIONS_PATH)
@@ -151,14 +145,12 @@ def ensure_repo_registration() -> None:
         run_git_command(
             ["submodule", "add", REPO_REGISTRATION, REGISTRATIONS_PATH.name],
             REPO_ROOT,
-            use_auth=True,
         )
     else:
         logger.info("Updating registrations git submodule.")
         run_git_command(
             ["submodule", "update", "--init", "--recursive", REGISTRATIONS_PATH.name],
             REPO_ROOT,
-            use_auth=True,
         )
 
 
@@ -204,7 +196,7 @@ def create_registration_pull_request(
     branch_action = "update" if registration_file.exists() else "create"
     branch_name = f"chore/{branch_action}-{owner}-{repo_name}"
 
-    run_git_command(["fetch", "origin", "--prune"], REGISTRATIONS_PATH, use_auth=True)
+    run_git_command(["fetch", "origin", "--prune"], REGISTRATIONS_PATH)
     default_branch = get_default_branch(REGISTRATIONS_PATH)
     run_git_command(
         ["checkout", "-B", branch_name, f"origin/{default_branch}"],
@@ -229,7 +221,7 @@ def create_registration_pull_request(
         REGISTRATIONS_PATH,
     )
 
-    run_git_command(["push", "-u", "origin", branch_name], REGISTRATIONS_PATH, use_auth=True)
+    run_git_command(["push", "-u", "origin", branch_name], REGISTRATIONS_PATH)
 
     pr_body = (
         f"Automated repo registration for `{owner}/{repo_name}`.\n\n"

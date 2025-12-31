@@ -46,7 +46,7 @@ spec:
           readOnly: true
       # Init container to configure git credentials securely
       - name: gitapp-callback-git-credentials
-        image: alpine/git:2.44.0
+        image: alpine/git:2.43.0
         command:
         - sh
         - -c
@@ -58,7 +58,7 @@ spec:
           fi
           mkdir -p /gitcreds
           CRED_STRING="https://${GIT_USERNAME}:${GIT_PAT}@github.com"
-          printf "%s\n" "${CRED_STRING}" | git credential-store store
+          echo "${CRED_STRING}" > /gitcreds/.git-credentials
         env:
         - name: GIT_USERNAME
           value: {{ .Values.gitappCallback.githubUserName }}
