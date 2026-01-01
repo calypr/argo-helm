@@ -331,6 +331,30 @@
             <form id="registrationForm" method="POST" action="/registrations">
                 <input type="hidden" name="installation_id" value="{{ installation_id }}">
 
+                {% if repositories|length > 1 %}
+                <div class="form-group">
+                    <label for="selected_repository">Repository *</label>
+                    <select id="selected_repository" name="selected_repository" required>
+                        <option value="">Select a repository...</option>
+                        {% for repo in repositories %}
+                        <option value="{{ repo.full_name }}">{{ repo.full_name }}</option>
+                        {% endfor %}
+                    </select>
+                    <small>You must select which repository this registration applies to.</small>
+                </div>
+                {% elif repositories|length == 1 %}
+                <!-- Single repo: store it as hidden field -->
+                <input type="hidden" name="selected_repository" value="{{ repositories[0].full_name }}">
+                <div class="form-group">
+                    <p><strong>Repository:</strong> {{ repositories[0].full_name }}</p>
+                </div>
+                {% else %}
+                <div class="alert alert-error">
+                    <p>No repositories found for this installation.</p>
+                </div>
+                {% endif %}
+
+
                 <div class="card">
                     <h3>Repository Configuration</h3>
 

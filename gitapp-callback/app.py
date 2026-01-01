@@ -753,6 +753,7 @@ def registrations_form():
         installation_id=installation_id,
         setup_action=setup_action,
         initial_data=initial_data,
+        repositories=repositories,
         github_app_name=GITHUB_APP_NAME,
     )
 
@@ -791,6 +792,7 @@ def registrations_submit():
     try:
         # Extract form data
         installation_id = request.form.get("installation_id", "").strip()
+        selected_repository = request.form.get("selected_repository", "").strip()
         default_branch = request.form.get("defaultBranch", "main").strip()
         admin_users_raw = request.form.get("adminUsers", "").strip()
         read_users_raw = request.form.get("readUsers", "").strip()
@@ -924,6 +926,17 @@ def registrations_submit():
                 ),
                 500,
             )
+
+        # Validate selected_repository if multiple repos exist
+        if len(repositories) > 1:
+            if not selected_repository:
+                return jsonify({"success": False, "error": "Repository selection is required"}), 400
+
+            selected_repos = [r for r in repositories if r["full_name"] == selected_repository]
+            if not selected_repos:
+                return jsonify({"success": False, "error": "Invalid repository selection"}), 400
+
+            repositories = selected_repos
 
         logger.info(f"Repository registration submitted: installation_id={installation_id} repositories={repositories}")
 
