@@ -206,10 +206,27 @@ def create_registration_pull_request(
 
     run_git_command(["fetch", "origin", "--prune"], REGISTRATIONS_PATH)
     default_branch = get_default_branch(REGISTRATIONS_PATH)
-    run_git_command(
-        ["checkout", "-B", branch_name, f"origin/{default_branch}"],
+
+    # Check if branch exists locally
+    branch_exists = run_git_command(
+        ["rev-parse", "--verify", branch_name],
         REGISTRATIONS_PATH,
-    )
+    ) != "FAILED"
+
+    if branch_exists:
+        # Switch to existing branch and fetch latest
+        logger.info(f"Branch {branch_name} already exists; switching to it and fetching latest.")
+        run_git_command(["checkout", branch_name], REGISTRATIONS_PATH)
+        run_git_command(["fetch", "origin", branch_name], REGISTRATIONS_PATH)
+        run_git_command(["reset", "--hard", f"origin/{branch_name}"], REGISTRATIONS_PATH)
+    else:
+        # Create new branch from default branch
+        logger.info(f"Creating new branch {branch_name} from {default_branch}.")
+        run_git_command(
+            ["checkout", "-B", branch_name, f"origin/{default_branch}"],
+            REGISTRATIONS_PATH,
+        )
+
 
     registration_file.parent.mkdir(parents=True, exist_ok=True)
     registration_payload = {
