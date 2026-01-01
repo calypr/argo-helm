@@ -271,12 +271,21 @@ def create_registration_pull_request(
         f"https://api.github.com/repos/{registration_repo_owner}/"
         f"{registration_repo_name}/pulls/{pr_number}/requested_reviewers"
     )
-    reviewers_response = requests.post(
-        reviewers_url,
-        headers=headers,
-        json={"reviewers": ["co-pilot"]},
-    )
-    reviewers_response.raise_for_status()
+    try:
+        reviewers_response = requests.post(
+            reviewers_url,
+            headers=headers,
+            json={"reviewers": ["Copilot"]},
+        )
+        reviewers_response.raise_for_status()
+        logger.info(f"Successfully added co-pilot as reviewer to PR #{pr_number}")
+    except requests.HTTPError as e:
+        # Log warning but don't fail the entire operation
+        logger.warning(reviewers_url)
+        logger.warning(
+            f"Failed to add reviewer to PR #{pr_number}: {e.response.status_code} - {e.response.text}"
+        )
+        raise
 
 
 def get_github_app_jwt() -> str:
