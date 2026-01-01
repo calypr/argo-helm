@@ -39,15 +39,21 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-key-change-in-production")
 
 # Configuration
-GITHUB_APP_NAME = os.environ.get("GITHUB_APP_NAME")
-GITHUB_APP_ID = os.environ.get("GITHUB_APP_ID")
-GITHUB_PRIVATE_KEY_PATH = os.environ.get("GITHUB_PRIVATE_KEY_PATH")
-GITHUB_PAT = os.environ.get("GITHUB_PAT")
-REPO_REGISTRATION = os.environ.get("REPO_REGISTRATION")
-VAULT_ADDR = os.environ.get("VAULT_ADDR")
-VAULT_TOKEN = os.environ.get("VAULT_TOKEN")
-GIT_CREDENTIALS_FILE = os.environ.get("GIT_CREDENTIALS_FILE")
+# GitHub App Configuration
+GITHUB_APP_NAME = os.environ.get("GITHUB_APP_NAME")  # Display name of the GitHub App (e.g., "calypr-workflows")
+GITHUB_APP_ID = os.environ.get("GITHUB_APP_ID")  # GitHub App ID for JWT authentication
+GITHUB_PRIVATE_KEY_PATH = os.environ.get("GITHUB_PRIVATE_KEY_PATH")  # Path to GitHub App private key file for signing JWTs
+GITHUB_PAT = os.environ.get("GITHUB_PAT")  # Personal Access Token for git operations (clone, push) in registrations repo
 
+# Repository Configuration
+REPO_REGISTRATION = os.environ.get("REPO_REGISTRATION")  # Git URL of the registrations repository where registration files are stored
+
+# Vault Configuration
+VAULT_ADDR = os.environ.get("VAULT_ADDR")  # HashiCorp Vault address (e.g., "https://vault.example.com")
+VAULT_TOKEN = os.environ.get("VAULT_TOKEN")  # Vault authentication token for storing S3 bucket credentials
+
+# Git Authentication
+GIT_CREDENTIALS_FILE = os.environ.get("GIT_CREDENTIALS_FILE")  # Path to git credentials file (e.g., /root/.git-credentials) for git credential.helper
 
 
 # Default to /tmp in development/test, /var/registrations in production
@@ -120,9 +126,14 @@ def ensure_repo_registration() -> None:
     if not GITHUB_PAT:
         raise ValueError("GITHUB_PAT environment variable not set")
 
+    # Configure git to use the credentials file
     logger.info(f"Setting git credential.helper to {GIT_CREDENTIALS_FILE}")
     result = run_git_command(["config", "--global", "credential.helper", f'store --file={GIT_CREDENTIALS_FILE}'], REPO_ROOT) 
     logger.info(f"result from setting git credential.helper {result}")
+    # Configure author name and email
+    # TODO make name and email configurable
+    run_git_command(["config", "--global", "user.name", GITHUB_APP_NAME or "GitHub App"], REPO_ROOT)
+    run_git_command(["config", "--global", "user.email", f"calyr@example.com"], REPO_ROOT)
 
     if not REGISTRATIONS_PATH.exists():
         logger.info("Cloning registrations repository.")
