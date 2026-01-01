@@ -26,6 +26,7 @@ import time
 import requests
 from typing import List, Dict, Optional, Tuple
 import hvac
+import yaml
 
 
 # Configure logging
@@ -123,55 +124,31 @@ def ensure_repo_registration() -> None:
     result = run_git_command(["config", "--global", "credential.helper", f'store --file={GIT_CREDENTIALS_FILE}'], REPO_ROOT) 
     logger.info(f"result from setting git credential.helper {result}")
 
-    if not (REPO_ROOT / ".git").exists():
-        if not REGISTRATIONS_PATH.exists():
-            logger.info("Cloning registrations repository without submodule.")
-            run_git_command(
-                ["clone", REPO_REGISTRATION, str(REGISTRATIONS_PATH)],
-                REPO_ROOT,
-            )
-            return
-        if (REGISTRATIONS_PATH / ".git").exists():
-            logger.info("Updating registrations repository checkout.")
-            run_git_command(
-                ["fetch", "origin", "--prune"],
-                REGISTRATIONS_PATH,
-            )
-            default_branch = get_default_branch(REGISTRATIONS_PATH)
-            run_git_command(["checkout", default_branch], REGISTRATIONS_PATH)
-            run_git_command(
-                ["reset", "--hard", f"origin/{default_branch}"],
-                REGISTRATIONS_PATH,
-            )
-            return
-        if any(REGISTRATIONS_PATH.iterdir()):
-            logger.warning(
-                "Registrations path exists and is not a git repo; skipping checkout."
-            )
+    if not REGISTRATIONS_PATH.exists():
+        logger.info("Cloning registrations repository.")
+        run_git_command(
+            ["clone", REPO_REGISTRATION, str(REGISTRATIONS_PATH)],
+            REPO_ROOT,
+        )
         return
-
-    gitmodules_path = REPO_ROOT / ".gitmodules"
-    submodule_declared = False
-    if gitmodules_path.exists():
-        submodule_declared = f"path = {REGISTRATIONS_PATH.name}" in gitmodules_path.read_text()
-
-    if not submodule_declared:
-        if REGISTRATIONS_PATH.exists() and any(REGISTRATIONS_PATH.iterdir()):
-            logger.warning(
-                "Registrations path exists and is not a submodule; skipping submodule add."
-            )
-            return
-        logger.info("Adding registrations repository as a git submodule.")
+    if (REGISTRATIONS_PATH / ".git").exists():
+        logger.info("Updating registrations repository checkout.")
         run_git_command(
-            ["submodule", "add", REPO_REGISTRATION, REGISTRATIONS_PATH.name],
-            REPO_ROOT,
+            ["fetch", "origin", "--prune"],
+            REGISTRATIONS_PATH,
         )
-    else:
-        logger.info("Updating registrations git submodule.")
+        default_branch = get_default_branch(REGISTRATIONS_PATH)
+        run_git_command(["checkout", default_branch], REGISTRATIONS_PATH)
         run_git_command(
-            ["submodule", "update", "--init", "--recursive", REGISTRATIONS_PATH.name],
-            REPO_ROOT,
+            ["reset", "--hard", f"origin/{default_branch}"],
+            REGISTRATIONS_PATH,
         )
+        return
+    if any(REGISTRATIONS_PATH.iterdir()):
+        logger.warning(
+            "Registrations path exists and is not a git repo; skipping checkout."
+        )
+    return
 
 
 def get_default_branch(repo_dir: Path) -> str:
@@ -229,7 +206,7 @@ def create_registration_pull_request(
         "registration_config": registration_config,
     }
     registration_file.write_text(
-        json.dumps(registration_payload, indent=2, sort_keys=True) + "\n"
+        yaml.dump(registration_payload, sort_keys=True, default_flow_style=False)
     )
 
     run_git_command(
