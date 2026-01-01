@@ -145,7 +145,7 @@ def ensure_repo_registration() -> None:
     if (REGISTRATIONS_PATH / ".git").exists():
         logger.info("Updating registrations repository checkout.")
         run_git_command(
-            ["fetch", "origin", "--prune"],
+            ["fetch", "--all", "--prune"],
             REGISTRATIONS_PATH,
         )
         default_branch = get_default_branch(REGISTRATIONS_PATH)
@@ -204,16 +204,25 @@ def create_registration_pull_request(
     branch_action = "update" if registration_file.exists() else "create"
     branch_name = f"chore/{branch_action}-{owner}-{repo_name}"
 
-    run_git_command(["fetch", "origin", "--prune"], REGISTRATIONS_PATH)
+    run_git_command(["fetch", "--all", "--prune"], REGISTRATIONS_PATH)
     default_branch = get_default_branch(REGISTRATIONS_PATH)
 
-    # Check if branch exists locally
-    branch_exists = run_git_command(
-        ["rev-parse", "--verify", branch_name],
+    # python
+    local_exists = run_git_command(
+        ["show-ref", "--verify", "--quiet", f"refs/heads/{branch_name}"],
         REGISTRATIONS_PATH,
     ) != "FAILED"
 
-    if branch_exists:
+    remote_exists = False
+    if not local_exists:
+        remote_exists = run_git_command(
+            ["ls-remote", "--exit-code", "--heads", "origin", branch_name],
+            REGISTRATIONS_PATH,
+        ) != "FAILED"
+    else:
+        remote_exists = True
+
+    if remote_exists:
         # Switch to existing branch and fetch latest
         logger.info(f"Branch {branch_name} already exists; switching to it and fetching latest.")
         run_git_command(["checkout", branch_name], REGISTRATIONS_PATH)
