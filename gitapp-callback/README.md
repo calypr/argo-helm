@@ -342,71 +342,42 @@ graph TD
 ```mermaid
 graph TD
     PostReq["POST /registrations"] --> ExtractForm["Extract form data<br/>installation_id, defaultBranch,<br/>admin/readUsers, buckets"]
-    ExtractForm --> ValAll{validate all form fields}
-
-    ValAll -->|No| FormErr400A["❌ Return 400"]
-    ValAll -->|Yes| SaveDB
-
-    SaveDB --> RemoveBuckets["Remove buckets from config<br/>del dataBucket, artifactBucket"]
-    RemoveBuckets --> CheckVault{VAULT_ADDR &<br/>VAULT_TOKEN set?}
-
-    CheckVault -->|Yes| SaveDataVault["Save dataBucket to Vault<br/>argo/apps/owner/repo/dataBucket"]
-    SaveDataVault --> SaveArtifactVault["Save artifactBucket to Vault<br/>argo/apps/owner/repo/artifactBucket"]
-    SaveArtifactVault --> ValVaultSave{Save<br/>success?}
-
-    CheckVault -->|No| SkipVault["⊘ Skip Vault save"]
-    ValVaultSave -->|No| FormErr500C["❌ Return 500<br/>Vault save failed"]
-    ValVaultSave -->|Yes| InsertDB
-    SkipVault --> InsertDB["INSERT/UPDATE registrations<br/>table in SQLite<br/>ON CONFLICT DO UPDATE"]
-
-    InsertDB --> CreatePR["create_registration_pull_request"]
-    CreatePR --> EnsureRepoPR["ensure_repo_registration"]
-    EnsureRepoPR --> FetchOriginPR["git fetch origin --prune"]
-    FetchOriginPR --> GetDefaultBranch["Get default branch<br/>from origin/HEAD"]
-    GetDefaultBranch --> CreateBranch["Create feature branch<br/>chore/create-owner-repo<br/>or chore/update-owner-repo"]
-    CreateBranch --> CreateFile["Create registration file<br/>registrations/owner/repo_name.yaml"]
-    CreateFile --> WritePayload["Write JSON payload<br/>{installation_id, registration_config}"]
-    WritePayload --> GitAdd["git add file"]
+    ExtractForm --> ValidateForm["Validate required fields<br/>emails, bucket config"]
+    ValidateForm -->|Error| FormErr["❌ Return 400/500 with error"]
+    ValidateForm --> FetchReposForm["Fetch installation repos<br/>GitHub API"]
+    FetchReposForm -->|Error| FormErr
+    FetchReposForm --> SaveDB["save_registration<br/>SQLite + optional Vault"]
+    SaveDB --> EnsureRepo["ensure_repo_registration<br/>configure git, fetch default"]
+    EnsureRepo --> FetchOriginPR["git fetch --all --prune"]
+    FetchOriginPR --> GetDefaultBranch["Get origin/HEAD default branch"]
+    GetDefaultBranch --> CheckLocalBranch{"Local branch exists?"}
+    CheckLocalBranch -->|Yes| CheckoutLocal["git checkout branch"]
+    CheckLocalBranch -->|No| CheckRemoteBranch{"Remote branch exists?"}
+    CheckRemoteBranch -->|Yes| CheckoutRemote["git checkout branch"]
+    CheckRemoteBranch -->|No| CreateBranch["git checkout -B branch<br/>origin/default"]
+    CheckoutLocal --> SyncRemote["git fetch origin branch<br/>git reset --hard origin/branch"]
+    CheckoutRemote --> SyncRemote
+    CreateBranch --> WriteFile
+    SyncRemote --> WriteFile["Write registration YAML<br/>registrations/owner/repo.yaml"]
+    WriteFile --> GitAdd["git add file"]
     GitAdd --> GitCommit["git commit --allow-empty<br/>-m branch_name"]
     GitCommit --> GitPush["git push -u origin branch"]
-    GitPush --> ValPush{Push<br/>success?}
-
-    ValPush -->|No| PRErr["❌ Git command returned FAILED"]
-    ValPush -->|Yes| CreateGHPR["Create GitHub PR via API<br/>POST /repos/owner/repo/pulls"]
-    CreateGHPR --> ValPRCreate{PR created<br/>success?}
-
-    ValPRCreate -->|No| CheckExistingPR{PR already<br/>exists?}
-    CheckExistingPR -->|Yes| GetExistingPR["Get existing PR"]
-    CheckExistingPR -->|No| PRErr500["❌ Return 500<br/>PR creation failed"]
-
-    ValPRCreate -->|Yes| AddReviewer["Add co-pilot<br/>as PR reviewer"]
-    GetExistingPR --> AddReviewer
-    AddReviewer --> ValReviewer{Reviewer<br/>added?}
-
-    ValReviewer -->|Yes| SuccessResp["✓ Return success<br/>JSON or HTML page<br/>with registration_config"]
-    ValReviewer -->|No| PRErr500
-
-    PRErr --> PRErrorResp["⚠️ Return 500<br/>Registration saved but<br/>git/PR creation failed"]
-    PRErr500 --> PRErrorResp
-
-    FormErr400A --> FormErrResp["❌ Return 400"]
-    FormErr400B --> FormErrResp
-    FormErr400C --> FormErrResp
-    FormErr400D --> FormErrResp
-    FormErr500A --> FormErrResp
-    FormErr500B --> FormErrResp
-    FormErr500C --> FormErrResp
-
-    PRErrorResp --> Done["Return response"]
-    FormErrResp --> Done
+    GitPush -->|Error| PRErr["❌ Return 500<br/>registration saved but PR failed"]
+    GitPush --> CreateGHPR["Create/lookup PR via GitHub API"]
+    CreateGHPR -->|Error| PRErr
+    CreateGHPR --> AddReviewer["Request reviewer\n(Copilot)"]
+    AddReviewer -->|Error| PRErr
+    AddReviewer --> SuccessResp["✓ Return success<br/>JSON or HTML summary"]
+    FormErr --> Done["Respond"]
+    PRErr --> Done
     SuccessResp --> Done
 
     style PostReq fill:#e1f5ff
-    style SaveDB fill:#e1f5ff,stroke:#f57c00,stroke-width:2px
-    style CreatePR fill:#e1f5ff,stroke:#f57c00,stroke-width:2px
+    style SaveDB stroke:#f57c00,stroke-width:2px
+    style EnsureRepo stroke:#f57c00,stroke-width:2px
     style SuccessResp fill:#c8e6c9
-    style PRErrorResp fill:#fff9c4
-    style FormErrResp fill:#ffccbc
+    style FormErr fill:#ffccbc
+    style PRErr fill:#fff9c4
 
 ```
 
