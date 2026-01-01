@@ -45,14 +45,16 @@ GITHUB_PAT = os.environ.get("GITHUB_PAT")
 REPO_REGISTRATION = os.environ.get("REPO_REGISTRATION")
 VAULT_ADDR = os.environ.get("VAULT_ADDR")
 VAULT_TOKEN = os.environ.get("VAULT_TOKEN")
+GIT_CREDENTIALS_FILE = os.environ.get("GIT_CREDENTIALS_FILE")
 
 
 
 # Default to /tmp in development/test, /var/registrations in production
 DEFAULT_DB_PATH = "/tmp/registrations.sqlite" if os.environ.get("FLASK_ENV") == "development" or os.environ.get("TESTING") else "/var/registrations/registrations.sqlite"
 DB_PATH = os.environ.get("DB_PATH", DEFAULT_DB_PATH)
-# ??? REPO_ROOT = Path(__file__).resolve().parents[1]
-REGISTRATIONS_PATH = Path("/tmp") / "registrations"
+# get current directory
+REPO_ROOT = Path(__file__).resolve().parents[0]
+REGISTRATIONS_PATH = Path("registrations")
 
 
 def run_git_command(args: List[str], repo_dir: Path) -> str:
@@ -66,13 +68,27 @@ def run_git_command(args: List[str], repo_dir: Path) -> str:
     """
     cmd = ["git"]
     cmd.extend(args)
-    result = subprocess.run(
-        cmd,
-        cwd=repo_dir,
-        check=True,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        logging.info(" ".join(cmd))
+        result = subprocess.run(
+            cmd,
+            cwd=repo_dir,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        return result.stdout.strip()
+    except subprocess.CalledProcessError as e:
+        logging.error(
+                "Git command failed: %s\nReturn code: %s\nStdout: %s\nStderr: %s\ncwd: %s",
+            " ".join(cmd),
+            e.returncode,
+            e.stdout,
+            e.stderr,
+            repo_dir,
+        )
+        return "FAILED"    
+    
     return result.stdout.strip()
 
 
@@ -102,6 +118,10 @@ def ensure_repo_registration() -> None:
         return
     if not GITHUB_PAT:
         raise ValueError("GITHUB_PAT environment variable not set")
+
+    logger.info(f"Setting git credential.helper to {GIT_CREDENTIALS_FILE}")
+    result = run_git_command(["config", "--global", "credential.helper", f'store --file={GIT_CREDENTIALS_FILE}'], REPO_ROOT) 
+    logger.info(f"result from setting git credential.helper {result}")
 
     if not (REPO_ROOT / ".git").exists():
         if not REGISTRATIONS_PATH.exists():
