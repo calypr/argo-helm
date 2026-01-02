@@ -88,6 +88,52 @@
             box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
         }
 
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .summary-item {
+            background: #f8fafc;
+            border-radius: 0.5rem;
+            border: 1px solid #e2e8f0;
+            padding: 0.75rem 1rem;
+        }
+
+        .summary-item span {
+            display: block;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: #64748b;
+            letter-spacing: 0.04em;
+            margin-bottom: 0.35rem;
+        }
+
+        .summary-item strong {
+            color: #0f172a;
+        }
+
+        .callout {
+            padding: 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid #bfdbfe;
+            background-color: #eff6ff;
+            color: #1e3a8a;
+            margin-bottom: 1.5rem;
+        }
+
+        .callout a {
+            color: #1d4ed8;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .callout a:hover {
+            text-decoration: underline;
+        }
+
         .form-group {
             margin-bottom: 1.5rem;
         }
@@ -107,6 +153,15 @@
             font-size: 0.95rem;
             color: #1e293b;
             background-color: #ffffff;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.65rem 0.9rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            font-size: 0.95rem;
+            margin-bottom: 0.75rem;
         }
 
         .button {
@@ -145,30 +200,72 @@
                 <h2>Select Repository</h2>
                 {% if setup_action == "install" %}
                 <p>Select a repository to register. You'll need to repeat this for each repository.</p>
-                {% else %}
-                <p>Choose the repository you want to update before continuing.</p>
-                {% endif %}
+            {% else %}
+            <p>Choose the repository you want to update before continuing.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <div class="summary">
+                <div class="summary-item">
+                    <span>Installation ID</span>
+                    <strong>{{ installation_id }}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Repositories Available</span>
+                    <strong>{{ repositories | length }}</strong>
+                </div>
             </div>
 
-            <div class="card">
-                <form method="GET" action="/registrations">
-                    <input type="hidden" name="installation_id" value="{{ installation_id }}">
-                    <input type="hidden" name="setup_action" value="{{ setup_action }}">
+            <div class="callout">
+                Add or remove repositories for this installation in GitHub.
+                <a href="https://github.com/settings/installations" target="_blank" rel="noopener noreferrer">
+                    Manage app installation
+                </a>
+            </div>
 
-                    <div class="form-group">
-                        <label for="selected_repository">Repository *</label>
-                        <select id="selected_repository" name="selected_repository" required>
-                            <option value="">Select a repository...</option>
-                            {% for repo in repositories %}
-                            <option value="{{ repo.full_name }}">{{ repo.full_name }}</option>
+            <form method="GET" action="/registrations">
+                <input type="hidden" name="installation_id" value="{{ installation_id }}">
+                <input type="hidden" name="setup_action" value="{{ setup_action }}">
+
+                <div class="form-group">
+                    <label for="selected_repository">Repository *</label>
+                    <input
+                        type="text"
+                        class="search-input"
+                        id="repoSearch"
+                        placeholder="Filter repositories..."
+                        aria-label="Filter repositories"
+                    >
+                    <select id="selected_repository" name="selected_repository" required>
+                        <option value="">Select a repository...</option>
+                        {% for repo in repositories %}
+                        <option value="{{ repo.full_name }}">{{ repo.full_name }}</option>
                             {% endfor %}
                         </select>
                     </div>
 
-                    <button type="submit" class="button">Continue</button>
-                </form>
-            </div>
-        </div>
-    </main>
+            <button type="submit" class="button">Continue</button>
+        </form>
+    </div>
+</div>
+</main>
+
+<script>
+    const repoSearch = document.getElementById('repoSearch');
+    const repoSelect = document.getElementById('selected_repository');
+
+    repoSearch.addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        Array.from(repoSelect.options).forEach(option => {
+            if (!option.value) {
+                option.hidden = false;
+                return;
+            }
+            const matches = option.value.toLowerCase().includes(query);
+            option.hidden = !matches;
+        });
+    });
+</script>
 </body>
 </html>

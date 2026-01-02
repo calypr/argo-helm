@@ -904,6 +904,7 @@ def registrations_form():
         selected_repository=selected_repository,
         creating_missing_registration=creating_missing_registration,
         multiple_repositories=total_repositories > 1,
+        repository_count=total_repositories,
         github_app_name=GITHUB_APP_NAME,
     )
 

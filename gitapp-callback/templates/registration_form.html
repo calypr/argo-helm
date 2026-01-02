@@ -270,28 +270,93 @@
             color: #1e40af;
         }
 
-        /* Installation ID Badge */
-        .installation-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.5rem 1rem;
-            background-color: #eff6ff;
-            border: 1px solid #bfdbfe;
+        /* Installation Summary */
+        .summary-card {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #e2e8f0;
+        }
+
+        .summary-card h3 {
+            color: #1e293b;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+
+        .summary-item {
+            background: #f8fafc;
             border-radius: 8px;
-            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            border: 1px solid #e2e8f0;
         }
 
-        .installation-badge strong {
-            margin-right: 0.5rem;
-            color: #1e40af;
+        .summary-item span {
+            display: block;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            margin-bottom: 0.35rem;
         }
 
-        .installation-badge code {
-            background-color: #dbeafe;
-            padding: 0.25rem 0.5rem;
+        .summary-item strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        .summary-item code {
+            background-color: #e2e8f0;
+            padding: 0.15rem 0.4rem;
             border-radius: 4px;
             font-family: 'Courier New', monospace;
             font-size: 0.9rem;
+        }
+
+        .summary-actions {
+            margin-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.85rem;
+            color: #1e40af;
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 0.35rem 0.7rem;
+            border-radius: 999px;
+        }
+
+        .subtle-link {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .subtle-link:hover {
+            text-decoration: underline;
+        }
+
+        .step-list {
+            margin-top: 0.75rem;
+            padding-left: 1.25rem;
+            color: #475569;
+            line-height: 1.6;
         }
     </style>
 </head>
@@ -312,12 +377,41 @@
         <div class="container">
             <div class="header">
                 <h2>Complete Repository Registration</h2>
-                <p>Configure your repository settings to get started with Argo Workflows.</p>
+                <p>Configure one repository at a time. The GitHub App installation can include multiple repositories.</p>
             </div>
 
-            <div class="installation-badge">
-                <strong>Installation ID:</strong>
-                <code>{{ installation_id }}</code>
+            <div class="summary-card">
+                <h3>Installation Overview</h3>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <span>Installation</span>
+                        <strong><code>{{ installation_id }}</code></strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Repository Count</span>
+                        <strong>{{ repository_count }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Current Repository</span>
+                        <strong>{{ selected_repository or "Not selected" }}</strong>
+                    </div>
+                </div>
+                <div class="summary-actions">
+                    <span class="pill">Changes to repo access happen in GitHub</span>
+                    <a class="subtle-link" href="https://github.com/settings/installations" target="_blank" rel="noopener noreferrer">
+                        Manage app installation
+                    </a>
+                    {% if multiple_repositories %}
+                    <a class="subtle-link" href="/registrations?installation_id={{ installation_id }}&setup_action={{ setup_action }}">
+                        Change repository
+                    </a>
+                    {% endif %}
+                </div>
+                <ol class="step-list">
+                    <li>Select the repository you want to configure.</li>
+                    <li>Provide bucket and access settings for this repository.</li>
+                    <li>Repeat for any additional repositories in this installation.</li>
+                </ol>
             </div>
 
             {% if setup_action == 'update' %}
