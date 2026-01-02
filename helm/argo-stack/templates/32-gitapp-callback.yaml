@@ -13,8 +13,7 @@ metadata:
     meta.helm.sh/release-name: {{ .Release.Name }}
     meta.helm.sh/release-namespace: {{ .Release.Namespace }}
     # Run with Deployment after ExternalSecrets
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "5"    
+    # Deployment is managed by Argo CD; ordering with ExternalSecrets is handled by initContainers and Secret mounts
 spec:
   replicas: {{ .Values.gitappCallback.replicas }}
   selector:
@@ -27,6 +26,9 @@ spec:
     spec:
       # Init container to wait for the secret to be created
       # This is useful when the secret is managed by external-secrets/vault
+      # Secret is shared w/ githubStatusProxy 
+      # TODO - gitapp-callback deployment which should wait for its own secrets, not the githubStatusProxy secrets.
+      # This could cause the init container to wait indefinitely or fail to detect missing secrets.
       initContainers:
       - name: gitapp-callback-wait-for-secret
         image: busybox:1.36
@@ -155,7 +157,7 @@ spec:
           optional: false
       - name: git-credentials
         emptyDir: {}
-          
+
 ---
 apiVersion: v1
 kind: Service

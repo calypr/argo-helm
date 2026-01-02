@@ -206,8 +206,8 @@ argo-stack:
 		--set githubStatusProxy.privateKeySecret.name="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set githubStatusProxy.privateKeySecret.key=privateKey \
 		--set githubStatusProxy.logLevel="DEBUG" \
-		--set-string gitappCallback.githubRepoUrl=https://github.com/calypr/registrations-test \
-		--set-string gitappCallback.githubUserName=bwalsh \
+		--set-string gitappCallback.githubRepoUrl="${GITHUBHAPP_CALLBACK_REPO_URL}" \
+		--set-string gitappCallback.githubUserName="${GITHUBHAPP_CALLBACK_USER_NAME}" \
 		--set-string gitappCallback.secretKey="${GITHUBHAPP_CALLBACK_FLASK_KEY}"\
 		-f helm/argo-stack/admin-values.yaml \
 		-f -

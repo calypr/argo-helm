@@ -270,8 +270,8 @@ gitappCallback:
   enabled: true
   # Git repository URL for storing repo registration data
   # This repository contains declarative YAML files for each RepoRegistration
-  githubRepoUrl: "" 
-  githubUserName: ""
+  githubRepoUrl: "TODO-SET-ME" 
+  githubUserName: "TODO-SET-ME"
   githubTokenSecret:
     vaultPath: argo/events/github#token
     name: github-reg-repo-token
@@ -287,7 +287,7 @@ gitappCallback:
   # IMPORTANT: Override this in production with a secure random value
   # Recommended: Use Vault with External Secrets Operator
   # Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'
-  secretKey: ""
+  secretKey: "TODO-SET-ME"
   # GitHub App name (displayed in the UI)
   githubAppName: "calypr"
   # Persistence configuration for registration database
