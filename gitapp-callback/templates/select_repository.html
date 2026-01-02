@@ -143,7 +143,11 @@
         <div class="container">
             <div class="header">
                 <h2>Select Repository</h2>
+                {% if setup_action == "install" %}
+                <p>Select a repository to register. You'll need to repeat this for each repository.</p>
+                {% else %}
                 <p>Choose the repository you want to update before continuing.</p>
+                {% endif %}
             </div>
 
             <div class="card">

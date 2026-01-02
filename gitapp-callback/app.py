@@ -827,17 +827,17 @@ def registrations_form():
         f"action={safe_setup_action}"
     )
 
-    # Check if registration exists
     selected_repository = request.args.get("selected_repository")
-    if setup_action == "update" and len(repositories) > 1:
-        if not selected_repository:
-            return render_template(
-                "select_repository.html",
-                installation_id=installation_id,
-                setup_action=setup_action,
-                repositories=repositories,
-                github_app_name=GITHUB_APP_NAME,
-            )
+    total_repositories = len(repositories)
+    if len(repositories) > 1 and not selected_repository:
+        return render_template(
+            "select_repository.html",
+            installation_id=installation_id,
+            setup_action=setup_action,
+            repositories=repositories,
+            github_app_name=GITHUB_APP_NAME,
+        )
+    if selected_repository:
         selected_repos = [r for r in repositories if r["full_name"] == selected_repository]
         if not selected_repos:
             logger.warning(
@@ -853,9 +853,12 @@ def registrations_form():
                 400,
             )
         repositories = selected_repos
+    elif len(repositories) == 1:
+        selected_repository = repositories[0]["full_name"]
 
     repository = repositories[0] if repositories else None
     existing_registration = get_registration(installation_id, repository)
+    creating_missing_registration = False
     
     # Handle install action
     if setup_action == "install":
@@ -873,7 +876,8 @@ def registrations_form():
                 redirect_url=url_for(
                     "registrations_form",
                     installation_id=installation_id,
-                    setup_action="update"
+                    setup_action="update",
+                    selected_repository=selected_repository,
                 ),
                 github_app_name=GITHUB_APP_NAME,
             )
@@ -881,21 +885,12 @@ def registrations_form():
     # Handle update action
     elif setup_action == "update":
         if not existing_registration:
-            # No existing registration for update
-            logger.error(
-                f"Installation {safe_installation_id} {selected_repository}  not found for update"
+            logger.info(
+                "No existing registration for installation %s %s; proceeding to create one.",
+                safe_installation_id,
+                selected_repository,
             )
-            return (
-                render_template(
-                    "error.html",
-                    error_message=(
-                        f"Installation {installation_id} {selected_repository} not found. "
-                        "Please install the GitHub App first."
-                    ),
-                    github_app_name=GITHUB_APP_NAME,
-                ),
-                404,
-            )
+            creating_missing_registration = True
 
     # Load existing data for update mode
     initial_data = existing_registration if setup_action == "update" else None
@@ -906,6 +901,9 @@ def registrations_form():
         setup_action=setup_action,
         initial_data=initial_data,
         repositories=repositories,
+        selected_repository=selected_repository,
+        creating_missing_registration=creating_missing_registration,
+        multiple_repositories=total_repositories > 1,
         github_app_name=GITHUB_APP_NAME,
     )
 

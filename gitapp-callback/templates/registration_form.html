@@ -325,28 +325,32 @@
                 You are updating an existing installation. Review and update your settings below.
             </div>
             {% endif %}
+            {% if setup_action == 'update' and creating_missing_registration %}
+            <div class="alert alert-info show">
+                No existing registration was found for this repository. Submitting this form will create it.
+            </div>
+            {% endif %}
+            {% if setup_action == 'install' and multiple_repositories %}
+            <div class="alert alert-info show">
+                This installation has multiple repositories. Each repository must be registered separately.
+            </div>
+            {% endif %}
 
             <div id="alertContainer"></div>
 
             <form id="registrationForm" method="POST" action="/registrations">
                 <input type="hidden" name="installation_id" value="{{ installation_id }}">
 
-                {% if repositories|length > 1 %}
+                {% if selected_repository %}
+                <input type="hidden" name="selected_repository" value="{{ selected_repository }}">
                 <div class="form-group">
-                    <label for="selected_repository">Repository *</label>
-                    <select id="selected_repository" name="selected_repository" required>
-                        <option value="">Select a repository...</option>
-                        {% for repo in repositories %}
-                        <option value="{{ repo.full_name }}">{{ repo.full_name }}</option>
-                        {% endfor %}
-                    </select>
-                    <small>You must select which repository this registration applies to.</small>
-                </div>
-                {% elif repositories|length == 1 %}
-                <!-- Single repo: store it as hidden field -->
-                <input type="hidden" name="selected_repository" value="{{ repositories[0].full_name }}">
-                <div class="form-group">
-                    <p><strong>Repository:</strong> {{ repositories[0].full_name }}</p>
+                    <label for="selected_repository_display">Repository</label>
+                    <input
+                        type="text"
+                        id="selected_repository_display"
+                        value="{{ selected_repository }}"
+                        readonly
+                    >
                 </div>
                 {% else %}
                 <div class="alert alert-error">
