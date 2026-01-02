@@ -29,6 +29,8 @@ import hvac
 import yaml
 from urllib.parse import urlparse
 
+EMAIL_PATTERN = re.compile(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+
 
 # Configure logging
 logging.basicConfig(
@@ -96,7 +98,6 @@ def run_git_command(args: List[str], repo_dir: Path) -> str:
             repo_dir,
         )
         return "FAILED"    
-    
     return result.stdout.strip()
 
 
@@ -115,6 +116,78 @@ def parse_repo_owner_name(repo_url: str) -> Tuple[str, str]:
         path = path[:-4]
     owner, repo = path.split("/", 1)
     return owner, repo
+
+
+def sanitize_log_value(value: Optional[str], max_length: int) -> str:
+    if not value:
+        return ""
+    safe_value = "".join(c for c in value[:max_length] if c.isalnum() or c in "-_")
+    return safe_value
+
+
+def parse_installation_id(raw_installation_id: Optional[str]) -> Optional[int]:
+    if not raw_installation_id:
+        return None
+    try:
+        return int(raw_installation_id)
+    except ValueError:
+        return None
+
+
+def parse_email_list(raw_value: str) -> List[str]:
+    return [email.strip() for email in raw_value.split(",") if email.strip()]
+
+
+def validate_email_list(emails: List[str]) -> Optional[str]:
+    for email in emails:
+        if not EMAIL_PATTERN.match(email):
+            return f"Invalid email address: {email}"
+    return None
+
+
+def parse_bucket_config(prefix: str, form: Dict[str, str]) -> Optional[Dict[str, any]]:
+    """Parse S3 bucket configuration from form data."""
+    bucket_name = form.get(f"{prefix}_bucket", "").strip()
+    if not bucket_name:
+        return None
+
+    access_key = form.get(f"{prefix}_accessKey", "").strip()
+    secret_key = form.get(f"{prefix}_secretKey", "").strip()
+
+    if not access_key or not secret_key:
+        raise ValueError(
+            f"{prefix.replace('_', ' ').title()} requires both access key and secret key"
+        )
+
+    is_aws = form.get(f"{prefix}_is_aws") == "on"
+
+    config = {
+        "bucket": bucket_name,
+        "accessKey": access_key,
+        "secretKey": secret_key,
+        "is_aws": is_aws,
+    }
+
+    if not is_aws:
+        hostname = form.get(f"{prefix}_hostname", "").strip()
+        region = form.get(f"{prefix}_region", "").strip()
+        path_style = form.get(f"{prefix}_pathStyle") == "on"
+
+        if not hostname or not region:
+            raise ValueError(
+                f"{prefix.replace('_', ' ').title()} (non-AWS) requires hostname and region"
+            )
+
+        if not hostname.startswith("https://"):
+            raise ValueError(
+                f"{prefix.replace('_', ' ').title()} hostname must start with https://"
+            )
+
+        config["hostname"] = hostname
+        config["region"] = region
+        config["pathStyle"] = path_style
+
+    return config
 
 
 def ensure_repo_registration() -> None:
@@ -565,34 +638,31 @@ def get_registration(installation_id, repository=None, git_host=None, full_name=
         logger.warning("Unable to resolve registration identity: %s", e)
         return None
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-    
-    cursor.execute(
-        "SELECT data FROM registrations WHERE git_host = ? AND full_name = ?",
-        (resolved_git_host, resolved_full_name)
-    )
-    
-    row = cursor.fetchone()
-    conn.close()
-    
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute(
+            "SELECT data FROM registrations WHERE git_host = ? AND full_name = ?",
+            (resolved_git_host, resolved_full_name),
+        )
+        row = cursor.fetchone()
+
     if row:
         registration_data = json.loads(row[0])
 
         if repository and VAULT_ADDR and VAULT_TOKEN:
-            full_name = repository['full_name']
-            owner, repo_name = full_name.split('/')
+            full_name = repository["full_name"]
+            owner, repo_name = full_name.split("/")
             data_vault_path = f"argo/apps/{owner}/{repo_name}/dataBucket"
             artifact_vault_path = f"argo/apps/{owner}/{repo_name}/artifactBucket"
             try:
                 client = hvac.Client(url=VAULT_ADDR, token=VAULT_TOKEN)
                 data_bucket_response = client.secrets.kv.v2.read_secret_version(
                     path=data_vault_path,
-                    mount_point="kv"
+                    mount_point="kv",
                 )
                 artifact_bucket_response = client.secrets.kv.v2.read_secret_version(
                     path=artifact_vault_path,
-                    mount_point="kv"
+                    mount_point="kv",
                 )
                 if data_bucket_response:
                     created_time = (
@@ -616,7 +686,11 @@ def get_registration(installation_id, repository=None, git_host=None, full_name=
                 logger.warning(f"Failed to retrieve bucket configurations from Vault: {e}")
 
         return registration_data
-    logger.error(f"Did not find: resolved_git_host: {resolved_git_host}, resolved_full_name: {resolved_full_name:}") 
+    logger.error(
+        "Did not find registration for git_host=%s full_name=%s",
+        resolved_git_host,
+        resolved_full_name,
+    )
     return None
 
 
@@ -639,19 +713,13 @@ def save_registration(installation_id, registration_data, repositories=None, git
         full_name=full_name or registration_data.get("full_name"),
     )
 
-    registration_data["git_host"] = resolved_git_host
-    registration_data["full_name"] = resolved_full_name
-    registration_data["installation_id"] = installation_id
+    registration_payload = dict(registration_data)
+    registration_payload["git_host"] = resolved_git_host
+    registration_payload["full_name"] = resolved_full_name
+    registration_payload["installation_id"] = installation_id
 
-    conn = sqlite3.connect(DB_PATH)
-    cursor = conn.cursor()
-
-    data_bucket = registration_data.get("dataBucket", None)
-    artifact_bucket = registration_data.get("artifactBucket", None)
-    if "dataBucket" in registration_data:
-        del registration_data["dataBucket"]
-    if "artifactBucket" in registration_data:
-        del registration_data["artifactBucket"]
+    data_bucket = registration_payload.pop("dataBucket", None)
+    artifact_bucket = registration_payload.pop("artifactBucket", None)
 
     # Save bucket configurations to Vault
     if repositories:
@@ -685,27 +753,26 @@ def save_registration(installation_id, registration_data, repositories=None, git
             logger.error(f"Failed to save bucket configurations to Vault: {e}")
             raise
 
-    data_json = json.dumps(registration_data)
-    
-    cursor.execute("""
-        INSERT INTO registrations (
-            git_host,
-            full_name,
-            installation_id,
-            data,
-            created_at,
-            updated_at
-        )
-        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ON CONFLICT(git_host, full_name) 
-        DO UPDATE SET 
-            installation_id = excluded.installation_id,
-            data = excluded.data,
-            updated_at = CURRENT_TIMESTAMP
-    """, (resolved_git_host, resolved_full_name, installation_id, data_json))
-    
-    conn.commit()
-    conn.close()
+    data_json = json.dumps(registration_payload)
+
+    with sqlite3.connect(DB_PATH) as conn:
+        cursor = conn.cursor()
+        cursor.execute("""
+            INSERT INTO registrations (
+                git_host,
+                full_name,
+                installation_id,
+                data,
+                created_at,
+                updated_at
+            )
+            VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+            ON CONFLICT(git_host, full_name) 
+            DO UPDATE SET 
+                installation_id = excluded.installation_id,
+                data = excluded.data,
+                updated_at = CURRENT_TIMESTAMP
+        """, (resolved_git_host, resolved_full_name, installation_id, data_json))
     logger.info(
         "Registration saved for git_host=%s full_name=%s installation_id=%s",
         resolved_git_host,
@@ -766,11 +833,9 @@ def registrations_form():
             400,
         )
     
-    # Validate installation_id is an integer
-    try:
-        int(installation_id)
-    except ValueError:
-        logger.warning(f"Invalid installation_id (not an integer): {installation_id[:50]}")
+    parsed_installation_id = parse_installation_id(installation_id)
+    if parsed_installation_id is None:
+        logger.warning("Invalid installation_id (not an integer): %s", installation_id[:50])
         return (
             render_template(
                 "error.html",
@@ -818,10 +883,8 @@ def registrations_form():
         )
 
     # Sanitize values for logging (only alphanumeric and basic chars)
-    safe_installation_id = "".join(
-        c for c in (installation_id or "")[:50] if c.isalnum() or c in "-_"
-    )
-    safe_setup_action = "".join(c for c in (setup_action or "")[:20] if c.isalnum() or c in "-_")
+    safe_installation_id = sanitize_log_value(installation_id, 50)
+    safe_setup_action = sanitize_log_value(setup_action, 20)
     logger.info(
         f"Registration form requested: installation_id={safe_installation_id}, "
         f"action={safe_setup_action}"
@@ -959,12 +1022,8 @@ def registrations_submit():
             )
 
         # Parse email lists
-        admin_users = [email.strip() for email in admin_users_raw.split(",") if email.strip()]
-        read_users = (
-            [email.strip() for email in read_users_raw.split(",") if email.strip()]
-            if read_users_raw
-            else []
-        )
+        admin_users = parse_email_list(admin_users_raw)
+        read_users = parse_email_list(read_users_raw)
 
         # Validate admin users
         if not admin_users:
@@ -973,62 +1032,13 @@ def registrations_submit():
                 400,
             )
 
-        # Basic email validation
-        email_pattern = r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
-        for email in admin_users + read_users:
-            if not re.match(email_pattern, email):
-                return jsonify({"success": False, "error": f"Invalid email address: {email}"}), 400
-
-        # Parse bucket configurations
-        def parse_bucket_config(prefix):
-            """Parse S3 bucket configuration from form data."""
-            bucket_name = request.form.get(f"{prefix}_bucket", "").strip()
-            if not bucket_name:
-                return None
-
-            access_key = request.form.get(f"{prefix}_accessKey", "").strip()
-            secret_key = request.form.get(f"{prefix}_secretKey", "").strip()
-
-            # If bucket is set, accessKey and secretKey must exist
-            if not access_key or not secret_key:
-                raise ValueError(
-                    f"{prefix.replace('_', ' ').title()} requires both access key and secret key"
-                )
-
-            is_aws = request.form.get(f"{prefix}_is_aws") == "on"
-
-            config = {
-                "bucket": bucket_name,
-                "accessKey": access_key,
-                "secretKey": secret_key,
-                "is_aws": is_aws,
-            }
-
-            # If not AWS, hostname, region, and pathStyle should be complete
-            if not is_aws:
-                hostname = request.form.get(f"{prefix}_hostname", "").strip()
-                region = request.form.get(f"{prefix}_region", "").strip()
-                path_style = request.form.get(f"{prefix}_pathStyle") == "on"
-
-                if not hostname or not region:
-                    raise ValueError(
-                        f"{prefix.replace('_', ' ').title()} (non-AWS) requires hostname and region"
-                    )
-
-                if not hostname.startswith("https://"):
-                    raise ValueError(
-                        f"{prefix.replace('_', ' ').title()} hostname must start with https://"
-                    )
-
-                config["hostname"] = hostname
-                config["region"] = region
-                config["pathStyle"] = path_style
-
-            return config
+        email_error = validate_email_list(admin_users + read_users)
+        if email_error:
+            return jsonify({"success": False, "error": email_error}), 400
 
         try:
-            data_bucket = parse_bucket_config("dataBucket")
-            artifact_bucket = parse_bucket_config("artifactBucket")
+            data_bucket = parse_bucket_config("dataBucket", request.form)
+            artifact_bucket = parse_bucket_config("artifactBucket", request.form)
         except ValueError as e:
             return jsonify({"success": False, "error": str(e)}), 400
 
