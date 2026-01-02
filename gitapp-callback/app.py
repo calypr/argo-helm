@@ -451,13 +451,13 @@ def init_db():
     logger.info(f"Database initialized at {DB_PATH}")
 
 
-def get_registration(installation_id, repositories=None):
+def get_registration(installation_id, repository=None):
     """
     Get a registration from the database.
     
     Args:
         installation_id: The GitHub installation ID
-        repositories: Optional list of repositories associated with the installation
+        repository: Optional repository associated with the installation
         
     Returns:
         dict: The registration data or None if not found
@@ -477,11 +477,8 @@ def get_registration(installation_id, repositories=None):
     if row:
         registration_data = json.loads(row[0])
 
-        if repositories and VAULT_ADDR and VAULT_TOKEN:
-            if len(repositories) > 1:
-                logging.warning("Multiple repositories found for installation; using the first one.")
-
-            full_name = repositories[0]['full_name']
+        if repository and VAULT_ADDR and VAULT_TOKEN:
+            full_name = repository['full_name']
             owner, repo_name = full_name.split('/')
             data_vault_path = f"argo/apps/{owner}/{repo_name}/dataBucket"
             artifact_vault_path = f"argo/apps/{owner}/{repo_name}/artifactBucket"
@@ -703,7 +700,34 @@ def registrations_form():
     )
 
     # Check if registration exists
-    existing_registration = get_registration(installation_id, repositories)
+    selected_repository = request.args.get("selected_repository")
+    if setup_action == "update" and len(repositories) > 1:
+        if not selected_repository:
+            return render_template(
+                "select_repository.html",
+                installation_id=installation_id,
+                setup_action=setup_action,
+                repositories=repositories,
+                github_app_name=GITHUB_APP_NAME,
+            )
+        selected_repos = [r for r in repositories if r["full_name"] == selected_repository]
+        if not selected_repos:
+            logger.warning(
+                "Invalid repository selection for installation %s",
+                safe_installation_id,
+            )
+            return (
+                render_template(
+                    "error.html",
+                    error_message="Invalid repository selection.",
+                    github_app_name=GITHUB_APP_NAME,
+                ),
+                400,
+            )
+        repositories = selected_repos
+
+    repository = repositories[0] if repositories else None
+    existing_registration = get_registration(installation_id, repository)
     
     # Handle install action
     if setup_action == "install":
