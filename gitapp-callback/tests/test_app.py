@@ -16,6 +16,9 @@ os.environ['TESTING'] = '1'
 
 from app import app, init_db
 
+TEST_REPO = {"full_name": "octo/widgets", "html_url": "https://github.com/octo/widgets"}
+TEST_REPO_ALT = {"full_name": "octo/alternate", "html_url": "https://github.com/octo/alternate"}
+
 
 @pytest.fixture
 def client():
@@ -73,13 +76,15 @@ def test_registrations_form_with_update_action(client):
     # Create existing registration first
     existing_data = {
         'installation_id': '12345678',
+        'git_host': 'github.com',
+        'full_name': TEST_REPO['full_name'],
         'defaultBranch': 'main',
         'adminUsers': ['admin@example.com'],
         'readUsers': [],
         'dataBucket': None,
         'artifactBucket': None
     }
-    save_registration('12345678', existing_data)
+    save_registration('12345678', existing_data, repositories=[TEST_REPO])
     
     # Now access update form
     response = client.get('/registrations?installation_id=12345678&setup_action=update')
@@ -310,7 +315,7 @@ def test_database_persistence_install(client):
     assert json_data['success'] is True
     
     # Verify it was saved to database
-    saved_data = get_registration('test-install-123')
+    saved_data = get_registration('test-install-123', repository=TEST_REPO)
     assert saved_data is not None
     assert saved_data['installation_id'] == 'test-install-123'
     assert saved_data['defaultBranch'] == 'develop'
@@ -324,13 +329,15 @@ def test_database_persistence_update(client):
     # Create initial registration
     initial_data = {
         'installation_id': 'test-update-456',
+        'git_host': 'github.com',
+        'full_name': TEST_REPO['full_name'],
         'defaultBranch': 'main',
         'adminUsers': ['admin@example.com'],
         'readUsers': [],
         'dataBucket': None,
         'artifactBucket': None
     }
-    save_registration('test-update-456', initial_data)
+    save_registration('test-update-456', initial_data, repositories=[TEST_REPO])
     
     # Update the registration
     response = client.post('/registrations', data={
@@ -344,7 +351,7 @@ def test_database_persistence_update(client):
     assert json_data['success'] is True
     
     # Verify the update
-    updated_data = get_registration('test-update-456')
+    updated_data = get_registration('test-update-456', repository=TEST_REPO)
     assert updated_data is not None
     assert updated_data['defaultBranch'] == 'production'
     assert len(updated_data['adminUsers']) == 2
@@ -357,13 +364,15 @@ def test_install_with_existing_registration_redirects(client):
     # Create existing registration
     existing_data = {
         'installation_id': '78900001',
+        'git_host': 'github.com',
+        'full_name': TEST_REPO['full_name'],
         'defaultBranch': 'main',
         'adminUsers': ['admin@example.com'],
         'readUsers': [],
         'dataBucket': None,
         'artifactBucket': None
     }
-    save_registration('78900001', existing_data)
+    save_registration('78900001', existing_data, repositories=[TEST_REPO])
     
     # Try to access install form (should get error/redirect)
     response = client.get('/registrations?installation_id=78900001&setup_action=install')
@@ -389,13 +398,15 @@ def test_update_form_prepopulates_data(client):
     # Create existing registration with bucket data
     existing_data = {
         'installation_id': '11100001',
+        'git_host': 'github.com',
+        'full_name': TEST_REPO_ALT['full_name'],
         'defaultBranch': 'staging',
         'dataBucket': None,
         'artifactBucket': None,
         'adminUsers': ['user1@example.com', 'user2@example.com'],
         'readUsers': ['viewer@example.com']
     }
-    save_registration('11100001', existing_data)
+    save_registration('11100001', existing_data, repositories=[TEST_REPO_ALT])
     
     # Access update form
     response = client.get('/registrations?installation_id=11100001&setup_action=update')

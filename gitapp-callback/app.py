@@ -27,6 +27,7 @@ import requests
 from typing import List, Dict, Optional, Tuple
 import hvac
 import yaml
+from urllib.parse import urlparse
 
 
 # Configure logging
@@ -425,7 +426,9 @@ def init_db():
     
     Creates the registrations table if it doesn't exist.
     Table schema:
-        - installation_id: TEXT PRIMARY KEY
+        - git_host: TEXT
+        - full_name: TEXT
+        - installation_id: TEXT
         - data: TEXT (JSON serialized RepoRegistration)
         - created_at: TIMESTAMP
         - updated_at: TIMESTAMP
@@ -437,38 +440,137 @@ def init_db():
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
-    cursor.execute("""
-        CREATE TABLE IF NOT EXISTS registrations (
-            installation_id TEXT PRIMARY KEY,
-            data TEXT NOT NULL,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    def create_registrations_table():
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS registrations (
+                git_host TEXT NOT NULL,
+                full_name TEXT NOT NULL,
+                installation_id TEXT NOT NULL,
+                data TEXT NOT NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                PRIMARY KEY (git_host, full_name)
+            )
+        """)
+
+    cursor.execute("PRAGMA table_info(registrations)")
+    columns = {row[1] for row in cursor.fetchall()}
+
+    if not columns:
+        create_registrations_table()
+    elif "git_host" not in columns or "full_name" not in columns:
+        logger.info("Migrating legacy registrations table to git_host/full_name primary key.")
+        cursor.execute("ALTER TABLE registrations RENAME TO registrations_legacy")
+        create_registrations_table()
+        cursor.execute(
+            "SELECT installation_id, data, created_at, updated_at FROM registrations_legacy"
         )
-    """)
+        rows = cursor.fetchall()
+        for installation_id, data, created_at, updated_at in rows:
+            try:
+                registration_data = json.loads(data)
+            except json.JSONDecodeError:
+                logger.warning("Skipping legacy registration with invalid JSON payload.")
+                continue
+            full_name = registration_data.get("full_name")
+            if not full_name:
+                logger.warning(
+                    "Skipping legacy registration without full_name for installation_id=%s.",
+                    installation_id,
+                )
+                continue
+            git_host = registration_data.get("git_host") or "github.com"
+            cursor.execute(
+                """
+                INSERT INTO registrations (
+                    git_host,
+                    full_name,
+                    installation_id,
+                    data,
+                    created_at,
+                    updated_at
+                )
+                VALUES (?, ?, ?, ?, ?, ?)
+                """,
+                (git_host, full_name, installation_id, data, created_at, updated_at),
+            )
+        logger.info(
+            "Legacy registrations migrated where possible; "
+            "legacy table preserved as registrations_legacy."
+        )
+    else:
+        create_registrations_table()
     
     conn.commit()
     conn.close()
     logger.info(f"Database initialized at {DB_PATH}")
 
 
-def get_registration(installation_id, repository=None):
+def extract_git_host(repository: Dict[str, any]) -> str:
+    """
+    Extract git host from repository metadata, defaulting to github.com.
+    """
+    if not repository:
+        return "github.com"
+    for key in ("html_url", "git_url", "ssh_url", "clone_url"):
+        url = repository.get(key)
+        if not url:
+            continue
+        if url.startswith("git@"):
+            host_part = url.split("@", 1)[1].split(":", 1)[0]
+            if host_part:
+                return host_part
+        parsed = urlparse(url)
+        if parsed.netloc:
+            return parsed.netloc
+    return "github.com"
+
+
+def resolve_registration_identity(
+    repository: Optional[Dict[str, any]] = None,
+    git_host: Optional[str] = None,
+    full_name: Optional[str] = None,
+) -> Tuple[str, str]:
+    if repository:
+        full_name = repository.get("full_name") or full_name
+        git_host = repository.get("git_host") or git_host or extract_git_host(repository)
+
+    if not full_name:
+        raise ValueError("full_name is required to locate the registration.")
+
+    return git_host or "github.com", full_name
+
+
+def get_registration(installation_id, repository=None, git_host=None, full_name=None):
     """
     Get a registration from the database.
     
     Args:
         installation_id: The GitHub installation ID
         repository: Optional repository associated with the installation
+        git_host: Optional git host override
+        full_name: Optional repository full name override
         
     Returns:
         dict: The registration data or None if not found
     """
 
+    try:
+        resolved_git_host, resolved_full_name = resolve_registration_identity(
+            repository=repository,
+            git_host=git_host,
+            full_name=full_name,
+        )
+    except ValueError as e:
+        logger.warning("Unable to resolve registration identity: %s", e)
+        return None
+
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
     
     cursor.execute(
-        "SELECT data FROM registrations WHERE installation_id = ?",
-        (installation_id,)
+        "SELECT data FROM registrations WHERE git_host = ? AND full_name = ?",
+        (resolved_git_host, resolved_full_name)
     )
     
     row = cursor.fetchone()
@@ -518,7 +620,7 @@ def get_registration(installation_id, repository=None):
     return None
 
 
-def save_registration(installation_id, registration_data, repositories=None):
+def save_registration(installation_id, registration_data, repositories=None, git_host=None, full_name=None):
     """
     Save or update a registration in the database.
     
@@ -526,7 +628,20 @@ def save_registration(installation_id, registration_data, repositories=None):
         installation_id: The GitHub installation ID
         registration_data: The RepoRegistration configuration dict
         repositories: Optional list of repositories associated with the installation
+        git_host: Optional git host override
+        full_name: Optional repository full name override
     """
+
+    repository = repositories[0] if repositories else None
+    resolved_git_host, resolved_full_name = resolve_registration_identity(
+        repository=repository,
+        git_host=git_host,
+        full_name=full_name or registration_data.get("full_name"),
+    )
+
+    registration_data["git_host"] = resolved_git_host
+    registration_data["full_name"] = resolved_full_name
+    registration_data["installation_id"] = installation_id
 
     conn = sqlite3.connect(DB_PATH)
     cursor = conn.cursor()
@@ -573,17 +688,30 @@ def save_registration(installation_id, registration_data, repositories=None):
     data_json = json.dumps(registration_data)
     
     cursor.execute("""
-        INSERT INTO registrations (installation_id, data, created_at, updated_at)
-        VALUES (?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-        ON CONFLICT(installation_id) 
+        INSERT INTO registrations (
+            git_host,
+            full_name,
+            installation_id,
+            data,
+            created_at,
+            updated_at
+        )
+        VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+        ON CONFLICT(git_host, full_name) 
         DO UPDATE SET 
+            installation_id = excluded.installation_id,
             data = excluded.data,
             updated_at = CURRENT_TIMESTAMP
-    """, (installation_id, data_json))
+    """, (resolved_git_host, resolved_full_name, installation_id, data_json))
     
     conn.commit()
     conn.close()
-    logger.info(f"Registration saved for installation_id={installation_id}")
+    logger.info(
+        "Registration saved for git_host=%s full_name=%s installation_id=%s",
+        resolved_git_host,
+        resolved_full_name,
+        installation_id,
+    )
 
 
 # Initialize module and database on startup
@@ -905,16 +1033,6 @@ def registrations_submit():
         except ValueError as e:
             return jsonify({"success": False, "error": str(e)}), 400
 
-        # Create registration configuration
-        registration_config = {
-            "installation_id": installation_id,
-            "defaultBranch": default_branch,
-            "dataBucket": data_bucket,
-            "artifactBucket": artifact_bucket,
-            "adminUsers": admin_users,
-            "readUsers": read_users,
-        }
-
         # Retrieve repositories for this installation
         try:
             repositories = get_installation_repositories(installation_id)
@@ -963,6 +1081,22 @@ def registrations_submit():
             repositories = selected_repos
 
         logger.info(f"Repository registration submitted: installation_id={installation_id} repositories={repositories}")
+
+        resolved_git_host, resolved_full_name = resolve_registration_identity(
+            repository=repositories[0]
+        )
+
+        # Create registration configuration
+        registration_config = {
+            "installation_id": installation_id,
+            "git_host": resolved_git_host,
+            "full_name": resolved_full_name,
+            "defaultBranch": default_branch,
+            "dataBucket": data_bucket,
+            "artifactBucket": artifact_bucket,
+            "adminUsers": admin_users,
+            "readUsers": read_users,
+        }
 
         # Save configuration to database
         save_registration(installation_id, registration_config, repositories)
