@@ -1,6 +1,6 @@
 {{- if .Values.repoRegistrations }}
 {{- range $reg := .Values.repoRegistrations }}
-{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+{{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
 ---
 # ArgoCD Application generated from RepoRegistration: {{ $reg.name }}
 apiVersion: argoproj.io/v1alpha1
@@ -10,7 +10,7 @@ metadata:
   namespace: {{ $.Values.namespaces.argocd | default "argocd" }}
   labels:
     app.kubernetes.io/name: {{ $reg.name }}
-    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/part-of: calypr-projects
     {{- if $reg.tenant }}
     tenant: {{ $reg.tenant }}
     {{- end }}

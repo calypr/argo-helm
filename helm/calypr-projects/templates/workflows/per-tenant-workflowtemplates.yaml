@@ -5,7 +5,7 @@ This ensures workflows can reference templates within the same namespace.
 */ -}}
 {{- if .Values.repoRegistrations }}
 {{- range $reg := .Values.repoRegistrations }}
-{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+{{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
 {{- $repoName := $reg.name }}
 ---
 apiVersion: argoproj.io/v1alpha1
@@ -14,7 +14,7 @@ metadata:
   name: nextflow-repo-runner
   namespace: {{ $namespace }}
   labels:
-    app.kubernetes.io/name: argo-stack
+    app.kubernetes.io/name: calypr-projects
     app.kubernetes.io/part-of: argo-workflows
     calypr.io/workflow-tenant: "true"
     calypr.io/repo: {{ $repoName }}

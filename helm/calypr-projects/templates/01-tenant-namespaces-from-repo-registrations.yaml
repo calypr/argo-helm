@@ -1,6 +1,6 @@
 {{- if .Values.repoRegistrations }}
 {{- range $reg := .Values.repoRegistrations }}
-{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+{{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
 {{- $cleaned := trimSuffix ".git" $reg.repoUrl }}
 {{- $cleaned = trimPrefix "https://" $cleaned }}
 {{- $cleaned = trimPrefix "http://" $cleaned }}
@@ -18,7 +18,7 @@ metadata:
     app.kubernetes.io/managed-by: {{ $.Release.Service }}
     app.kubernetes.io/instance: {{ $.Release.Name }}
     app.kubernetes.io/name: {{ $reg.name }}
-    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/part-of: calypr-projects
     helm.sh/chart: {{ $.Chart.Name }}-{{ $.Chart.Version }}
     {{- if $reg.tenant }}
     tenant: {{ $reg.tenant }}

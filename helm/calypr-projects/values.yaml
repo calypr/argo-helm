@@ -1,0 +1,163 @@
+# Default values for calypr-projects chart
+# Declare variables to be passed into your templates.
+
+# ============================================================================
+# Namespace definitions
+# ============================================================================
+
+namespaces:
+  argo: argo-workflows
+  argocd: argocd
+  tenant: calypr-tenants
+  argoEvents: argo-events
+
+# ============================================================================
+# External Secrets Operator (ESO) and Vault Integration
+# ============================================================================
+
+externalSecrets:
+  # Enable External Secrets integration
+  enabled: true
+
+  # HashiCorp Vault provider configuration
+  vault:
+    enabled: true
+    # Vault server address (required when vault.enabled=true)
+    address: "http://vault.vault.svc.cluster.local:8200"
+    # Scope of the SecretStore (cluster or namespace)
+    scope: "cluster"
+    # Optional override for SecretStore name
+    secretStoreName: ""
+
+    # Optional: CA bundle for TLS verification
+    caBundleSecretName: ""
+    caBundleSecretKey: "ca.crt"
+
+    # Vault authentication configuration
+    auth:
+      # Auth method: kubernetes, jwt, or approle
+      method: "kubernetes"
+      # Path where the auth method is mounted in Vault
+      mount: "kubernetes"
+      # Vault role name for authentication
+      role: "argo-stack"
+      # ServiceAccount used by SecretStore for Kubernetes auth
+      serviceAccountName: "eso-vault-auth"
+      # AppRole configuration (when method=approle)
+      approle:
+        roleId: ""
+        secretRef:
+          name: "vault-approle-secret"
+          key: "secretId"
+
+    # KV secrets engine configuration
+    kv:
+      # KV engine version (1 or 2)
+      engineVersion: "v2"
+      # Default path prefix for all secrets
+      defaultPathPrefix: "kv"
+
+# ============================================================================
+# GitHub Status Proxy (core service is installed via argo-stack)
+# ============================================================================
+
+githubStatusProxy:
+  namespace: argocd
+
+# ============================================================================
+# Artifact Storage Configuration ( Results of Workflows )
+# ============================================================================
+
+s3:
+  enabled: false
+  hostname: ""
+  bucket: ""
+  region: ""
+  insecure: false
+  pathStyle: true
+  accessKeyId: ""
+  secretAccessKey: ""
+
+# ============================================================================
+# Argo Events Configuration - GitHub EventSource and Sensor
+# ============================================================================
+
+events:
+  enabled: true
+  namespace: argo-events
+
+  eventBus:
+    create: true
+    name: default
+
+  github:
+    enabled: true
+    name: github
+
+    # Secret for GitHub API Token
+    secret:
+      create: true
+      name: github-secret
+      tokenKey: token
+
+    # Webhook service exposed by EventSource
+    webhook:
+      endpoint: /events
+      port: 12000
+      service:
+        type: ClusterIP
+      ingress:
+        enabled: true
+        className: nginx
+        hosts: []
+        tls: []
+
+# ============================================================================
+# Workflow Execution Configuration
+# ============================================================================
+
+workflows:
+  runnerServiceAccount: wf-runner
+  baseUrl: "https://argo-workflows.example.com"
+
+# ============================================================================
+# RepoRegistration - Self-Service Repository Onboarding (DECLARATIVE)
+# ============================================================================
+
+repoRegistrations: []
+
+# Prefix for workflow namespaces. For a repoUrl https://github.com/<org>/<repo>.git,
+# the workflow namespace is assumed to be: <workflowNamespacePrefix><org>-<repo>
+workflowNamespacePrefix: wf-
+
+# Global group that should have full Argo CD admin privileges
+adminGroup: wf-admins
+
+# ============================================================================
+# Argo CD Notifications - GitHub Status Integration
+# ============================================================================
+
+notifications:
+  enabled: true
+  github:
+    enabled: true
+  triggers:
+    onSyncSucceeded: true
+    onSyncFailed: true
+    onSyncRunning: false
+    onHealthDegraded: false
+  defaultSubscriptions:
+    autoSubscribe: true
+
+# ============================================================================
+# Deprecated single application configuration
+# ============================================================================
+
+argocdApplication:
+  enabled: false
+  name: ""
+  project: default
+  repoURL: ""
+  targetRevision: "main"
+  path: "."
+  destinationNamespace: ""

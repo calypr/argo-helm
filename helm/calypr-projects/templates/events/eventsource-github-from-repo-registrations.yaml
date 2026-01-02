@@ -9,7 +9,7 @@ metadata:
   namespace: {{ .Values.events.namespace | default "argo-events" }}
   labels:
     app.kubernetes.io/name: argo-events
-    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/part-of: calypr-projects
     source: repo-registration
   annotations:
     helm.sh/hook: post-install,post-upgrade
@@ -26,7 +26,7 @@ spec:
     {{- if ge (len $parts) 2 }}
       {{- $owner = index $parts 0 }}
     {{- end }}
-    {{- $eventName := $reg.eventName | default (include "argo-stack.repoRegistration.eventName" $reg) }}
+    {{- $eventName := $reg.eventName | default (include "calypr-projects.repoRegistration.eventName" $reg) }}
     {{ $eventName }}:
       owner: {{ $owner | quote }}
       repository: {{ $repoName | quote }}

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: calypr-projects
+description: Per-tenant Argo resources for Calypr projects (namespaces, RBAC, WorkflowTemplates, and repo registrations)
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
