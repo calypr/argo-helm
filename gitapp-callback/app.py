@@ -616,7 +616,7 @@ def get_registration(installation_id, repository=None, git_host=None, full_name=
                 logger.warning(f"Failed to retrieve bucket configurations from Vault: {e}")
 
         return registration_data
-    
+    logger.error(f"Did not find: resolved_git_host: {resolved_git_host}, resolved_full_name: {resolved_full_name:}") 
     return None
 
 
@@ -862,12 +862,12 @@ def registrations_form():
         if existing_registration:
             # Installation already exists, warn user and redirect to update
             logger.warning(
-                f"Installation {safe_installation_id} already exists, redirecting to update"
+                f"Installation {safe_installation_id} {selected_repository}  already exists, redirecting to update"
             )
             return render_template(
                 "error.html",
                 error_message=(
-                    f"Installation {installation_id} is already registered. "
+                    f"Installation {installation_id} {selected_repository} is already registered. "
                     "Redirecting you to update the existing registration..."
                 ),
                 redirect_url=url_for(
@@ -883,13 +883,13 @@ def registrations_form():
         if not existing_registration:
             # No existing registration for update
             logger.error(
-                f"Installation {safe_installation_id} not found for update"
+                f"Installation {safe_installation_id} {selected_repository}  not found for update"
             )
             return (
                 render_template(
                     "error.html",
                     error_message=(
-                        f"Installation {installation_id} not found. "
+                        f"Installation {installation_id} {selected_repository} not found. "
                         "Please install the GitHub App first."
                     ),
                     github_app_name=GITHUB_APP_NAME,
