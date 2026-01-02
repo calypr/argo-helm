@@ -38,6 +38,16 @@
             font-weight: 600;
         }
 
+        .sidebar-avatar {
+            display: block;
+            width: 120px;
+            height: 120px;
+            margin: 0 1.5rem 2rem;
+            padding: 0.5rem;
+            border-radius: 16px;
+            background: #ffffff;
+        }
+
         .sidebar nav ul {
             list-style: none;
         }
@@ -364,6 +374,7 @@
     <!-- Left Navigation -->
     <aside class="sidebar">
         <h1>{{ github_app_name }}</h1>
+        <img class="sidebar-avatar" src="{{ url_for('static', filename='avatar.svg') }}" alt="App avatar">
         <nav>
             <ul>
                 <li><a href="#" class="active">Repository Registration</a></li>
