@@ -3,7 +3,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: gitapp-callback
-  namespace: {{ .Values.namespaces.security }}
+  namespace: {{ .Values.namespaces.argocd }}
   labels:
     app: gitapp-callback
     app.kubernetes.io/name: gitapp-callback
@@ -12,6 +12,10 @@ metadata:
   annotations:
     meta.helm.sh/release-name: {{ .Release.Name }}
     meta.helm.sh/release-namespace: {{ .Release.Namespace }}
+    # Run with Deployment after ExternalSecrets
+    # Deployment is managed by Argo CD; ordering with ExternalSecrets is handled by initContainers and Secret mounts
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "5"    
 spec:
   replicas: {{ .Values.gitappCallback.replicas }}
   selector:
@@ -22,34 +26,116 @@ spec:
       labels:
         app: gitapp-callback
     spec:
+      # Init container to wait for the secret to be created
+      # This is useful when the secret is managed by external-secrets/vault
+      # Secret is shared w/ githubStatusProxy 
+      # TODO - gitapp-callback deployment which should wait for its own secrets, not the githubStatusProxy secrets.
+      # This could cause the init container to wait indefinitely or fail to detect missing secrets.
+      initContainers:
+      - name: gitapp-callback-wait-for-secret
+        image: busybox:1.36
+        command:
+        - sh
+        - -c
+        - |
+          echo "Waiting for secret {{ .Values.githubStatusProxy.privateKeySecret.name }} to be available..."
+          until [ -f /etc/github/private-key.pem ]; do
+            echo "Secret not found, waiting..."
+            sleep 2
+          done
+          echo "Secret found, proceeding with startup"
+        volumeMounts:
+        - name: github-app-key
+          mountPath: /etc/github
+          readOnly: true
+      # Init container to configure git credentials securely
+      - name: gitapp-callback-git-credentials
+        image: alpine/git:2.43.0
+        command:
+        - sh
+        - -c
+        - |
+          set -e
+          if [ -z "$GIT_USERNAME" ] || [ -z "$GIT_PAT" ]; then
+            echo "GIT_USERNAME or GIT_PAT not set"
+            exit 1
+          fi
+          mkdir -p /gitcreds
+          CRED_STRING="https://${GIT_USERNAME}:${GIT_PAT}@github.com"
+          echo "${CRED_STRING}" > /gitcreds/.git-credentials
+        env:
+        - name: GIT_USERNAME
+          value: {{ .Values.gitappCallback.githubUserName }}
+        - name: GIT_PAT
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.gitappCallback.githubTokenSecret.name }}
+              key: {{ .Values.gitappCallback.githubTokenSecret.key }}
+        volumeMounts:
+        - name: git-credentials
+          mountPath: /gitcreds
+
+
       containers:
       - name: gitapp-callback
         image: "{{ .Values.gitappCallback.image.repository }}:{{ .Values.gitappCallback.image.tag }}"
         imagePullPolicy: "{{ .Values.gitappCallback.image.pullPolicy }}"
         env:
+        # Environment variables for GitApp Callback
+        - name: GITHUB_APP_ID
+          value: {{ .Values.githubApp.appId | quote }}
+        - name: GITHUB_PRIVATE_KEY_PATH
+          value: /etc/github/private-key.pem
         - name: SECRET_KEY
           value: {{ .Values.gitappCallback.secretKey | quote }}
+        # for UI
         - name: GITHUB_APP_NAME
           value: {{ .Values.gitappCallback.githubAppName | quote }}
+        # for persistence
         - name: DB_PATH
           value: "/var/registrations/registrations.sqlite"
+        - name: VAULT_ADDR
+          value: {{ .Values.gitappCallback.vault.addr | quote }}
+        - name: VAULT_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.gitappCallback.vault.tokenSecret.name }}
+              key: {{ .Values.gitappCallback.vault.tokenSecret.key }}
+        - name: GITHUB_PAT
+          valueFrom:
+            secretKeyRef:
+              name: {{ .Values.gitappCallback.githubTokenSecret.name }}
+              key: {{ .Values.gitappCallback.githubTokenSecret.key }}
+        - name: GIT_USERNAME
+          value: {{ .Values.gitappCallback.githubUserName }}
+        - name: REPO_REGISTRATION
+          value: {{ .Values.gitappCallback.githubRepoUrl | quote }}
+        - name: GIT_CREDENTIALS_FILE
+          value: /root/.git-credentials
+
         ports:
         - containerPort: 8080
         volumeMounts:
         - name: registrations-data
           mountPath: /var/registrations
+        - name: github-app-key
+          mountPath: /etc/github
+          readOnly: true
+        - name: git-credentials
+          mountPath: /root
+
         livenessProbe:
           httpGet:
             path: /healthz
             port: 8080
           initialDelaySeconds: 5
-          periodSeconds: 10
+          periodSeconds: 30
         readinessProbe:
           httpGet:
             path: /healthz
             port: 8080
           initialDelaySeconds: 2
-          periodSeconds: 5
+          periodSeconds: 30
       volumes:
       - name: registrations-data
         {{- if and .Values.gitappCallback.persistence.enabled .Values.gitappCallback.persistence.useExtraMounts }}
@@ -64,12 +150,22 @@ spec:
         {{- else }}
         emptyDir: {}
         {{- end }}
+      - name: github-app-key
+        secret:
+          secretName: {{ .Values.githubStatusProxy.privateKeySecret.name }}
+          items:
+          - key: {{ .Values.githubStatusProxy.privateKeySecret.key }}
+            path: private-key.pem
+          optional: false
+      - name: git-credentials
+        emptyDir: {}
+
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: gitapp-callback
-  namespace: {{ .Values.namespaces.security }}
+  namespace: {{ .Values.namespaces.argocd }}
   labels:
     app: gitapp-callback
     app.kubernetes.io/name: gitapp-callback

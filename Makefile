@@ -49,6 +49,7 @@ check-vars:
 	@test -f "$(GITHUBHAPP_PRIVATE_KEY_FILE_PATH)" || (echo "Error: GITHUBHAPP_PRIVATE_KEY_FILE_PATH file '$(GITHUBHAPP_PRIVATE_KEY_FILE_PATH)' not found. Create the file before installing" && exit 1)
 	@test -n "$(GITHUBHAPP_PRIVATE_KEY_VAULT_PATH)" || (echo "Error: GITHUBHAPP_PRIVATE_KEY_VAULT_PATH is undefined. Run 'export GITHUBHAPP_PRIVATE_KEY_VAULT_PATH=...' before installing" && exit 1)
 	@test -n "$(GITHUBHAPP_INSTALLATION_ID)" || (echo "Error: GITHUBHAPP_INSTALLATION_ID is undefined. Run 'export GITHUBHAPP_INSTALLATION_ID=...' before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_CALLBACK_FLASK_KEY)" || (echo "Error: GITHUBHAPP_CALLBACK_FLASK_KEY is undefined. Run 'export GITHUBHAPP_CALLBACK_FLASK_KEY=...' before installing" && exit 1)
 	@echo "✅ All GITHUBHAPP environment variables are set."
 
 
@@ -205,6 +206,9 @@ argo-stack:
 		--set githubStatusProxy.privateKeySecret.name="${GITHUBHAPP_PRIVATE_KEY_SECRET_NAME}" \
 		--set githubStatusProxy.privateKeySecret.key=privateKey \
 		--set githubStatusProxy.logLevel="DEBUG" \
+		--set-string gitappCallback.githubRepoUrl="${GITHUBHAPP_CALLBACK_REPO_URL}" \
+		--set-string gitappCallback.githubUserName="${GITHUBHAPP_CALLBACK_USER_NAME}" \
+		--set-string gitappCallback.secretKey="${GITHUBHAPP_CALLBACK_FLASK_KEY}"\
 		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
@@ -225,6 +229,10 @@ ports:
 	kubectl create secret tls ${TLS_SECRET_NAME}  -n calypr-api     --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
 	kubectl create secret tls ${TLS_SECRET_NAME}  -n calypr-tenants --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
 	sudo rm /tmp/fullchain.pem /tmp/privkey.pem
+	#
+	kubectl create secret generic gitapp-vault-token \
+  		--from-literal=token=$(VAULT_TOKEN) \
+  		-n argocd
 	# install ingress
 	helm upgrade --install ingress-authz-overlay \
 	  helm/argo-stack/overlays/ingress-authz-overlay \

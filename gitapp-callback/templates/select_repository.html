@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Select Repository - {{ github_app_name }}</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: #f5f7fa;
+            color: #475569;
+            min-height: 100vh;
+            display: flex;
+        }
+
+        .sidebar {
+            width: 250px;
+            background-color: #1e293b;
+            color: #e2e8f0;
+            padding: 2rem 0;
+            position: fixed;
+            height: 100vh;
+            overflow-y: auto;
+        }
+
+        .sidebar h1 {
+            color: #ffffff;
+            font-size: 1.5rem;
+            padding: 0 1.5rem;
+            margin-bottom: 2rem;
+            font-weight: 600;
+        }
+
+        .sidebar-avatar {
+            display: block;
+            width: 120px;
+            height: 120px;
+            margin: 0 1.5rem 2rem;
+            padding: 0.5rem;
+            border-radius: 16px;
+            background: #ffffff;
+        }
+
+        .sidebar nav ul {
+            list-style: none;
+        }
+
+        .sidebar nav li {
+            margin: 0.25rem 0;
+        }
+
+        .sidebar nav a {
+            display: block;
+            padding: 0.75rem 1.5rem;
+            color: #cbd5e1;
+            text-decoration: none;
+            transition: background-color 0.2s, color 0.2s;
+        }
+
+        .sidebar nav a:hover,
+        .sidebar nav a.active {
+            background-color: #334155;
+            color: #ffffff;
+        }
+
+        .main-content {
+            margin-left: 250px;
+            flex: 1;
+            padding: 2rem;
+        }
+
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+        }
+
+        .header {
+            margin-bottom: 2rem;
+        }
+
+        .header h2 {
+            color: #1e293b;
+            font-size: 1.75rem;
+            font-weight: 600;
+            margin-bottom: 0.5rem;
+        }
+
+        .card {
+            background-color: #ffffff;
+            border-radius: 0.75rem;
+            padding: 2rem;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+        }
+
+        .summary {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+            margin-bottom: 1.5rem;
+        }
+
+        .summary-item {
+            background: #f8fafc;
+            border-radius: 0.5rem;
+            border: 1px solid #e2e8f0;
+            padding: 0.75rem 1rem;
+        }
+
+        .summary-item span {
+            display: block;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            color: #64748b;
+            letter-spacing: 0.04em;
+            margin-bottom: 0.35rem;
+        }
+
+        .summary-item strong {
+            color: #0f172a;
+        }
+
+        .callout {
+            padding: 1rem;
+            border-radius: 0.75rem;
+            border: 1px solid #bfdbfe;
+            background-color: #eff6ff;
+            color: #1e3a8a;
+            margin-bottom: 1.5rem;
+        }
+
+        .callout a {
+            color: #1d4ed8;
+            font-weight: 600;
+            text-decoration: none;
+        }
+
+        .callout a:hover {
+            text-decoration: underline;
+        }
+
+        .form-group {
+            margin-bottom: 1.5rem;
+        }
+
+        label {
+            display: block;
+            margin-bottom: 0.5rem;
+            font-weight: 500;
+            color: #1e293b;
+        }
+
+        select {
+            width: 100%;
+            padding: 0.75rem 1rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            font-size: 0.95rem;
+            color: #1e293b;
+            background-color: #ffffff;
+        }
+
+        .search-input {
+            width: 100%;
+            padding: 0.65rem 0.9rem;
+            border: 1px solid #cbd5e1;
+            border-radius: 0.5rem;
+            font-size: 0.95rem;
+            margin-bottom: 0.75rem;
+        }
+
+        .button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 0.75rem 1.5rem;
+            border-radius: 0.5rem;
+            border: none;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s, transform 0.1s;
+            background-color: #2563eb;
+            color: #ffffff;
+        }
+
+        .button:hover {
+            background-color: #1d4ed8;
+        }
+    </style>
+</head>
+<body>
+    <aside class="sidebar">
+        <h1>{{ github_app_name }}</h1>
+        <img class="sidebar-avatar" src="{{ url_for('static', filename='avatar.png') }}" alt="App avatar">
+        <nav>
+            <ul>
+                <li><a href="#" class="active">Repository Registration</a></li>
+                <li><a href="https://calypr-demo.ddns.net" target="_blank" rel="noopener noreferrer">Documentation</a></li>
+            </ul>
+        </nav>
+    </aside>
+
+    <main class="main-content">
+        <div class="container">
+            <div class="header">
+                <h2>Select Repository</h2>
+                {% if setup_action == "install" %}
+                <p>Select a repository to register. You'll need to repeat this for each repository.</p>
+            {% else %}
+            <p>Choose the repository you want to update before continuing.</p>
+            {% endif %}
+        </div>
+
+        <div class="card">
+            <div class="summary">
+                <div class="summary-item">
+                    <span>Installation ID</span>
+                    <strong>{{ installation_id }}</strong>
+                </div>
+                <div class="summary-item">
+                    <span>Repositories Available</span>
+                    <strong>{{ repositories | length }}</strong>
+                </div>
+            </div>
+
+            <div class="callout">
+                Add or remove repositories for this installation in GitHub.
+                <a href="https://github.com/settings/installations" target="_blank" rel="noopener noreferrer">
+                    Manage app installation
+                </a>
+            </div>
+
+            <form method="GET" action="/registrations">
+                <input type="hidden" name="installation_id" value="{{ installation_id }}">
+                <input type="hidden" name="setup_action" value="{{ setup_action }}">
+
+                <div class="form-group">
+                    <label for="selected_repository">Repository *</label>
+                    <input
+                        type="text"
+                        class="search-input"
+                        id="repoSearch"
+                        placeholder="Filter repositories..."
+                        aria-label="Filter repositories"
+                    >
+                    <select id="selected_repository" name="selected_repository" required>
+                        <option value="">Select a repository...</option>
+                        {% for repo in repositories %}
+                        <option value="{{ repo.full_name }}">{{ repo.full_name }}</option>
+                            {% endfor %}
+                        </select>
+                    </div>
+
+            <button type="submit" class="button">Continue</button>
+        </form>
+    </div>
+</div>
+</main>
+
+<script>
+    const repoSearch = document.getElementById('repoSearch');
+    const repoSelect = document.getElementById('selected_repository');
+
+    repoSearch.addEventListener('input', function() {
+        const query = this.value.toLowerCase();
+        Array.from(repoSelect.options).forEach(option => {
+            if (!option.value) {
+                option.hidden = false;
+                return;
+            }
+            const matches = option.value.toLowerCase().includes(query);
+            option.hidden = !matches;
+        });
+    });
+</script>
+</body>
+</html>

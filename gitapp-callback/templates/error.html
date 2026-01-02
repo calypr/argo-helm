@@ -38,6 +38,16 @@
             font-weight: 600;
         }
 
+        .sidebar-avatar {
+            display: block;
+            width: 120px;
+            height: 120px;
+            margin: 0 1.5rem 2rem;
+            padding: 0.5rem;
+            border-radius: 16px;
+            background: #ffffff;
+        }
+
         .sidebar nav ul {
             list-style: none;
         }
@@ -158,12 +168,11 @@
     <!-- Left Navigation -->
     <aside class="sidebar">
         <h1>{{ github_app_name }}</h1>
+        <img class="sidebar-avatar" src="{{ url_for('static', filename='avatar.png') }}" alt="App avatar">
         <nav>
             <ul>
-                <li><a href="/registrations">Repository Registration</a></li>
-                <li><a href="#">My Repositories</a></li>
-                <li><a href="#">Settings</a></li>
-                <li><a href="#">Documentation</a></li>
+                <li><a href="/registrations?installation_id={{ installation_id }}&setup_action=update">Repository Registration</a></li>
+                <li><a href="https://calypr-demo.ddns.net" target="_blank" rel="noopener noreferrer">Documentation</a></li>
             </ul>
         </nav>
     </aside>

@@ -38,6 +38,16 @@
             font-weight: 600;
         }
 
+        .sidebar-avatar {
+            display: block;
+            width: 120px;
+            height: 120px;
+            margin: 0 1.5rem 2rem;
+            padding: 0.5rem;
+            border-radius: 16px;
+            background: #ffffff;
+        }
+
         .sidebar nav ul {
             list-style: none;
         }
@@ -122,6 +132,27 @@
             margin: 2rem 0;
         }
 
+        .next-steps {
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e3a8a;
+            border-radius: 8px;
+            padding: 1.25rem;
+            margin-bottom: 1.5rem;
+            text-align: left;
+        }
+
+        .next-steps h3 {
+            font-size: 1rem;
+            margin-bottom: 0.5rem;
+            color: #1e3a8a;
+        }
+
+        .next-steps ul {
+            padding-left: 1.25rem;
+            line-height: 1.6;
+        }
+
         .config-summary h3 {
             color: #334155;
             font-size: 1rem;
@@ -196,12 +227,11 @@
     <!-- Left Navigation -->
     <aside class="sidebar">
         <h1>{{ github_app_name }}</h1>
+        <img class="sidebar-avatar" src="{{ url_for('static', filename='avatar.png') }}" alt="App avatar">
         <nav>
             <ul>
-                <li><a href="/registrations">Repository Registration</a></li>
-                <li><a href="#">My Repositories</a></li>
-                <li><a href="#">Settings</a></li>
-                <li><a href="#">Documentation</a></li>
+                <li><a href="/registrations?installation_id={{ config.installation_id }}&setup_action=update">Repository Registration</a></li>
+                <li><a href="https://calypr-demo.ddns.net" target="_blank" rel="noopener noreferrer">Documentation</a></li>
             </ul>
         </nav>
     </aside>
@@ -217,7 +247,15 @@
                 </div>
 
                 <h2>Registration Complete!</h2>
-                <p>Your repository has been successfully registered with Argo Workflows.</p>
+                <p>Your repository has been successfully registered.</p>
+
+                <div class="next-steps">
+                    <h3>What’s next</h3>
+                    <ul>
+                        <li>Repeat the registration flow for any other repositories in this installation.</li>
+                        <li>When you add or remove repositories in GitHub, return here to update the configuration.</li>
+                    </ul>
+                </div>
 
                 <div class="config-summary">
                     <h3>Configuration Summary</h3>
@@ -225,6 +263,11 @@
                     <div class="config-item">
                         <span class="config-label">Installation ID:</span>
                         <span class="config-value"><code>{{ config.installation_id }}</code></span>
+                    </div>
+
+                    <div class="config-item">
+                        <span class="config-label">Repository:</span>
+                        <span class="config-value"><code>{{ config.full_name }}</code></span>
                     </div>
 
                     <div class="config-item">
@@ -274,7 +317,12 @@
                 </div>
 
                 <div>
-                    <a href="https://github.com" class="btn btn-primary">Go to GitHub</a>
+                    <a href="/registrations?installation_id={{ config.installation_id }}&setup_action=update" class="btn btn-primary">
+                        Register another repository
+                    </a>
+                    <a href="https://github.com/settings/installations" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">
+                        Manage app installation
+                    </a>
                 </div>
             </div>
         </div>

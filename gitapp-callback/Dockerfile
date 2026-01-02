@@ -1,4 +1,4 @@
-FROM python:3.11-slim
+FROM python:3.12-slim
 
 WORKDIR /app
 
@@ -10,7 +10,7 @@ ENV PYTHONDONTWRITEBYTECODE=1 \
 
 # Install curl for health checks
 RUN apt-get update && \
-    apt-get install -y --no-install-recommends curl && \
+    apt-get install -y --no-install-recommends curl git && \
     apt-get clean && \
     rm -rf /var/lib/apt/lists/*
 
@@ -21,6 +21,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY app.py .
 COPY templates/ templates/
+COPY static/ static/
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \

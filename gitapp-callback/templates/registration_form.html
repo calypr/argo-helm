@@ -38,6 +38,16 @@
             font-weight: 600;
         }
 
+        .sidebar-avatar {
+            display: block;
+            width: 120px;
+            height: 120px;
+            margin: 0 1.5rem 2rem;
+            padding: 0.5rem;
+            border-radius: 16px;
+            background: #ffffff;
+        }
+
         .sidebar nav ul {
             list-style: none;
         }
@@ -225,6 +235,21 @@
             text-decoration: underline;
         }
 
+        .link-button {
+            background: none;
+            border: none;
+            color: #2563eb;
+            cursor: pointer;
+            font-size: 0.9rem;
+            font-weight: 500;
+            padding: 0;
+            text-decoration: underline;
+        }
+
+        .link-button:hover {
+            color: #1d4ed8;
+        }
+
         /* Alert Messages */
         .alert {
             padding: 1rem;
@@ -255,28 +280,93 @@
             color: #1e40af;
         }
 
-        /* Installation ID Badge */
-        .installation-badge {
-            display: inline-flex;
-            align-items: center;
-            padding: 0.5rem 1rem;
-            background-color: #eff6ff;
-            border: 1px solid #bfdbfe;
+        /* Installation Summary */
+        .summary-card {
+            background: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+            padding: 1.5rem;
+            margin-bottom: 1.5rem;
+            border: 1px solid #e2e8f0;
+        }
+
+        .summary-card h3 {
+            color: #1e293b;
+            font-size: 1.1rem;
+            font-weight: 600;
+            margin-bottom: 0.75rem;
+        }
+
+        .summary-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 1rem;
+        }
+
+        .summary-item {
+            background: #f8fafc;
             border-radius: 8px;
-            margin-bottom: 1rem;
+            padding: 0.75rem 1rem;
+            border: 1px solid #e2e8f0;
         }
 
-        .installation-badge strong {
-            margin-right: 0.5rem;
-            color: #1e40af;
+        .summary-item span {
+            display: block;
+            font-size: 0.8rem;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: #64748b;
+            margin-bottom: 0.35rem;
         }
 
-        .installation-badge code {
-            background-color: #dbeafe;
-            padding: 0.25rem 0.5rem;
+        .summary-item strong {
+            color: #0f172a;
+            font-weight: 600;
+        }
+
+        .summary-item code {
+            background-color: #e2e8f0;
+            padding: 0.15rem 0.4rem;
             border-radius: 4px;
             font-family: 'Courier New', monospace;
             font-size: 0.9rem;
+        }
+
+        .summary-actions {
+            margin-top: 1rem;
+            display: flex;
+            flex-wrap: wrap;
+            gap: 0.75rem;
+            align-items: center;
+        }
+
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.35rem;
+            font-size: 0.85rem;
+            color: #1e40af;
+            background-color: #eff6ff;
+            border: 1px solid #bfdbfe;
+            padding: 0.35rem 0.7rem;
+            border-radius: 999px;
+        }
+
+        .subtle-link {
+            color: #2563eb;
+            text-decoration: none;
+            font-weight: 500;
+        }
+
+        .subtle-link:hover {
+            text-decoration: underline;
+        }
+
+        .step-list {
+            margin-top: 0.75rem;
+            padding-left: 1.25rem;
+            color: #475569;
+            line-height: 1.6;
         }
     </style>
 </head>
@@ -284,12 +374,11 @@
     <!-- Left Navigation -->
     <aside class="sidebar">
         <h1>{{ github_app_name }}</h1>
+        <img class="sidebar-avatar" src="{{ url_for('static', filename='avatar.png') }}" alt="App avatar">
         <nav>
             <ul>
                 <li><a href="#" class="active">Repository Registration</a></li>
-                <li><a href="#">My Repositories</a></li>
-                <li><a href="#">Settings</a></li>
-                <li><a href="#">Documentation</a></li>
+                <li><a href="https://calypr-demo.ddns.net" target="_blank" rel="noopener noreferrer">Documentation</a></li>
             </ul>
         </nav>
     </aside>
@@ -299,12 +388,41 @@
         <div class="container">
             <div class="header">
                 <h2>Complete Repository Registration</h2>
-                <p>Configure your repository settings to get started with Argo Workflows.</p>
+                <p>Configure one repository at a time. The GitHub App installation can include multiple repositories.</p>
             </div>
 
-            <div class="installation-badge">
-                <strong>Installation ID:</strong>
-                <code>{{ installation_id }}</code>
+            <div class="summary-card">
+                <h3>Installation Overview</h3>
+                <div class="summary-grid">
+                    <div class="summary-item">
+                        <span>Installation</span>
+                        <strong><code>{{ installation_id }}</code></strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Repository Count</span>
+                        <strong>{{ repository_count }}</strong>
+                    </div>
+                    <div class="summary-item">
+                        <span>Current Repository</span>
+                        <strong>{{ selected_repository or "Not selected" }}</strong>
+                    </div>
+                </div>
+                <div class="summary-actions">
+                    <span class="pill">Changes to repo access happen in GitHub</span>
+                    <a class="subtle-link" href="https://github.com/settings/installations" target="_blank" rel="noopener noreferrer">
+                        Manage app installation
+                    </a>
+                    {% if multiple_repositories %}
+                    <a class="subtle-link" href="/registrations?installation_id={{ installation_id }}&setup_action={{ setup_action }}">
+                        Change repository
+                    </a>
+                    {% endif %}
+                </div>
+                <ol class="step-list">
+                    <li>Select the repository you want to configure.</li>
+                    <li>Provide bucket and access settings for this repository.</li>
+                    <li>Repeat for any additional repositories in this installation.</li>
+                </ol>
             </div>
 
             {% if setup_action == 'update' %}
@@ -312,11 +430,39 @@
                 You are updating an existing installation. Review and update your settings below.
             </div>
             {% endif %}
+            {% if setup_action == 'update' and creating_missing_registration %}
+            <div class="alert alert-info show">
+                No existing registration was found for this repository. Submitting this form will create it.
+            </div>
+            {% endif %}
+            {% if setup_action == 'install' and multiple_repositories %}
+            <div class="alert alert-info show">
+                This installation has multiple repositories. Each repository must be registered separately.
+            </div>
+            {% endif %}
 
             <div id="alertContainer"></div>
 
             <form id="registrationForm" method="POST" action="/registrations">
                 <input type="hidden" name="installation_id" value="{{ installation_id }}">
+
+                {% if selected_repository %}
+                <input type="hidden" name="selected_repository" value="{{ selected_repository }}">
+                <div class="form-group">
+                    <label for="selected_repository_display">Repository</label>
+                    <input
+                        type="text"
+                        id="selected_repository_display"
+                        value="{{ selected_repository }}"
+                        readonly
+                    >
+                </div>
+                {% else %}
+                <div class="alert alert-error">
+                    <p>No repositories found for this installation.</p>
+                </div>
+                {% endif %}
+
 
                 <div class="card">
                     <h3>Repository Configuration</h3>
@@ -340,110 +486,121 @@
                     <h3>Data Bucket Configuration</h3>
                     <p class="help-text" style="margin-bottom: 1.5rem;">S3-compatible bucket for storing workflow data (optional)</p>
 
-                    <div class="form-group">
-                        <label for="dataBucket_bucket">
-                            Bucket Name
-                        </label>
-                        <input
-                            type="text"
-                            id="dataBucket_bucket"
-                            name="dataBucket_bucket"
-                            placeholder="my-data-bucket"
-                            value="{{ initial_data.dataBucket.bucket if initial_data and initial_data.dataBucket else '' }}"
-                        >
+                    {% set data_bucket_has_secret = initial_data and initial_data.dataBucketCreatedTime %}
+                    {% if data_bucket_has_secret %}
+                    <div class="alert alert-info show bucket-notice">
+                        This bucket information was saved on {{ initial_data.dataBucketCreatedTime }}.
+                        <button type="button" class="link-button bucket-reentry-toggle" data-target="dataBucketForm">
+                            Click here to re-enter.
+                        </button>
                     </div>
+                    {% endif %}
 
-                    <div id="dataBucketFields" style="display: none;">
+                    <div id="dataBucketForm" {% if data_bucket_has_secret %}style="display: none;"{% endif %}>
                         <div class="form-group">
-                            <label for="dataBucket_accessKey">
-                                Access Key <span class="required">*</span>
+                            <label for="dataBucket_bucket">
+                                Bucket Name
                             </label>
-                            <div class="password-field">
-                                <input
-                                    type="password"
-                                    id="dataBucket_accessKey"
-                                    name="dataBucket_accessKey"
-                                    placeholder="AKIAIOSFODNN7EXAMPLE"
-                                    value="{{ initial_data.dataBucket.accessKey if initial_data and initial_data.dataBucket else '' }}"
-                                >
-                                <button type="button" class="toggle-password" data-target="dataBucket_accessKey">
-                                    <span class="show-text">Show</span>
-                                    <span class="hide-text" style="display: none;">Hide</span>
-                                </button>
-                            </div>
+                            <input
+                                type="text"
+                                id="dataBucket_bucket"
+                                name="dataBucket_bucket"
+                                placeholder="my-data-bucket"
+                                value=""
+                            >
                         </div>
 
-                        <div class="form-group">
-                            <label for="dataBucket_secretKey">
-                                Secret Key <span class="required">*</span>
-                            </label>
-                            <div class="password-field">
-                                <input
-                                    type="password"
-                                    id="dataBucket_secretKey"
-                                    name="dataBucket_secretKey"
-                                    placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-                                    value="{{ initial_data.dataBucket.secretKey if initial_data and initial_data.dataBucket else '' }}"
-                                >
-                                <button type="button" class="toggle-password" data-target="dataBucket_secretKey">
-                                    <span class="show-text">Show</span>
-                                    <span class="hide-text" style="display: none;">Hide</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    id="dataBucket_is_aws"
-                                    name="dataBucket_is_aws"
-                                    {% if not initial_data or not initial_data.dataBucket or initial_data.dataBucket.is_aws %}checked{% endif %}
-                                >
-                                Is AWS S3
-                            </label>
-                            <p class="help-text">Uncheck if using a non-AWS S3-compatible service (e.g., MinIO)</p>
-                        </div>
-
-                        <div id="dataBucketNonAwsFields" style="display: none;">
+                        <div id="dataBucketFields" style="display: none;">
                             <div class="form-group">
-                                <label for="dataBucket_hostname">
-                                    Hostname <span class="required">*</span>
+                                <label for="dataBucket_accessKey">
+                                    Access Key <span class="required">*</span>
                                 </label>
-                                <input
-                                    type="url"
-                                    id="dataBucket_hostname"
-                                    name="dataBucket_hostname"
-                                    placeholder="https://minio.example.org:9000"
-                                    value="{{ initial_data.dataBucket.hostname if initial_data and initial_data.dataBucket else '' }}"
-                                >
-                                <p class="help-text">S3 endpoint URL (must start with https://)</p>
+                                <div class="password-field">
+                                    <input
+                                        type="password"
+                                        id="dataBucket_accessKey"
+                                        name="dataBucket_accessKey"
+                                        placeholder="AKIAIOSFODNN7EXAMPLE"
+                                        value=""
+                                    >
+                                    <button type="button" class="toggle-password" data-target="dataBucket_accessKey">
+                                        <span class="show-text">Show</span>
+                                        <span class="hide-text" style="display: none;">Hide</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="form-group">
-                                <label for="dataBucket_region">
-                                    Region <span class="required">*</span>
+                                <label for="dataBucket_secretKey">
+                                    Secret Key <span class="required">*</span>
                                 </label>
-                                <input
-                                    type="text"
-                                    id="dataBucket_region"
-                                    name="dataBucket_region"
-                                    placeholder="us-west-2"
-                                    value="{{ initial_data.dataBucket.region if initial_data and initial_data.dataBucket else '' }}"
-                                >
+                                <div class="password-field">
+                                    <input
+                                        type="password"
+                                        id="dataBucket_secretKey"
+                                        name="dataBucket_secretKey"
+                                        placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                                        value=""
+                                    >
+                                    <button type="button" class="toggle-password" data-target="dataBucket_secretKey">
+                                        <span class="show-text">Show</span>
+                                        <span class="hide-text" style="display: none;">Hide</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="form-group">
                                 <label>
                                     <input
                                         type="checkbox"
-                                        id="dataBucket_pathStyle"
-                                        name="dataBucket_pathStyle"
-                                        {% if initial_data and initial_data.dataBucket and initial_data.dataBucket.pathStyle %}checked{% endif %}
+                                        id="dataBucket_is_aws"
+                                        name="dataBucket_is_aws"
+                                        checked
                                     >
-                                    Use Path-Style Requests
+                                    Is AWS S3
                                 </label>
-                                <p class="help-text">Forces path-style requests (e.g., s3.amazonaws.com/bucket)</p>
+                                <p class="help-text">Uncheck if using a non-AWS S3-compatible service (e.g., MinIO)</p>
+                            </div>
+
+                            <div id="dataBucketNonAwsFields" style="display: none;">
+                                <div class="form-group">
+                                    <label for="dataBucket_hostname">
+                                        Hostname <span class="required">*</span>
+                                    </label>
+                                    <input
+                                        type="url"
+                                        id="dataBucket_hostname"
+                                        name="dataBucket_hostname"
+                                        placeholder="https://minio.example.org:9000"
+                                        value=""
+                                    >
+                                    <p class="help-text">S3 endpoint URL (must start with https://)</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="dataBucket_region">
+                                        Region <span class="required">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="dataBucket_region"
+                                        name="dataBucket_region"
+                                        placeholder="us-west-2"
+                                        value=""
+                                    >
+                                </div>
+
+                                <div class="form-group">
+                                    <label>
+                                        <input
+                                            type="checkbox"
+                                            id="dataBucket_pathStyle"
+                                            name="dataBucket_pathStyle"
+                                        >
+                                        Use Path-Style Requests
+                                    </label>
+                                    <p class="help-text">Forces path-style requests (e.g., s3.amazonaws.com/bucket)</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -453,110 +610,121 @@
                     <h3>Artifact Bucket Configuration</h3>
                     <p class="help-text" style="margin-bottom: 1.5rem;">S3-compatible bucket for storing workflow artifacts (optional)</p>
 
-                    <div class="form-group">
-                        <label for="artifactBucket_bucket">
-                            Bucket Name
-                        </label>
-                        <input
-                            type="text"
-                            id="artifactBucket_bucket"
-                            name="artifactBucket_bucket"
-                            placeholder="my-artifact-bucket"
-                            value="{{ initial_data.artifactBucket.bucket if initial_data and initial_data.artifactBucket else '' }}"
-                        >
+                    {% set artifact_bucket_has_secret = initial_data and initial_data.artifactBucketCreatedTime %}
+                    {% if artifact_bucket_has_secret %}
+                    <div class="alert alert-info show bucket-notice">
+                        This bucket information was saved on {{ initial_data.artifactBucketCreatedTime }}.
+                        <button type="button" class="link-button bucket-reentry-toggle" data-target="artifactBucketForm">
+                            Click here to re-enter.
+                        </button>
                     </div>
+                    {% endif %}
 
-                    <div id="artifactBucketFields" style="display: none;">
+                    <div id="artifactBucketForm" {% if artifact_bucket_has_secret %}style="display: none;"{% endif %}>
                         <div class="form-group">
-                            <label for="artifactBucket_accessKey">
-                                Access Key <span class="required">*</span>
+                            <label for="artifactBucket_bucket">
+                                Bucket Name
                             </label>
-                            <div class="password-field">
-                                <input
-                                    type="password"
-                                    id="artifactBucket_accessKey"
-                                    name="artifactBucket_accessKey"
-                                    placeholder="AKIAIOSFODNN7EXAMPLE"
-                                    value="{{ initial_data.artifactBucket.accessKey if initial_data and initial_data.artifactBucket else '' }}"
-                                >
-                                <button type="button" class="toggle-password" data-target="artifactBucket_accessKey">
-                                    <span class="show-text">Show</span>
-                                    <span class="hide-text" style="display: none;">Hide</span>
-                                </button>
-                            </div>
+                            <input
+                                type="text"
+                                id="artifactBucket_bucket"
+                                name="artifactBucket_bucket"
+                                placeholder="my-artifact-bucket"
+                                value=""
+                            >
                         </div>
 
-                        <div class="form-group">
-                            <label for="artifactBucket_secretKey">
-                                Secret Key <span class="required">*</span>
-                            </label>
-                            <div class="password-field">
-                                <input
-                                    type="password"
-                                    id="artifactBucket_secretKey"
-                                    name="artifactBucket_secretKey"
-                                    placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
-                                    value="{{ initial_data.artifactBucket.secretKey if initial_data and initial_data.artifactBucket else '' }}"
-                                >
-                                <button type="button" class="toggle-password" data-target="artifactBucket_secretKey">
-                                    <span class="show-text">Show</span>
-                                    <span class="hide-text" style="display: none;">Hide</span>
-                                </button>
-                            </div>
-                        </div>
-
-                        <div class="form-group">
-                            <label>
-                                <input
-                                    type="checkbox"
-                                    id="artifactBucket_is_aws"
-                                    name="artifactBucket_is_aws"
-                                    {% if not initial_data or not initial_data.artifactBucket or initial_data.artifactBucket.is_aws %}checked{% endif %}
-                                >
-                                Is AWS S3
-                            </label>
-                            <p class="help-text">Uncheck if using a non-AWS S3-compatible service (e.g., MinIO)</p>
-                        </div>
-
-                        <div id="artifactBucketNonAwsFields" style="display: none;">
+                        <div id="artifactBucketFields" style="display: none;">
                             <div class="form-group">
-                                <label for="artifactBucket_hostname">
-                                    Hostname <span class="required">*</span>
+                                <label for="artifactBucket_accessKey">
+                                    Access Key <span class="required">*</span>
                                 </label>
-                                <input
-                                    type="url"
-                                    id="artifactBucket_hostname"
-                                    name="artifactBucket_hostname"
-                                    placeholder="https://minio.example.org:9000"
-                                    value="{{ initial_data.artifactBucket.hostname if initial_data and initial_data.artifactBucket else '' }}"
-                                >
-                                <p class="help-text">S3 endpoint URL (must start with https://)</p>
+                                <div class="password-field">
+                                    <input
+                                        type="password"
+                                        id="artifactBucket_accessKey"
+                                        name="artifactBucket_accessKey"
+                                        placeholder="AKIAIOSFODNN7EXAMPLE"
+                                        value=""
+                                    >
+                                    <button type="button" class="toggle-password" data-target="artifactBucket_accessKey">
+                                        <span class="show-text">Show</span>
+                                        <span class="hide-text" style="display: none;">Hide</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="form-group">
-                                <label for="artifactBucket_region">
-                                    Region <span class="required">*</span>
+                                <label for="artifactBucket_secretKey">
+                                    Secret Key <span class="required">*</span>
                                 </label>
-                                <input
-                                    type="text"
-                                    id="artifactBucket_region"
-                                    name="artifactBucket_region"
-                                    placeholder="us-west-2"
-                                    value="{{ initial_data.artifactBucket.region if initial_data and initial_data.artifactBucket else '' }}"
-                                >
+                                <div class="password-field">
+                                    <input
+                                        type="password"
+                                        id="artifactBucket_secretKey"
+                                        name="artifactBucket_secretKey"
+                                        placeholder="wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY"
+                                        value=""
+                                    >
+                                    <button type="button" class="toggle-password" data-target="artifactBucket_secretKey">
+                                        <span class="show-text">Show</span>
+                                        <span class="hide-text" style="display: none;">Hide</span>
+                                    </button>
+                                </div>
                             </div>
 
                             <div class="form-group">
                                 <label>
                                     <input
                                         type="checkbox"
-                                        id="artifactBucket_pathStyle"
-                                        name="artifactBucket_pathStyle"
-                                        {% if initial_data and initial_data.artifactBucket and initial_data.artifactBucket.pathStyle %}checked{% endif %}
+                                        id="artifactBucket_is_aws"
+                                        name="artifactBucket_is_aws"
+                                        checked
                                     >
-                                    Use Path-Style Requests
+                                    Is AWS S3
                                 </label>
-                                <p class="help-text">Forces path-style requests (e.g., s3.amazonaws.com/bucket)</p>
+                                <p class="help-text">Uncheck if using a non-AWS S3-compatible service (e.g., MinIO)</p>
+                            </div>
+
+                            <div id="artifactBucketNonAwsFields" style="display: none;">
+                                <div class="form-group">
+                                    <label for="artifactBucket_hostname">
+                                        Hostname <span class="required">*</span>
+                                    </label>
+                                    <input
+                                        type="url"
+                                        id="artifactBucket_hostname"
+                                        name="artifactBucket_hostname"
+                                        placeholder="https://minio.example.org:9000"
+                                        value=""
+                                    >
+                                    <p class="help-text">S3 endpoint URL (must start with https://)</p>
+                                </div>
+
+                                <div class="form-group">
+                                    <label for="artifactBucket_region">
+                                        Region <span class="required">*</span>
+                                    </label>
+                                    <input
+                                        type="text"
+                                        id="artifactBucket_region"
+                                        name="artifactBucket_region"
+                                        placeholder="us-west-2"
+                                        value=""
+                                    >
+                                </div>
+
+                                <div class="form-group">
+                                    <label>
+                                        <input
+                                            type="checkbox"
+                                            id="artifactBucket_pathStyle"
+                                            name="artifactBucket_pathStyle"
+                                        >
+                                        Use Path-Style Requests
+                                    </label>
+                                    <p class="help-text">Forces path-style requests (e.g., s3.amazonaws.com/bucket)</p>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -620,6 +788,20 @@
                     input.type = 'password';
                     showText.style.display = 'inline';
                     hideText.style.display = 'none';
+                }
+            });
+        });
+
+        document.querySelectorAll('.bucket-reentry-toggle').forEach(button => {
+            button.addEventListener('click', function() {
+                const targetId = this.getAttribute('data-target');
+                const target = document.getElementById(targetId);
+                if (target) {
+                    target.style.display = 'block';
+                }
+                const notice = this.closest('.bucket-notice');
+                if (notice) {
+                    notice.style.display = 'none';
                 }
             });
         });

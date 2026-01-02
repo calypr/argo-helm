@@ -210,14 +210,181 @@ spec:
     app: gitapp-callback
 ```
 
+## References
+https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/about-the-user-authorization-callback-url
+
+
 ### GitHub App Configuration
 
 1. Go to your GitHub App settings
 2. Set "Post-installation redirect URL" to: `https://your-domain.com/registrations`
 3. GitHub will append `?installation_id=XXX&setup_action=install` automatically
 
+## Overview
+### initialize app
+```mermaid
+graph TD
+    Start["🚀 App Startup"] --> InitDB["Initialize SQLite Database"]
+    InitDB --> CreateTable["Create registrations table<br/>installation_id, data, timestamps"]
+    CreateTable --> EnsureRepo["ensure_repo_registration"]
+
+    EnsureRepo --> CheckRepo{REPO_REGISTRATION<br/>configured?}
+    CheckRepo -->|No| SkipRepo["⊘ Skip registrations checkout"]
+    CheckRepo -->|Yes| SetupGit["Configure git credentials<br/>GIT_CREDENTIALS_FILE"]
+    SetupGit --> ConfigHelper["git config --global<br/>credential.helper store"]
+    ConfigHelper --> CheckPath{REGISTRATIONS_PATH<br/>exists?}
+
+    CheckPath -->|No| CloneRepo["Clone registrations repo<br/>git clone REPO_REGISTRATION"]
+    CloneRepo --> ReadyApp["✓ App Ready"]
+
+    CheckPath -->|Yes| CheckGit{.git directory<br/>exists?}
+    CheckGit -->|Yes| FetchOrigin["Fetch and update repo<br/>git fetch origin --prune"]
+    FetchOrigin --> GetBranch["Get default branch<br/>git symbolic-ref refs/remotes/origin/HEAD"]
+    GetBranch --> Checkout["git checkout default_branch"]
+    Checkout --> Reset["git reset --hard<br/>origin/default_branch"]
+    Reset --> ReadyApp
+
+    CheckGit -->|No| CheckEmpty{Directory<br/>not empty?}
+    CheckEmpty -->|Yes| WarnEmpty["⚠️ Warn: skip if dir not empty"]
+    CheckEmpty -->|No| ReadyApp
+
+    SkipRepo --> ReadyApp
+    WarnEmpty --> ReadyApp
+
+    ReadyApp --> InitComplete["✓ Initialization Complete<br/>Ready for HTTP requests"]
+
+    style Start fill:#e1f5ff
+    style ReadyApp fill:#c8e6c9
+    style InitComplete fill:#c8e6c9,stroke:#4caf50,stroke-width:2px
+
+```
+
+### Get registration flow
+```mermaid
+graph TD
+    GetReq["GET /registrations"] --> ExtractParams["Extract installation_id<br/>and setup_action params"]
+    ExtractParams --> ValInstallID{installation_id<br/>present?}
+
+    ValInstallID -->|No| Err400A["❌ Return 400<br/>Missing installation_id"]
+    ValInstallID -->|Yes| ValInteger{installation_id<br/>is integer?}
+
+    ValInteger -->|No| Err400B["❌ Return 400<br/>Invalid format"]
+    ValInteger -->|Yes| FetchRepos["Fetch repositories from<br/>GitHub API<br/>get_installation_repositories"]
+    FetchRepos --> ValFetch{Fetch<br/>success?}
+
+    ValFetch -->|No| Err500A["❌ Return 500<br/>GitHub API error"]
+    ValFetch -->|Yes| ValAction{setup_action<br/>valid?}
+
+    ValAction -->|No| Err400C["❌ Return 400<br/>Invalid setup_action"]
+    ValAction -->|Yes| CheckAction{setup_action<br/>== install?}
+
+    CheckAction -->|Yes| CheckExists{Registration<br/>exists?}
+    CheckExists -->|Yes| Redirect["⤴️ Redirect to update<br/>with setup_action=update"]
+    CheckExists -->|No| DisplayForm["✓ Display registration form<br/>initial_data = null"]
+
+    CheckAction -->|No| CheckExistsUpdate{Registration<br/>exists?}
+    CheckExistsUpdate -->|No| Err404["❌ Return 404<br/>Not found for update"]
+    CheckExistsUpdate -->|Yes| LoadForm["✓ Load existing data<br/>from database<br/>and display form"]
+
+    Redirect --> Done["Return HTML response"]
+    DisplayForm --> Done
+    LoadForm --> Done
+    Err400A --> Done
+    Err400B --> Done
+    Err400C --> Done
+    Err500A --> Done
+    Err404 --> Done
+
+    style GetReq fill:#e1f5ff
+    style DisplayForm fill:#fff9c4
+    style LoadForm fill:#fff9c4
+    style Done fill:#c8e6c9
+    style Err400A fill:#ffccbc
+    style Err400B fill:#ffccbc
+    style Err400C fill:#ffccbc
+    style Err500A fill:#ffccbc
+    style Err404 fill:#ffccbc
+
+```
+
+### Validate registration
+```mermaid
+graph TD
+    PostReq["POST /registrations"] --> ExtractForm["Extract form data<br/>installation_id, defaultBranch,<br/>admin/readUsers, buckets"]
+    ExtractForm --> ValInstall{installation_id<br/>present?}
+
+    ValInstall -->|No| FormErr400A["❌ Return 400"]
+    ValInstall -->|Yes| ValAdmin{Admin users<br/>present?}
+
+    ValAdmin -->|No| FormErr400B["❌ Return 400"]
+    ValAdmin -->|Yes| ParseEmails["Parse email lists<br/>admin_users, read_users"]
+    ParseEmails --> ValEmails{All emails<br/>valid format?}
+
+    ValEmails -->|No| FormErr400C["❌ Return 400<br/>Invalid email"]
+    ValEmails -->|Yes| ParseBuckets["Parse S3 bucket configs<br/>dataBucket & artifactBucket"]
+    ParseBuckets --> ValBuckets{Bucket config<br/>valid?}
+
+    ValBuckets -->|No| FormErr400D["❌ Return 400<br/>Invalid bucket config"]
+    ValBuckets -->|Yes| CreateConfig["Create registration_config dict"]
+    CreateConfig --> FetchReposForm["Fetch repositories<br/>from GitHub API"]
+    FetchReposForm --> ValFetchForm{Fetch<br/>success?}
+
+    ValFetchForm -->|No| FormErr500A["❌ Return 500"]
+    ValFetchForm -->|Yes| CheckReposExist{Repositories<br/>found?}
+
+    CheckReposExist -->|No| FormErr500B["❌ Return 500<br/>No repos found"]
+    CheckReposExist -->|Yes| SaveDB["save_registration"]
+    
+```
+
+
+### Upsert registration flow
+```mermaid
+graph TD
+    PostReq["POST /registrations"] --> ExtractForm["Extract form data<br/>installation_id, defaultBranch,<br/>admin/readUsers, buckets"]
+    ExtractForm --> ValidateForm["Validate required fields<br/>emails, bucket config"]
+    ValidateForm -->|Error| FormErr["❌ Return 400/500 with error"]
+    ValidateForm --> FetchReposForm["Fetch installation repos<br/>GitHub API"]
+    FetchReposForm -->|Error| FormErr
+    FetchReposForm --> SaveDB["save_registration<br/>SQLite + optional Vault"]
+    SaveDB --> EnsureRepo["ensure_repo_registration<br/>configure git, fetch default"]
+    EnsureRepo --> FetchOriginPR["git fetch --all --prune"]
+    FetchOriginPR --> GetDefaultBranch["Get origin/HEAD default branch"]
+    GetDefaultBranch --> CheckLocalBranch{"Local branch exists?"}
+    CheckLocalBranch -->|Yes| CheckoutLocal["git checkout branch"]
+    CheckLocalBranch -->|No| CheckRemoteBranch{"Remote branch exists?"}
+    CheckRemoteBranch -->|Yes| CheckoutRemote["git checkout branch"]
+    CheckRemoteBranch -->|No| CreateBranch["git checkout -B branch<br/>origin/default"]
+    CheckoutLocal --> SyncRemote["git fetch origin branch<br/>git reset --hard origin/branch"]
+    CheckoutRemote --> SyncRemote
+    CreateBranch --> WriteFile
+    SyncRemote --> WriteFile["Write registration YAML<br/>registrations/owner/repo.yaml"]
+    WriteFile --> GitAdd["git add file"]
+    GitAdd --> GitCommit["git commit --allow-empty<br/>-m branch_name"]
+    GitCommit --> GitPush["git push -u origin branch"]
+    GitPush -->|Error| PRErr["❌ Return 500<br/>registration saved but PR failed"]
+    GitPush --> CreateGHPR["Create/lookup PR via GitHub API"]
+    CreateGHPR -->|Error| PRErr
+    CreateGHPR --> AddReviewer["Request reviewer\n(Copilot)"]
+    AddReviewer -->|Error| PRErr
+    AddReviewer --> SuccessResp["✓ Return success<br/>JSON or HTML summary"]
+    FormErr --> Done["Respond"]
+    PRErr --> Done
+    SuccessResp --> Done
+
+    style PostReq fill:#e1f5ff
+    style SaveDB stroke:#f57c00,stroke-width:2px
+    style EnsureRepo stroke:#f57c00,stroke-width:2px
+    style SuccessResp fill:#c8e6c9
+    style FormErr fill:#ffccbc
+    style PRErr fill:#fff9c4
+
+```
+
+
 ## Future Enhancements
 
+- [ ] refactor tests to use pytest fixtures/mocks
 - [ ] Persist configuration to Kubernetes CRD (RepoRegistration)
 - [ ] Integrate with GitHub API to fetch repository details
 - [ ] Validate installation_id with GitHub API

@@ -268,20 +268,28 @@ landingPage:
 gitappCallback:
   # Enable the GitHub App callback service deployment
   enabled: true
+  # Git repository URL for storing repo registration data
+  # This repository contains declarative YAML files for each RepoRegistration
+  githubRepoUrl: "TODO-SET-ME" 
+  githubUserName: "TODO-SET-ME"
+  githubTokenSecret:
+    vaultPath: argo/events/github#token
+    name: github-reg-repo-token
+    key: token
   # Container image configuration
   image:
     repository: gitapp-callback
     tag: v1.0.0
     pullPolicy: IfNotPresent
   # Number of replicas
-  replicas: 2
+  replicas: 1
   # Flask secret key for session management
   # IMPORTANT: Override this in production with a secure random value
   # Recommended: Use Vault with External Secrets Operator
   # Generate with: python3 -c 'import secrets; print(secrets.token_hex(32))'
-  secretKey: "REPLACE_ME_WITH_SECURE_RANDOM_VALUE"
+  secretKey: "TODO-SET-ME"
   # GitHub App name (displayed in the UI)
-  githubAppName: "calypr-workflows"
+  githubAppName: "calypr"
   # Persistence configuration for registration database
   persistence:
     # Enable persistent storage for SQLite database (uses PVC or host mount based on useExtraMounts)
@@ -302,7 +310,11 @@ gitappCallback:
     storageClass: ""
     # Storage size
     size: "10Mi" # Requests 10 Megabytes of storage
-
+  vault:
+    addr: "http://vault.vault.svc.cluster.local:8200"
+    tokenSecret:
+      name: "gitapp-vault-token"
+      key: "token"
 # ============================================================================
 # GitHub Status Proxy Settings
 # ============================================================================
@@ -313,7 +325,7 @@ githubStatusProxy:
     repository: github-status-proxy
     tag: latest
     pullPolicy: IfNotPresent  
-  replicas: 2
+  replicas: 1
   namespace: argocd
   # GitHub App configuration
   # The App ID can be found in your GitHub App settings
