@@ -131,7 +131,7 @@ repoRegistration: {}
 # ============================================================================
 
 applicationSet:
-  enabled: false
+  enabled: true
   name: repo-registrations-test
   namespace: argocd
   project: repo-registrations-test
