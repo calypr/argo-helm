@@ -139,6 +139,10 @@ applicationSet:
     repoURL: https://github.com/calypr/registrations-test.git
     revision: main
     path: environments/test/**/*.yaml
+    githubTokenSecret:
+      vaultPath: argo/events/github#token
+      name: github-reg-repo-token
+      key: token
   template:
     name: 'calypr-projects-{{ regexReplaceAll "\\.yaml$" .path.basename "" }}'
     repoURL: https://github.com/calypr/argo-helm.git
