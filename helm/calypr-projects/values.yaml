@@ -126,6 +126,64 @@ workflows:
 
 repoRegistrations: []
 
+# ============================================================================
+# ApplicationSet - Git-based repo registrations
+# ============================================================================
+
+applicationSet:
+  enabled: false
+  name: repo-registrations-test
+  namespace: argocd
+  project: repo-registrations-test
+  generator:
+    repoURL: https://github.com/calypr/registrations-test.git
+    revision: main
+    path: environments/test/**/*.yaml
+  template:
+    name: 'calypr-projects-{{ regexReplaceAll "\\.yaml$" .path.basename "" }}'
+    repoURL: https://github.com/calypr/argo-helm.git
+    targetRevision: development
+    path: helm/calypr-projects
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: argocd
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+  appProject:
+    enabled: true
+    name: repo-registrations-test
+    description: Multi-tenant project for repo registrations in test.
+    sourceRepos:
+      - https://github.com/calypr/argo-helm.git
+      - https://github.com/calypr/registrations-test.git
+    destinations:
+      - server: https://kubernetes.default.svc
+        namespace: argocd
+      - server: https://kubernetes.default.svc
+        namespace: wf-*
+    clusterResourceBlacklist:
+      - group: "*"
+        kind: "*"
+    namespaceResourceWhitelist:
+      - group: ""
+        kind: Namespace
+      - group: ""
+        kind: ServiceAccount
+      - group: ""
+        kind: ConfigMap
+      - group: ""
+        kind: Secret
+      - group: rbac.authorization.k8s.io
+        kind: Role
+      - group: rbac.authorization.k8s.io
+        kind: RoleBinding
+      - group: argoproj.io
+        kind: WorkflowTemplate
+
 # Prefix for workflow namespaces. For a repoUrl https://github.com/<org>/<repo>.git,
 # the workflow namespace is assumed to be: <workflowNamespacePrefix><org>-<repo>
 workflowNamespacePrefix: wf-
