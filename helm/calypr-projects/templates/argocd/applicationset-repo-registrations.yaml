@@ -46,6 +46,7 @@ spec:
           selfHeal: {{ $automated.selfHeal | default true }}
         {{- if $syncPolicy.syncOptions }}
         syncOptions:
-{{ toYaml $syncPolicy.syncOptions | indent 10 }}
+          {{- toYaml $syncPolicy.syncOptions | nindent 10 }}
         {{- end }}
 {{- end }}
+
