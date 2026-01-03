@@ -4,7 +4,6 @@
 {{- $destination := .Values.applicationSet.destination | default dict }}
 {{- $syncPolicy := .Values.applicationSet.syncPolicy | default dict }}
 {{- $automated := $syncPolicy.automated | default dict }}
-{{- $appName := default "calypr-projects-{{ regexReplaceAll \"\\\\.yaml$\" .path.basename \"\" }}" $template.name }}
 apiVersion: argoproj.io/v1alpha1
 kind: ApplicationSet
 metadata:
@@ -19,9 +18,13 @@ spec:
         revision: {{ $generator.revision | default "main" | quote }}
         files:
           - path: {{ $generator.path | default "environments/test/*.yaml" | quote }}
+        secretKeyRef:
+          name: {{ .Values.applicationSet.generator.githubTokenSecret.name }}
+          key: {{ .Values.applicationSet.generator.githubTokenSecret.key }}
+
   template:
     metadata:
-      name: {{ $appName | quote }}
+      name: "calypr-projects-{{`{{.path.basenameNormalized}}`}}"
       labels:
         app.kubernetes.io/part-of: calypr-projects
         app.kubernetes.io/managed-by: applicationset
@@ -33,7 +36,7 @@ spec:
           path: {{ $template.path | default "helm/calypr-projects" | quote }}
           helm:
             valueFiles:
-              - '$values/{{ .path.path }}/{{ .path.basename }}'
+              - "$values/{{`{{.path.path}}`}}"
         - repoURL: {{ required "applicationSet.generator.repoURL is required" $generator.repoURL | quote }}
           targetRevision: {{ $generator.revision | default "main" | quote }}
           ref: values
@@ -49,4 +52,3 @@ spec:
           {{- toYaml $syncPolicy.syncOptions | nindent 10 }}
         {{- end }}
 {{- end }}
-
