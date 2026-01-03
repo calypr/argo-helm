@@ -4,7 +4,7 @@ metadata:
   name: nextflow-repo-runner
   namespace: {{ .Values.namespaces.argo }}
   labels:
-    app.kubernetes.io/name: argo-stack
+    app.kubernetes.io/name: calypr-projects
   annotations:
     helm.sh/hook: post-install,post-upgrade
     helm.sh/hook-weight: "10"

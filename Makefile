@@ -1,5 +1,5 @@
 # Convenience targets for local testing
-.PHONY: deps lint template validate kind ct adapter github-status-proxy test-artifacts all minio minio-ls help build-proxy-binary build-proxy-image load-proxy-image deploy-proxy test-secrets test-artifact-repository-ref minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup vault-seed-github-app
+.PHONY: deps lint template validate kind ct adapter github-status-proxy test-artifacts all minio minio-ls help build-proxy-binary build-proxy-image load-proxy-image deploy-proxy test-secrets test-artifact-repository-ref minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup vault-seed-github-app calypr-projects
 # S3/MinIO configuration - defaults to in-cluster MinIO
 S3_ENABLED           ?= true
 S3_ACCESS_KEY_ID     ?= minioadmin
@@ -176,6 +176,9 @@ ct: check-vars kind deps
 init: check-vars kind bump-limits eso-install vault-dev vault-seed deps minio vault-auth 
 
 argo-stack:
+	# @kubectl create secret generic gitapp-vault-token \
+ 	#	--from-literal=token=$(VAULT_TOKEN) \
+ 	#	-n argocd --dry-run=client -o yaml | kubectl apply -f -
 	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
 	envsubst < my-values.yaml | helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
@@ -212,7 +215,23 @@ argo-stack:
 		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
-deploy: init docker-install argo-stack ports
+calypr-projects:
+	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
+	envsubst < my-values.yaml | helm upgrade --install \
+		calypr-projects ./helm/calypr-projects -n argocd --create-namespace \
+		--wait --atomic --timeout 10m0s \
+		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
+		--set-string events.github.webhook.url=https://${ARGO_HOSTNAME}/events \
+		--set-string workflows.baseUrl=https://${ARGO_HOSTNAME} \
+		--set-string s3.enabled=${S3_ENABLED} \
+		--set-string s3.bucket=${S3_BUCKET} \
+		--set-string s3.pathStyle=true \
+		--set-string s3.insecure=true \
+		--set-string s3.region=${S3_REGION} \
+		--set-string s3.hostname=${S3_HOSTNAME} \
+		-f -
+
+deploy: init docker-install argo-stack calypr-projects ports
 ports:	
 	# manual certificate
 	# If the secret already exists, delete it first:
@@ -375,6 +394,7 @@ help:
 	@echo ""
 	@echo "🚀 Deployment:"
 	@echo "  deploy            - Full deployment to kind cluster"
+	@echo "  calypr-projects   - Install per-tenant workflows, RBAC, and repo resources"
 	@echo "  ct                - Run chart-testing lint and install"
 	@echo ""
 	@echo "🔍 Utilities:"
@@ -607,4 +627,3 @@ docker-gitapp-callback:
 	@echo "✅ loaded docker gitapp-callback"
 
 docker-install: docker-runner docker-authz docker-landing-page docker-gitapp-callback load-proxy-image
-

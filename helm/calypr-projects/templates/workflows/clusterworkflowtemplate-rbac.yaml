@@ -11,7 +11,7 @@ kind: ClusterRole
 metadata:
   name: clusterworkflowtemplate-reader
   labels:
-    app.kubernetes.io/name: argo-stack
+    app.kubernetes.io/name: calypr-projects
     app.kubernetes.io/part-of: argo-workflows
     app.kubernetes.io/component: rbac
   annotations:
@@ -31,7 +31,7 @@ kind: ClusterRoleBinding
 metadata:
   name: argo-events-clusterworkflowtemplate-reader
   labels:
-    app.kubernetes.io/name: argo-stack
+    app.kubernetes.io/name: calypr-projects
     app.kubernetes.io/part-of: argo-workflows
     app.kubernetes.io/component: rbac
   annotations:
@@ -49,7 +49,7 @@ subjects:
 
 {{- if .Values.repoRegistrations }}
 {{- range $reg := .Values.repoRegistrations }}
-{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+{{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
 ---
 # ClusterRoleBinding for workflow runner service account in tenant namespace: {{ $reg.name }}
 # This allows workflows to execute templates that reference ClusterWorkflowTemplates
@@ -59,7 +59,7 @@ metadata:
   name: wf-runner-clusterworkflowtemplate-{{ $reg.name }}
   labels:
     app.kubernetes.io/name: {{ $reg.name }}
-    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/part-of: calypr-projects
     app.kubernetes.io/component: rbac
     {{- if $reg.tenant }}
     tenant: {{ $reg.tenant }}

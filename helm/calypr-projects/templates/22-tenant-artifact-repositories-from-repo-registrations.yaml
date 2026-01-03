@@ -5,7 +5,7 @@ This ConfigMap is required by Argo Workflows to locate artifact storage.
 */ -}}
 {{- if .Values.repoRegistrations }}
 {{- range $reg := .Values.repoRegistrations }}
-{{- $namespace := include "argo-stack.repoRegistration.namespace" $reg }}
+{{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
 {{- if $reg.artifactBucket }}
 ---
 apiVersion: v1
@@ -15,7 +15,7 @@ metadata:
   namespace: {{ $namespace }}
   labels:
     app.kubernetes.io/name: argo-workflows
-    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/part-of: calypr-projects
     app.kubernetes.io/component: artifact-repository
     app.kubernetes.io/managed-by: helm
     calypr.io/application: {{ $reg.name }}

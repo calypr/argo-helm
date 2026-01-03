@@ -1,5 +1,5 @@
 {{- if .Values.s3.enabled }}
-{{- if not (include "argo-stack.vault.enabled" .) }}
+{{- if not (include "calypr-projects.vault.enabled" .) }}
 apiVersion: v1
 kind: Secret
 metadata:
@@ -18,7 +18,7 @@ metadata:
   namespace: {{ .Values.namespaces.argo }}
   labels:
     app.kubernetes.io/name: argo-workflows
-    app.kubernetes.io/part-of: argo-stack
+    app.kubernetes.io/part-of: calypr-projects
     app.kubernetes.io/component: artifact-repository
 data:
   # Legacy default key for backward compatibility

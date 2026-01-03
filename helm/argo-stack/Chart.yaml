@@ -1,6 +1,6 @@
 apiVersion: v2
 name: argo-stack
-description: Umbrella chart for Argo Workflows, Argo CD, authz-adapter, RBAC, and optional Argo CD Application with Vault/ESO integration
+description: Umbrella chart for Argo Workflows, Argo CD, authz-adapter, and core Calypr services with Vault/ESO integration
 type: application
 version: 0.1.0
 appVersion: "1.0.0"

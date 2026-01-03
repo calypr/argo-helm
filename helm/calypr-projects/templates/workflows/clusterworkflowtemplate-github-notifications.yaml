@@ -8,7 +8,7 @@ kind: ClusterWorkflowTemplate
 metadata:
   name: github-status-notify
   labels:
-    app.kubernetes.io/name: argo-stack
+    app.kubernetes.io/name: calypr-projects
     app.kubernetes.io/part-of: argo-workflows
     app.kubernetes.io/component: notifications
   annotations:
