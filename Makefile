@@ -237,7 +237,22 @@ argo-stack:
 		-f helm/argo-stack/admin-values.yaml \
 		-f -
 
-calypr-projects:
+calypr-projects-git-secret:
+	#Use an Argo CD repository credential Secret in the argocd namespace. The ApplicationSet will pick it up automatically when the repoURL matches.
+	#Example (HTTPS with PAT):
+	#Create a Secret with annotation argocd.argoproj.io/secret-type: repository
+	#Set url, username, password keys (username can be git if using PAT).
+	@kubectl -n argocd create secret generic repo-registrations-test \
+	  --from-literal=url=https://github.com/calypr/registrations-test.git \
+	  --from-literal=username="$(GITHUBHAPP_CALLBACK_USER_NAME)" \
+	  --from-literal=password="$(GITHUB_PAT)" \
+	  --type Opaque
+	@kubectl -n argocd annotate secret repo-registrations-test \
+	  argocd.argoproj.io/secret-type=repository
+
+calypr-projects: calypr-projects-helm calypr-projects-git-secret
+
+calypr-projects-helm:
 	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
 	envsubst < my-values.yaml | helm upgrade --install \
 		calypr-projects ./helm/calypr-projects -n argocd --create-namespace \

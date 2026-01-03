@@ -18,10 +18,6 @@ spec:
         revision: {{ $generator.revision | default "main" | quote }}
         files:
           - path: {{ $generator.path | default "environments/test/*.yaml" | quote }}
-        secretKeyRef:
-          name: {{ .Values.applicationSet.generator.githubTokenSecret.name }}
-          key: {{ .Values.applicationSet.generator.githubTokenSecret.key }}
-
   template:
     metadata:
       name: "calypr-projects-{{`{{.path.basenameNormalized}}`}}"
