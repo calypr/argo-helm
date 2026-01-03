@@ -1,3 +1,7 @@
+ifneq (,$(wildcard ./.env))
+    include .env
+    export
+endif
 # Convenience targets for local testing
 .PHONY: deps lint template validate kind ct adapter github-status-proxy test-artifacts all minio minio-ls help build-proxy-binary build-proxy-image load-proxy-image deploy-proxy test-secrets test-artifact-repository-ref minio-status minio-cleanup vault-dev vault-seed vault-cleanup vault-status eso-install eso-status eso-cleanup vault-seed-github-app calypr-projects
 # S3/MinIO configuration - defaults to in-cluster MinIO
@@ -91,6 +95,24 @@ template: check-vars deps
 		-f - \
 		-f helm/argo-stack/admin-values.yaml \
 		--namespace argocd > rendered.yaml
+
+template-calypr-projects: check-vars deps
+	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
+	envsubst < my-values.yaml | \
+	helm template calypr-projects helm/calypr-projects \
+		--debug \
+		-n argocd --create-namespace \
+		--wait --atomic --timeout 10m0s \
+		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
+		--set-string events.github.webhook.url=https://${ARGO_HOSTNAME}/events \
+		--set-string workflows.baseUrl=https://${ARGO_HOSTNAME} \
+		--set-string s3.enabled=${S3_ENABLED} \
+		--set-string s3.bucket=${S3_BUCKET} \
+		--set-string s3.pathStyle=true \
+		--set-string s3.insecure=true \
+		--set-string s3.region=${S3_REGION} \
+		--set-string s3.hostname=${S3_HOSTNAME} \
+		-f - > rendered.yaml
 
 validate:
 	kubeconform -strict -ignore-missing-schemas \
