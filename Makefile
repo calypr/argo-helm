@@ -176,9 +176,9 @@ ct: check-vars kind deps
 init: check-vars kind bump-limits eso-install vault-dev vault-seed deps minio vault-auth 
 
 argo-stack:
-	@kubectl create secret generic gitapp-vault-token \
-		--from-literal=token=$(VAULT_TOKEN) \
-		-n argocd --dry-run=client -o yaml | kubectl apply -f -
+	# @kubectl create secret generic gitapp-vault-token \
+ 	#	--from-literal=token=$(VAULT_TOKEN) \
+ 	#	-n argocd --dry-run=client -o yaml | kubectl apply -f -
 	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
 	envsubst < my-values.yaml | helm upgrade --install \
 		argo-stack ./helm/argo-stack -n argocd --create-namespace \
@@ -249,6 +249,9 @@ ports:
 	kubectl create secret tls ${TLS_SECRET_NAME}  -n calypr-tenants --cert=/tmp/fullchain.pem --key=/tmp/privkey.pem || true
 	sudo rm /tmp/fullchain.pem /tmp/privkey.pem
 	#
+	kubectl create secret generic gitapp-vault-token \
+  		--from-literal=token=$(VAULT_TOKEN) \
+  		-n argocd
 	# install ingress
 	helm upgrade --install ingress-authz-overlay \
 	  helm/argo-stack/overlays/ingress-authz-overlay \
