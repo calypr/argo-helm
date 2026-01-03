@@ -56,8 +56,8 @@ data:
           key: AWS_SECRET_ACCESS_KEY
         useSDKCreds: false
         pathStyle: {{ .Values.s3.pathStyle }}
-{{- if .Values.repoRegistrations }}
-{{- range $reg := .Values.repoRegistrations }}
+{{- if .Values.repoRegistration }}
+{{- $reg := .Values.repoRegistration }}
 {{- if $reg.artifactBucket }}
     
     # Artifact repository for {{ $reg.name }}
@@ -91,7 +91,6 @@ data:
         {{- if $reg.artifactBucket.pathStyle }}
         pathStyle: {{ $reg.artifactBucket.pathStyle }}
         {{- end }}
-{{- end }}
 {{- end }}
 {{- end }}
 {{- end }}

@@ -1,5 +1,5 @@
-{{- if and .Values.events.enabled .Values.repoRegistrations }}
-{{- if gt (len .Values.repoRegistrations) 0 }}
+{{- if and .Values.events.enabled .Values.repoRegistration }}
+{{- $reg := .Values.repoRegistration }}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
@@ -18,16 +18,13 @@ spec:
 
   # Dependencies (one per repository from RepoRegistrations)
   dependencies:
-  {{- range $reg := .Values.repoRegistrations }}
   {{- $eventName := $reg.eventName | default (include "calypr-projects.repoRegistration.eventName" $reg) }}
   - name: {{ $eventName | quote }}
     eventSourceName: {{ printf "%s-repo-registrations" ($.Values.events.github.name | default "github") | quote }}
     eventName: {{ $eventName | quote }}
-  {{- end }}
 
   # Triggers (one per repository) — fire on that repo's push
   triggers:
-  {{- range $reg := .Values.repoRegistrations }}
   {{- /* Extract owner and repo from GitHub URL */ -}}
   {{- $urlWithoutProtocol := regexReplaceAll "^https?://(www\\.)?github\\.com/" $reg.repoUrl "" }}
   {{- $parts := splitList "/" $urlWithoutProtocol }}
@@ -105,7 +102,4 @@ spec:
               dependencyName: {{ $eventName | quote }}
               dataKey: body.after
             dest: spec.arguments.parameters.5.value
-  {{- end }}
 {{- end }}
-{{- end }}
-

@@ -1,5 +1,5 @@
-{{- if .Values.repoRegistrations }}
-{{- range $reg := .Values.repoRegistrations }}
+{{- if .Values.repoRegistration }}
+{{- $reg := .Values.repoRegistration }}
 {{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
 ---
 # ServiceAccount for workflows in tenant namespace: {{ $reg.name }}
@@ -193,5 +193,4 @@ subjects:
   - kind: ServiceAccount
     name: wf-runner
     namespace: {{ $namespace }}
-{{- end }}
 {{- end }}

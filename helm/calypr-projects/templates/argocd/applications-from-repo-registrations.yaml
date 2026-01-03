@@ -1,5 +1,5 @@
-{{- if .Values.repoRegistrations }}
-{{- range $reg := .Values.repoRegistrations }}
+{{- if .Values.repoRegistration }}
+{{- $reg := .Values.repoRegistration }}
 {{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
 ---
 # ArgoCD Application generated from RepoRegistration: {{ $reg.name }}
@@ -64,5 +64,4 @@ spec:
       prune: true
       selfHeal: true
     {{- end }}
-{{- end }}
 {{- end }}

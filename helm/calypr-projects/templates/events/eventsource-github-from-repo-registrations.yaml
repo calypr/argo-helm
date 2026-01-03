@@ -1,5 +1,5 @@
-{{- if and .Values.events.enabled .Values.repoRegistrations }}
-{{- if gt (len .Values.repoRegistrations) 0 }}
+{{- if and .Values.events.enabled .Values.repoRegistration }}
+{{- $reg := .Values.repoRegistration }}
 ---
 # EventSource for repositories defined in RepoRegistrations
 apiVersion: argoproj.io/v1alpha1
@@ -16,7 +16,6 @@ metadata:
     helm.sh/hook-weight: "5"
 spec:
   github:
-    {{- range $reg := .Values.repoRegistrations }}
     {{- /* Extract owner and repo from GitHub URL */ -}}
     {{- /* Remove protocol and domain, split by /, get last two parts */ -}}
     {{- $urlWithoutProtocol := regexReplaceAll "^https?://(www\\.)?github\\.com/" $reg.repoUrl "" }}
@@ -49,7 +48,6 @@ spec:
         name: {{ $.Values.events.github.secret.name }}
         key: {{ $.Values.events.github.secret.tokenKey | default "token" }}
       {{- end }}
-    {{- end }}
 ---
 # Service for repo-registrations EventSource
 apiVersion: v1
@@ -94,6 +92,5 @@ spec:
                   number: {{ $.Values.events.github.webhook.port | default 12000 }}
   {{- end }}
   tls: {{ toYaml (.Values.events.github.webhook.ingress.tls | default list) | nindent 4 }}
-{{- end }}
 {{- end }}
 {{- end }}

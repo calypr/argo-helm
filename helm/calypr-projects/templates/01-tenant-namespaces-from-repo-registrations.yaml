@@ -1,5 +1,5 @@
-{{- if .Values.repoRegistrations }}
-{{- range $reg := .Values.repoRegistrations }}
+{{- if .Values.repoRegistration }}
+{{- $reg := .Values.repoRegistration }}
 {{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
 {{- $cleaned := trimSuffix ".git" $reg.repoUrl }}
 {{- $cleaned = trimPrefix "https://" $cleaned }}
@@ -35,5 +35,4 @@ metadata:
     {{- if $reg.tenant }}
     repo-registration/tenant: {{ $reg.tenant | quote }}
     {{- end }}
-{{- end }}
 {{- end }}

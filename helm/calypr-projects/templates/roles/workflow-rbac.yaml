@@ -1,7 +1,8 @@
 {{- $wfPrefix := .Values.workflowNamespacePrefix -}}
 {{- $adminGroup := .Values.adminGroup -}}
-{{- range $r := .Values.repoRegistrations }}
-{{- $repoUrl := required "repoRegistrations[].repoUrl is required" $r.repoUrl }}
+{{- if .Values.repoRegistration }}
+{{- $r := .Values.repoRegistration }}
+{{- $repoUrl := required "repoRegistration.repoUrl is required" $r.repoUrl }}
 {{- $trimmed := $repoUrl | trimPrefix "https://github.com/" | trimSuffix ".git" }}
 {{- $parts := splitList "/" $trimmed }}
 {{- $org := index $parts 0 }}

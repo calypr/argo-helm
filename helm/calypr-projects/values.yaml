@@ -124,7 +124,7 @@ workflows:
 # RepoRegistration - Self-Service Repository Onboarding (DECLARATIVE)
 # ============================================================================
 
-repoRegistrations: []
+repoRegistration: {}
 
 # ============================================================================
 # ApplicationSet - Git-based repo registrations

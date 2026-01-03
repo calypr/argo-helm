@@ -3,8 +3,8 @@ Per-Tenant Workflow Templates
 Renders a WorkflowTemplate for each repoRegistration in its dedicated tenant namespace.
 This ensures workflows can reference templates within the same namespace.
 */ -}}
-{{- if .Values.repoRegistrations }}
-{{- range $reg := .Values.repoRegistrations }}
+{{- if .Values.repoRegistration }}
+{{- $reg := .Values.repoRegistration }}
 {{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
 {{- $repoName := $reg.name }}
 ---
@@ -205,5 +205,3 @@ spec:
           - name: AWS_S3_ENDPOINT
             value: "https://{{ "{{workflow.parameters.artifact-endpoint}}" }}"            
 {{- end }}
-{{- end }}
-

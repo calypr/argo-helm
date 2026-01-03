@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 Test script to validate that Vault has been seeded with all required secrets
-for repoRegistrations from my-values.yaml.
+for repoRegistration from my-values.yaml.
 
 This test verifies that the vault-seed Makefile target has correctly created
 all necessary secrets that ExternalSecrets will reference.
@@ -15,7 +15,7 @@ from typing import Dict, List, Any, Set
 
 
 class TestVaultSeeding:
-    """Test suite for Vault secret seeding based on repoRegistrations."""
+    """Test suite for Vault secret seeding based on repoRegistration."""
     
     @classmethod
     def setup_class(cls):
@@ -24,16 +24,18 @@ class TestVaultSeeding:
         cls.values_file = cls.repo_root / "my-values.yaml"
         cls.vault_prefix = "kv/argo/apps"
         
-        # Load repoRegistrations from my-values.yaml
+        # Load repoRegistration from my-values.yaml
         cls.repo_registrations = cls._load_repo_registrations()
     
     @classmethod
     def _load_repo_registrations(cls) -> List[Dict[str, Any]]:
-        """Load repoRegistrations from my-values.yaml."""
+        """Load repoRegistration from my-values.yaml."""
         with open(cls.values_file, 'r') as f:
             values = yaml.safe_load(f)
-        
-        return values.get('repoRegistrations', [])
+        repo_registration = values.get('repoRegistration')
+        if not repo_registration:
+            return []
+        return [repo_registration]
     
     @classmethod
     def _vault_exec(cls, cmd: str) -> str:
@@ -80,7 +82,7 @@ class TestVaultSeeding:
     
     @classmethod
     def _extract_vault_paths(cls) -> Dict[str, Set[str]]:
-        """Extract all expected Vault paths from repoRegistrations."""
+        """Extract all expected Vault paths from repoRegistration."""
         paths = {
             'github': set(),
             's3_artifact': set(),
@@ -143,7 +145,7 @@ class TestVaultSeeding:
         paths = self._extract_vault_paths()
         github_paths = paths['github']
         
-        assert len(github_paths) > 0, "No GitHub secret paths found in repoRegistrations"
+        assert len(github_paths) > 0, "No GitHub secret paths found in repoRegistration"
         
         missing_paths = []
         invalid_secrets = []
@@ -178,7 +180,7 @@ class TestVaultSeeding:
         paths = self._extract_vault_paths()
         s3_paths = paths['s3_artifact']
         
-        assert len(s3_paths) > 0, "No S3 artifact secret paths found in repoRegistrations"
+        assert len(s3_paths) > 0, "No S3 artifact secret paths found in repoRegistration"
         
         missing_paths = []
         invalid_secrets = []
@@ -281,7 +283,7 @@ class TestVaultSeeding:
                 missing_by_repo[repo_name] = missing_secrets
         
         if missing_by_repo:
-            error_msg = "Some repoRegistrations are missing required secrets:\n"
+            error_msg = "Some repoRegistration are missing required secrets:\n"
             for repo_name, missing in missing_by_repo.items():
                 error_msg += f"\n  {repo_name}:\n"
                 for secret_type, path in missing:
@@ -289,7 +291,7 @@ class TestVaultSeeding:
             
             raise AssertionError(error_msg)
         
-        print(f"✅ All {len(self.repo_registrations)} repoRegistrations have their required secrets")
+        print(f"✅ All {len(self.repo_registrations)} repoRegistration have their required secrets")
     
     def test_vault_paths_match_externalsecret_templates(self):
         """Test that vault paths are formatted correctly for ExternalSecret templates."""

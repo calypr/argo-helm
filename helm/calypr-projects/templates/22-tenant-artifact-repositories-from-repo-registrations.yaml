@@ -3,8 +3,8 @@ Per-Tenant Artifact Repositories ConfigMap
 Creates an artifact-repositories ConfigMap in each tenant namespace.
 This ConfigMap is required by Argo Workflows to locate artifact storage.
 */ -}}
-{{- if .Values.repoRegistrations }}
-{{- range $reg := .Values.repoRegistrations }}
+{{- if .Values.repoRegistration }}
+{{- $reg := .Values.repoRegistration }}
 {{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
 {{- if $reg.artifactBucket }}
 ---
@@ -58,9 +58,8 @@ data:
         key: AWS_SECRET_ACCESS_KEY
       useSDKCreds: false
       {{- end }}
-      {{- if $reg.artifactBucket.pathStyle }}
+{{- if $reg.artifactBucket.pathStyle }}
       pathStyle: {{ $reg.artifactBucket.pathStyle }}
       {{- end }}
-{{- end }}
 {{- end }}
 {{- end }}

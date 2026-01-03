@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Test script to validate Helm template rendering with repoRegistrations.
+Test script to validate Helm template rendering with repoRegistration.
 
 This test validates that the Helm chart correctly generates all expected
-resources from the repoRegistrations configuration in my-values.yaml:
+resources from the repoRegistration configuration in my-values.yaml:
 - ArgoCD Applications
 - ExternalSecrets for GitHub and S3 credentials
 - Artifact Repository ConfigMaps
@@ -19,7 +19,7 @@ from typing import List, Dict, Any
 
 
 class TestRepoRegistrationsRendering:
-    """Test suite for repoRegistrations template rendering."""
+    """Test suite for repoRegistration template rendering."""
     
     @classmethod
     def setup_class(cls):
@@ -112,7 +112,7 @@ class TestRepoRegistrationsRendering:
         actual_count = len(repo_reg_apps)
         
         assert actual_count == expected_count, (
-            f"Expected {expected_count} ArgoCD Applications from repoRegistrations, "
+            f"Expected {expected_count} ArgoCD Applications from repoRegistration, "
             f"but found {actual_count}"
         )
         print(f"✅ Found {actual_count} ArgoCD Application(s)")
@@ -146,7 +146,7 @@ class TestRepoRegistrationsRendering:
         actual_count = len(repo_reg_secrets)
         
         assert actual_count == expected_count, (
-            f"Expected {expected_count} ExternalSecrets from repoRegistrations, "
+            f"Expected {expected_count} ExternalSecrets from repoRegistration, "
             f"but found {actual_count}"
         )
         print(f"✅ Found {actual_count} ExternalSecrets")
@@ -219,7 +219,7 @@ class TestRepoRegistrationsRendering:
         actual_count = len(repo_reg_cms)
         
         assert actual_count == expected_count, (
-            f"Expected {expected_count} Artifact Repository ConfigMap(s) from repoRegistrations, "
+            f"Expected {expected_count} Artifact Repository ConfigMap(s) from repoRegistration, "
             f"but found {actual_count}"
         )
         print(f"✅ Found {actual_count} Artifact Repository ConfigMap(s)")
@@ -269,7 +269,7 @@ class TestRepoRegistrationsRendering:
         actual_count = len(repo_reg_eventsources)
         
         assert actual_count == expected_count, (
-            f"Expected {expected_count} EventSource from repoRegistrations, "
+            f"Expected {expected_count} EventSource from repoRegistration, "
             f"but found {actual_count}"
         )
         print(f"✅ Found {actual_count} EventSource")

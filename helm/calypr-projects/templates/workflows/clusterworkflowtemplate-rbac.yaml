@@ -47,8 +47,8 @@ subjects:
     name: {{ .Values.events.github.sensorServiceAccount | default "default" }}
     namespace: {{ .Values.namespaces.argoEvents | default "argo-events" }}
 
-{{- if .Values.repoRegistrations }}
-{{- range $reg := .Values.repoRegistrations }}
+{{- if .Values.repoRegistration }}
+{{- $reg := .Values.repoRegistration }}
 {{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
 ---
 # ClusterRoleBinding for workflow runner service account in tenant namespace: {{ $reg.name }}
@@ -114,5 +114,4 @@ subjects:
   - kind: ServiceAccount
     name: argo-stack-argo-workflows-workflow-controller
     namespace: argo-workflows
-{{- end }}
 {{- end }}
