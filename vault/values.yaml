@@ -1,0 +1,38 @@
+injector:
+  enabled: false
+
+ui:
+  enabled: true
+
+server:
+  dev:
+    enabled: false
+
+  ha:
+    enabled: true
+    replicas: 3
+
+    raft:
+      enabled: true
+      setNodeId: true
+      config: |
+        ui = true
+        listener "tcp" {
+          # TLS is disabled here to simplify local development and testing only.
+          # Do NOT use this configuration as-is in production environments.
+          # For production, you should enable TLS by setting `tls_disable = 0`
+          # and configuring `tls_cert_file` and `tls_key_file` (and related options)
+          # as documented in the Vault listener TCP configuration:
+          # https://developer.hashicorp.com/vault/docs/configuration/listener/tcp
+          tls_disable = 1
+          address = "[::]:8200"
+          cluster_address = "[::]:8201"
+        }
+        storage "raft" {
+          path = "/vault/data"
+        }
+
+  dataStorage:
+    enabled: true
+    size: 10Gi
+    mountPath: "/vault/data"
