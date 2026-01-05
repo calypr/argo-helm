@@ -32,7 +32,7 @@ spec:
           path: {{ $template.path | default "helm/calypr-projects" | quote }}
           helm:
             valueFiles:
-              - "$values/{{`{{.path.path}}`}}"
+              - "$values/{{`{{.path.path}}`}}/{{`{{.path.basename}}`}}"
         - repoURL: {{ required "applicationSet.generator.repoURL is required" $generator.repoURL | quote }}
           targetRevision: {{ $generator.revision | default "main" | quote }}
           ref: values
