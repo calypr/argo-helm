@@ -20,7 +20,7 @@ spec:
           - path: {{ $generator.path | default "environments/test/*.yaml" | quote }}
   template:
     metadata:
-      name: "calypr-projects-{{`{{.path.basenameNormalized}}`}}-{{`{{.path.filenameNormalized}}`}}"
+      name: "calypr-projects-{{`{{.path.basenameNormalized}}`}}-{{`{{.path.filenameNormalized | trimSuffix \".yaml\" }}`}}"
       labels:
         app.kubernetes.io/part-of: calypr-projects
         app.kubernetes.io/managed-by: applicationset
@@ -32,7 +32,7 @@ spec:
           path: {{ $template.path | default "helm/calypr-projects" | quote }}
           helm:
             valueFiles:
-              - "$values/{{`{{.path.path}}`}}"
+              - "$values/{{`{{.path.path}}`}}/{{`{{.path.filename}}`}}"
         - repoURL: {{ required "applicationSet.generator.repoURL is required" $generator.repoURL | quote }}
           targetRevision: {{ $generator.revision | default "main" | quote }}
           ref: values
