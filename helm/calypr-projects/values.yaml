@@ -138,7 +138,7 @@ applicationSet:
   generator:
     repoURL: https://github.com/calypr/registrations-test.git
     revision: main
-    path: environments/test/**/*.yaml
+    path: environments/test/**.yaml
     githubTokenSecret:
       vaultPath: argo/events/github#token
       name: github-reg-repo-token
