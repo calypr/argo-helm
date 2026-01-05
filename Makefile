@@ -250,7 +250,7 @@ calypr-projects-git-secret:
 	@kubectl -n argocd annotate secret repo-registrations-test \
 	  argocd.argoproj.io/secret-type=repository
 
-calypr-projects: calypr-projects-helm calypr-projects-git-secret
+calypr-projects: calypr-projects-helm
 
 calypr-projects-helm:
 	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
