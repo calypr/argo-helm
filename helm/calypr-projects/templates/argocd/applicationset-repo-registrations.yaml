@@ -20,7 +20,7 @@ spec:
           - path: {{ $generator.path | default "environments/test/*.yaml" | quote }}
   template:
     metadata:
-      name: "calypr-projects-{{`{{.path.basenameNormalized}}`}}"
+      name: "calypr-projects-{{`{{.path.basenameNormalized}}`}}-{{`{{.path.filenameNormalized}}`}}"
       labels:
         app.kubernetes.io/part-of: calypr-projects
         app.kubernetes.io/managed-by: applicationset
