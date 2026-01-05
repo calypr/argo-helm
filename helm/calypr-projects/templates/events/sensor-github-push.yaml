@@ -1,105 +1,92 @@
 {{- if and .Values.events.enabled .Values.repoRegistration }}
 {{- $reg := .Values.repoRegistration }}
+
+{{- $urlWithoutProtocol := regexReplaceAll "^https?://(www\\.)?github\\.com/" $reg.repoUrl "" }}
+{{- $parts := splitList "/" $urlWithoutProtocol }}
+{{- $repoName := (last $parts | trimSuffix ".git") }}
+{{- $owner := "" }}
+{{- if ge (len $parts) 2 }}
+{{- $owner = index $parts 0 }}
+{{- end }}
+
+{{- $eventName := $reg.eventName | default (include "calypr-projects.repoRegistration.eventName" $reg) }}
+{{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
+
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: {{ .Values.events.github.sensorName | default "run-nextflow-on-push" }}
-  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  name: {{ (.Values.events.github.sensorName | default "run-nextflow-on-push") | quote }}
+  namespace: {{ (.Values.events.namespace | default "argo-events") | quote }}
   labels:
     app.kubernetes.io/name: argo-events
     app.kubernetes.io/part-of: calypr-projects
     source: repo-registration
   annotations:
-    "helm.sh/hook": post-install,post-upgrade
-    "helm.sh/hook-weight": "10"
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "10"
 spec:
   template:
-    serviceAccountName: {{ .Values.events.github.sensorServiceAccount | default "default" }}
-
-  # Dependencies (one per repository from RepoRegistrations)
+    serviceAccountName: {{ (.Values.events.github.sensorServiceAccount | default "default") | quote }}
   dependencies:
-  {{- $eventName := $reg.eventName | default (include "calypr-projects.repoRegistration.eventName" $reg) }}
-  - name: {{ $eventName | quote }}
-    eventSourceName: {{ printf "%s-repo-registrations" ($.Values.events.github.name | default "github") | quote }}
-    eventName: {{ $eventName | quote }}
-
-  # Triggers (one per repository) — fire on that repo's push
+    - name: {{ $eventName | quote }}
+      eventSourceName: {{ printf "%s-repo-registrations" (.Values.events.github.name | default "github") | quote }}
+      eventName: {{ $eventName | quote }}
   triggers:
-  {{- /* Extract owner and repo from GitHub URL */ -}}
-  {{- $urlWithoutProtocol := regexReplaceAll "^https?://(www\\.)?github\\.com/" $reg.repoUrl "" }}
-  {{- $parts := splitList "/" $urlWithoutProtocol }}
-  {{- $repoName := last $parts | trimSuffix ".git" }}
-  {{- $owner := "" }}
-  {{- if ge (len $parts) 2 }}
-    {{- $owner = index $parts 0 }}
-  {{- end }}
-  {{- $eventName := $reg.eventName | default (include "calypr-projects.repoRegistration.eventName" $reg) }}
-  {{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
-  - template:
-      conditions: {{ $eventName }}
-      name: submit-wf-{{ $repoName }}
-      argoWorkflow:
-        operation: submit
-        source:
-          resource:
-            apiVersion: argoproj.io/v1alpha1
-            kind: Workflow
-            metadata:
-              generateName: {{ printf "%s-" $reg.name }}
-              namespace: {{ $namespace }}
-            spec:
-              serviceAccountName: {{ $.Values.workflows.runnerServiceAccount | default "wf-runner" }}
-              workflowTemplateRef:
-                name: {{ $reg.workflowTemplateRef | default "nextflow-repo-runner" }}
-              arguments:
-                parameters:
-                  - name: repo-name
-                    value: {{ $reg.name | quote }}
-                  - name: repo-url
-                    value: {{ $reg.repoUrl | quote }}
-                  # Populated from GitHub webhook
-                  - name: installation-id
-                    value: ""          # body.installation.id
-                  - name: git-ref
-                    value: ""          # body.ref
-                  - name: git-before
-                    value: ""          # body.before
-                  - name: git-after
-                    value: ""          # body.after (commit SHA)
-                  {{- if $reg.artifactBucket }}
-                  - name: artifact-bucket
-                    value: {{ $reg.artifactBucket.bucket | quote }}
-                  - name: artifact-endpoint
-                    value: {{ $reg.artifactBucket.hostname | quote }}
-                  - name: artifact-region
-                    value: {{ $reg.artifactBucket.region | quote }}
-                  {{- end }}
-        parameters:
-          # Map GitHub webhook -> workflow arguments
-          # index 0: repo-name (static)
-          # index 1: repo-url (static)
-
-          # installation.id -> parameters[2].value
-          - src:
-              dependencyName: {{ $eventName | quote }}
-              dataKey: body.installation.id
-            dest: spec.arguments.parameters.2.value
-
-          # ref -> parameters[3].value
-          - src:
-              dependencyName: {{ $eventName | quote }}
-              dataKey: body.ref
-            dest: spec.arguments.parameters.3.value
-
-          # before -> parameters[4].value
-          - src:
-              dependencyName: {{ $eventName | quote }}
-              dataKey: body.before
-            dest: spec.arguments.parameters.4.value
-
-          # after -> parameters[5].value
-          - src:
-              dependencyName: {{ $eventName | quote }}
-              dataKey: body.after
-            dest: spec.arguments.parameters.5.value
+    - template:
+        name: {{ printf "submit-wf-%s" $repoName | quote }}
+        # Most Sensor specs use "conditions" (plural)
+        conditions: {{ $eventName | quote }}
+        argoWorkflow:
+          operation: submit
+          source:
+            resource:
+              apiVersion: argoproj.io/v1alpha1
+              kind: Workflow
+              metadata:
+                generateName: {{ printf "%s-" $reg.name | quote }}
+                namespace: {{ $namespace | quote }}
+              spec:
+                serviceAccountName: {{ (.Values.workflows.runnerServiceAccount | default "wf-runner") | quote }}
+                workflowTemplateRef:
+                  name: {{ ($reg.workflowTemplateRef | default "nextflow-repo-runner") | quote }}
+                arguments:
+                  parameters:
+                    - name: repo-name
+                      value: {{ $reg.name | quote }}
+                    - name: repo-url
+                      value: {{ $reg.repoUrl | quote }}
+                    - name: installation-id
+                      value: ""
+                    - name: git-ref
+                      value: ""
+                    - name: git-before
+                      value: ""
+                    - name: git-after
+                      value: ""
+                    {{- if $reg.artifactBucket }}
+                    - name: artifact-bucket
+                      value: {{ $reg.artifactBucket.bucket | quote }}
+                    - name: artifact-endpoint
+                      value: {{ $reg.artifactBucket.hostname | quote }}
+                    - name: artifact-region
+                      value: {{ $reg.artifactBucket.region | quote }}
+                    {{- end }}
+          parameters:
+            - src:
+                dependencyName: {{ $eventName | quote }}
+                dataKey: body.installation.id
+              dest: spec.arguments.parameters.2.value
+            - src:
+                dependencyName: {{ $eventName | quote }}
+                dataKey: body.ref
+              dest: spec.arguments.parameters.3.value
+            - src:
+                dependencyName: {{ $eventName | quote }}
+                dataKey: body.before
+              dest: spec.arguments.parameters.4.value
+            - src:
+                dependencyName: {{ $eventName | quote }}
+                dataKey: body.after
+              dest: spec.arguments.parameters.5.value
 {{- end }}
+
