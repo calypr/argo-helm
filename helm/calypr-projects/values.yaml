@@ -146,7 +146,7 @@ applicationSet:
   template:
     name: 'calypr-projects-{{ regexReplaceAll "\\.yaml$" .path.basename "" }}'
     repoURL: https://github.com/calypr/argo-helm.git
-    targetRevision: development
+    targetRevision: feature/application-set
     path: helm/calypr-projects
   destination:
     server: https://kubernetes.default.svc
