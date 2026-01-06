@@ -54,6 +54,10 @@ check-vars:
 	@test -n "$(GITHUBHAPP_PRIVATE_KEY_VAULT_PATH)" || (echo "Error: GITHUBHAPP_PRIVATE_KEY_VAULT_PATH is undefined. Run 'export GITHUBHAPP_PRIVATE_KEY_VAULT_PATH=...' before installing" && exit 1)
 	@test -n "$(GITHUBHAPP_INSTALLATION_ID)" || (echo "Error: GITHUBHAPP_INSTALLATION_ID is undefined. Run 'export GITHUBHAPP_INSTALLATION_ID=...' before installing" && exit 1)
 	@test -n "$(GITHUBHAPP_CALLBACK_FLASK_KEY)" || (echo "Error: GITHUBHAPP_CALLBACK_FLASK_KEY is undefined. Run 'export GITHUBHAPP_CALLBACK_FLASK_KEY=...' before installing" && exit 1)
+
+	@test -n "$(GITHUBHAPP_WEBHOOK_SECRET_VAULT_PATH)" || (echo "Error: GITHUBHAPP_WEBHOOK_SECRET_VAULT_PATH is undefined. Run 'export GITHUBHAPP_WEBHOOK_SECRET_VAULT_PATH=...' before installing" && exit 1)
+	@test -n "$(GITHUBHAPP_WEBHOOK_SECRET)" || (echo "Error: GITHUBHAPP_WEBHOOK_SECRET is undefined. Run 'export GITHUBHAPP_WEBHOOK_SECRET=...' before installing" && exit 1)
+
 	@echo "✅ All GITHUBHAPP environment variables are set."
 
 
@@ -517,6 +521,10 @@ vault-seed-etc:
 	@# nextflow-hello-project GitHub credentials
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-project/github \
 		token="$(GITHUB_PAT)"
+
+	@kubectl exec -n vault vault-0 -- vault kv put kv/$(GITHUBHAPP_WEBHOOK_SECRET_VAULT_PATH) \
+		$(GITHUBHAPP_WEBHOOK_SECRET_KEY)="$(GITHUBHAPP_WEBHOOK_SECRET)"
+
 	@# nextflow-hello-project S3 artifact credentials
 	@kubectl exec -n vault vault-0 -- vault kv put kv/argo/apps/bwalsh/nextflow-hello-project/s3/artifacts \
 		AWS_ACCESS_KEY_ID="minioadmin" \

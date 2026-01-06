@@ -78,39 +78,6 @@ s3:
   accessKeyId: ""
   secretAccessKey: ""
 
-# ============================================================================
-# Argo Events Configuration - GitHub EventSource and Sensor
-# ============================================================================
-
-events:
-  enabled: true
-  namespace: argo-events
-
-  eventBus:
-    create: true
-    name: default
-
-  github:
-    enabled: true
-    name: github
-
-    # Secret for GitHub API Token
-    secret:
-      create: true
-      name: github-secret
-      tokenKey: token
-
-    # Webhook service exposed by EventSource
-    webhook:
-      endpoint: /events
-      port: 12000
-      service:
-        type: ClusterIP
-      ingress:
-        enabled: true
-        className: nginx
-        hosts: []
-        tls: []
 
 # ============================================================================
 # Workflow Execution Configuration
@@ -223,3 +190,40 @@ argocdApplication:
   targetRevision: "main"
   path: "."
   destinationNamespace: ""
+
+
+
+# ============================================================================
+# Argo Events Configuration - GitHub EventSource and Sensor
+# TODO - deprecate?
+# ============================================================================
+
+events:
+  enabled: true
+  namespace: argo-events
+
+  eventBus:
+    create: true
+    name: default
+
+  github:
+    enabled: true
+    name: github
+
+    # Secret for GitHub API Token
+    secret:
+      create: true
+      name: github-secret
+      tokenKey: token
+
+    # Webhook service exposed by EventSource
+    webhook:
+      endpoint: /events
+      port: 12000
+      service:
+        type: ClusterIP
+      ingress:
+        enabled: true
+        className: nginx
+        hosts: []
+        tls: []

@@ -535,3 +535,48 @@ notifications:
     # Automatically add notification subscriptions to applications
     # created from repoRegistrations in calypr-projects
     autoSubscribe: true
+
+
+# ============================================================================
+# Argo Events Configuration - GitHub EventSource and Sensor
+# ============================================================================
+
+events:
+  enabled: true
+  namespace: argo-events
+
+  eventBus:
+    create: true
+    name: default
+
+  github:
+    enabled: true
+    name: github
+
+    # Secret for GitHub API Token
+    secret:
+      create: true
+      name: github-secret
+      tokenKey: token
+
+    # Webhook service exposed by EventSource
+    webhook:
+      endpoint: /events
+      port: 12000
+      service:
+        type: ClusterIP
+      ingress:
+        enabled: true
+        className: nginx
+        hosts: []
+        tls: []
+
+
+# ============================================================================
+# GitHub App Events Configuration
+# ============================================================================
+gitappEvents:
+  githubWebhookSecret:
+    vaultPath: argo/argocd/github-app#webhookSecret
+    name: github-app-webhook-secret
+    key: webhookSecret

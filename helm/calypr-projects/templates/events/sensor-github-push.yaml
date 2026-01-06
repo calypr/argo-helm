@@ -1,41 +1,28 @@
-{{- if and .Values.events.enabled .Values.repoRegistration }}
-{{- $reg := .Values.repoRegistration }}
-
-{{- $urlWithoutProtocol := regexReplaceAll "^https?://(www\\.)?github\\.com/" $reg.repoUrl "" }}
-{{- $parts := splitList "/" $urlWithoutProtocol }}
-{{- $repoName := (last $parts | trimSuffix ".git") }}
-{{- $owner := "" }}
-{{- if ge (len $parts) 2 }}
-{{- $owner = index $parts 0 }}
-{{- end }}
-
-{{- $eventName := $reg.eventName | default (include "calypr-projects.repoRegistration.eventName" $reg) }}
-{{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
-
+{{- $reg := .Values.repoRegistration -}}
+{{- if and .Values.events.enabled $reg -}}
+{{- $tenantNs := printf "wf-%s" (replace "/" "-" $reg.full_name) -}}
 apiVersion: argoproj.io/v1alpha1
 kind: Sensor
 metadata:
-  name: {{ (.Values.events.github.sensorName | default "run-nextflow-on-push") | quote }}
-  namespace: {{ (.Values.events.namespace | default "argo-events") | quote }}
-  labels:
-    app.kubernetes.io/name: argo-events
-    app.kubernetes.io/part-of: calypr-projects
-    source: repo-registration
-  annotations:
-    helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "10"
+  name: {{ printf "dispatch-%s" $reg.name | quote }}
+  namespace: {{ .Values.events.namespace | default "argo-events" | quote }}
 spec:
-  template:
-    serviceAccountName: {{ (.Values.events.github.sensorServiceAccount | default "default") | quote }}
   dependencies:
-    - name: {{ $eventName | quote }}
-      eventSourceName: {{ printf "%s-repo-registrations" (.Values.events.github.name | default "github") | quote }}
-      eventName: {{ $eventName | quote }}
+    - name: repo-push
+      eventSourceName: {{ .Values.events.eventSourceName | default "github-app-webhooks" | quote }}
+      eventName: {{ .Values.events.eventName | default "github" | quote }}
+      filters:
+        data:
+          - path: header.X-GitHub-Event
+            type: string
+            value: ["push"]
+          - path: body.repository.full_name
+            type: string
+            value: [{{ $reg.full_name | quote }}]
   triggers:
     - template:
-        name: {{ printf "submit-wf-%s" $repoName | quote }}
-        # Most Sensor specs use "conditions" (plural)
-        conditions: {{ $eventName | quote }}
+        name: submit-workflow
+        conditions: "repo-push"
         argoWorkflow:
           operation: submit
           source:
@@ -44,11 +31,11 @@ spec:
               kind: Workflow
               metadata:
                 generateName: {{ printf "%s-" $reg.name | quote }}
-                namespace: {{ $namespace | quote }}
+                namespace: {{ $tenantNs | quote }}
               spec:
-                serviceAccountName: {{ (.Values.workflows.runnerServiceAccount | default "wf-runner") | quote }}
+                serviceAccountName: {{ .Values.workflows.runnerServiceAccount | default "wf-runner" | quote }}
                 workflowTemplateRef:
-                  name: {{ ($reg.workflowTemplateRef | default "nextflow-repo-runner") | quote }}
+                  name: {{ $reg.workflowTemplateRef | default "nextflow-repo-runner" | quote }}
                 arguments:
                   parameters:
                     - name: repo-name
@@ -63,30 +50,4 @@ spec:
                       value: ""
                     - name: git-after
                       value: ""
-                    {{- if $reg.artifactBucket }}
-                    - name: artifact-bucket
-                      value: {{ $reg.artifactBucket.bucket | quote }}
-                    - name: artifact-endpoint
-                      value: {{ $reg.artifactBucket.hostname | quote }}
-                    - name: artifact-region
-                      value: {{ $reg.artifactBucket.region | quote }}
-                    {{- end }}
-          parameters:
-            - src:
-                dependencyName: {{ $eventName | quote }}
-                dataKey: body.installation.id
-              dest: spec.arguments.parameters.2.value
-            - src:
-                dependencyName: {{ $eventName | quote }}
-                dataKey: body.ref
-              dest: spec.arguments.parameters.3.value
-            - src:
-                dependencyName: {{ $eventName | quote }}
-                dataKey: body.before
-              dest: spec.arguments.parameters.4.value
-            - src:
-                dependencyName: {{ $eventName | quote }}
-                dataKey: body.after
-              dest: spec.arguments.parameters.5.value
-{{- end }}
-
+{{- end -}}
