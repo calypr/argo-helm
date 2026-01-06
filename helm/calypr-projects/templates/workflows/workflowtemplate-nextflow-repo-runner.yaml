@@ -1,3 +1,4 @@
+{{- if .Values.initialize }}
 apiVersion: argoproj.io/v1alpha1
 kind: WorkflowTemplate
 metadata:
@@ -76,3 +77,4 @@ spec:
               secretKeyRef:
                 name: s3-credentials-{{ "{{workflow.parameters.repo-name}}" }}
                 key: AWS_SECRET_ACCESS_KEY
+  {{- end }}

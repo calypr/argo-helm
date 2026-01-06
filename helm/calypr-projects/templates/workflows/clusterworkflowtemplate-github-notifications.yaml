@@ -1,3 +1,4 @@
+{{- if .Values.initialize }}
 {{- /*
 ClusterWorkflowTemplate for GitHub Status Notifications
 Provides a centralized notification mechanism for workflows across all namespaces.
@@ -36,4 +37,4 @@ spec:
             "status": {{`{{toJson workflow.status}}`}},
             "target_url": "{{ .Values.workflows.baseUrl }}/workflows/{{`{{workflow.namespace}}`}}/{{`{{workflow.name}}`}}"
           }
-
+  {{- end }}

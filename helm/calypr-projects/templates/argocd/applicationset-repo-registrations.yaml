@@ -1,4 +1,4 @@
-{{- if and .Values.applicationSet .Values.applicationSet.enabled }}
+{{- if and .Values.initialize .Values.applicationSet.enabled }}
 {{- $generator := .Values.applicationSet.generator | default dict }}
 {{- $template := .Values.applicationSet.template | default dict }}
 {{- $destination := .Values.applicationSet.destination | default dict }}
@@ -19,6 +19,7 @@ spec:
         files:
           - path: {{ $generator.path | default "environments/test/*.yaml" | quote }}
   template:
+    # Application template
     metadata:
       name: "calypr-projects-{{`{{.path.basenameNormalized}}`}}-{{`{{.path.filenameNormalized | trimSuffix \".yaml\" }}`}}"
       labels:

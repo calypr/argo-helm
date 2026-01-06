@@ -97,6 +97,10 @@ repoRegistration: {}
 # ApplicationSet - Git-based repo registrations
 # ============================================================================
 
+# Enable setup: ApplicationSet, AppProject, and associated resources
+# Defaults false to disable automatic setup during git syncs
+initialize: false
+
 applicationSet:
   enabled: true
   name: repo-registrations-test
@@ -139,6 +143,10 @@ applicationSet:
     clusterResourceBlacklist:
       - group: "*"
         kind: "*"
+    # Allow apps in this project to manage cluster-scoped Namespace objects
+    clusterResourceWhitelist:
+      - group: ""
+        kind: Namespace
     namespaceResourceWhitelist:
       - group: ""
         kind: Namespace

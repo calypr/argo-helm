@@ -1,4 +1,4 @@
-{{- if .Values.s3.enabled }}
+{{- if and .initialize .Values.s3.enabled }}
 {{- if not (include "calypr-projects.vault.enabled" .) }}
 apiVersion: v1
 kind: Secret

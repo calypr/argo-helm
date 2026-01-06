@@ -1,4 +1,4 @@
-{{- if and .Values.applicationSet .Values.applicationSet.enabled .Values.applicationSet.appProject.enabled }}
+{{- if and .Values.initialize .Values.applicationSet.enabled .Values.applicationSet.appProject.enabled }}
 {{- $appProject := .Values.applicationSet.appProject | default dict }}
 {{- $destinations := $appProject.destinations | default list }}
 {{- $sourceRepos := $appProject.sourceRepos | default list }}

@@ -1,0 +1,68 @@
+{{- if .Values.repoRegistration }}
+{{- $reg := .Values.repoRegistration }}
+{{- $namespace := include "calypr-projects.repoRegistration.namespace" $reg }}
+---
+# ClusterRoleBinding for workflow runner service account in tenant namespace: {{ $reg.name }}
+# This allows workflows to execute templates that reference ClusterWorkflowTemplates
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: wf-runner-clusterworkflowtemplate-{{ $reg.name }}
+  labels:
+    app.kubernetes.io/name: {{ $reg.name }}
+    app.kubernetes.io/part-of: calypr-projects
+    app.kubernetes.io/component: rbac
+    {{- if $reg.tenant }}
+    tenant: {{ $reg.tenant }}
+    {{- end }}
+    source: repo-registration
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation
+    repo-registration/name: {{ $reg.name | quote }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: clusterworkflowtemplate-reader
+subjects:
+  - kind: ServiceAccount
+    name: wf-runner
+    namespace: {{ $namespace }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: argo-workflows-controller
+  namespace: {{ $namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation  
+rules:
+  - apiGroups: ["argoproj.io"]
+    resources:
+      - workflows
+      - workflows/finalizers
+      - workflowtasksets
+      - workflowtasksets/status
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: argo-workflows-controller-binding
+  namespace: {{ $namespace }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "1"
+    helm.sh/hook-delete-policy: before-hook-creation  
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: argo-workflows-controller
+subjects:
+  - kind: ServiceAccount
+    name: argo-stack-argo-workflows-workflow-controller
+    namespace: argo-workflows
+{{- end }}

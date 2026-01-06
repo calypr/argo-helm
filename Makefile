@@ -100,13 +100,15 @@ template: check-vars deps
 		-f helm/argo-stack/admin-values.yaml \
 		--namespace argocd > rendered.yaml
 
-template-calypr-projects: check-vars deps
+template-calypr-projects-initialize: check-vars deps
+	# initialize=true to create initial resources in calypr-projects
 	S3_HOSTNAME=${S3_HOSTNAME} S3_BUCKET=${S3_BUCKET} S3_REGION=${S3_REGION} \
 	envsubst < my-values.yaml | \
 	helm template calypr-projects helm/calypr-projects \
 		--debug \
 		-n argocd --create-namespace \
 		--wait --atomic --timeout 10m0s \
+		--set initialize=true \
 		--set-string events.github.webhook.ingress.hosts[0]=${ARGO_HOSTNAME} \
 		--set-string events.github.webhook.url=https://${ARGO_HOSTNAME}/events \
 		--set-string workflows.baseUrl=https://${ARGO_HOSTNAME} \
@@ -116,7 +118,21 @@ template-calypr-projects: check-vars deps
 		--set-string s3.insecure=true \
 		--set-string s3.region=${S3_REGION} \
 		--set-string s3.hostname=${S3_HOSTNAME} \
-		-f - > rendered.yaml
+		-f - > tests/fixtures/rendered-templates/calypr-projects-initialize-rendered.yaml
+
+template-calypr-projects-repo:
+	# Render calypr-projects with a specific repo registration values file
+	helm template helm/calypr-projects/ \
+		--name-template calypr-projects-bwalsh-nextflow-hello-project \
+		--namespace argocd \
+		--kube-version 1.30 \
+		--values tests/fixtures/repo-registrations/environments/test/bwalsh/nextflow-hello-project.yaml  \
+		--include-crds \
+		--debug > tests/fixtures/rendered-templates/calypr-projects-repo-rendered.yaml
+
+test-template-calypr-projects: template-calypr-projects-repo template-calypr-projects-initialize
+	pytest tests/test_calypr_projects_initialize_rendering.py
+	pytest tests/test_calypr_projects_repo_rendering.py
 
 validate:
 	kubeconform -strict -ignore-missing-schemas \
