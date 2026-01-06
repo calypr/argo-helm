@@ -9,6 +9,9 @@ kind: ApplicationSet
 metadata:
   name: {{ .Values.applicationSet.name | default "repo-registrations" }}
   namespace: {{ .Values.applicationSet.namespace | default (.Values.namespaces.argocd | default "argocd") }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
 spec:
   goTemplate: true
   goTemplateOptions: ["missingkey=error"]

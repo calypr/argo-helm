@@ -7,6 +7,9 @@ kind: AppProject
 metadata:
   name: {{ $appProject.name | default .Values.applicationSet.project }}
   namespace: {{ .Values.applicationSet.namespace | default (.Values.namespaces.argocd | default "argocd") }}
+  annotations:
+    "helm.sh/hook": post-install,post-upgrade
+    "helm.sh/hook-weight": "1"
 spec:
   description: {{ $appProject.description | default "AppProject for repo-registration ApplicationSet." | quote }}
   sourceRepos:
