@@ -541,6 +541,13 @@ notifications:
 # Argo Events Configuration - GitHub EventSource and Sensor
 # ============================================================================
 
+argo-events:
+  configs:
+    jetstream:
+      streamConfig:
+        # JetStream stream replicas must be 1 for non-clustered NATS.
+        replicas: 1
+    
 events:
   enabled: true
   namespace: argo-events
