@@ -1,0 +1,76 @@
+{{- if .Values.events.enabled }}
+---
+# EventSource for git push
+apiVersion: argoproj.io/v1alpha1
+kind: EventSource
+metadata:
+  name: github-app-webhooks
+  namespace: argo-events
+spec:
+  webhook:
+    github:
+      endpoint: /events
+      method: POST
+      port: "12000"
+---
+# Service for GitHub App Webhooks EventSource
+apiVersion: v1
+kind: Service
+metadata:
+  name: github-app-webhooks
+  namespace: argo-events
+spec:
+  type: ClusterIP
+  selector:
+    eventsource-name: github-app-webhooks
+  ports:
+    - name: http
+      port: 12000
+      targetPort: 12000
+
+---
+# Service for repo-registrations EventSource
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.events.github.name | default "github" }}-repo-registrations-eventsource-svc
+  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  labels:
+    eventsource-name: {{ .Values.events.github.name | default "github" }}-repo-registrations
+    source: repo-registration
+spec:
+  selector:
+    eventsource-name: {{ .Values.events.github.name | default "github" }}-repo-registrations
+  ports:
+    - name: webhook
+      port: {{ .Values.events.github.webhook.port | default 12000 }}
+      targetPort: 12000
+  type: {{ .Values.events.github.webhook.service.type | default "ClusterIP" }}
+{{- if and .Values.events.github.webhook.ingress.enabled (gt (len (.Values.events.github.webhook.ingress.hosts | default list)) 0) }}
+---
+# Ingress for repo-registrations EventSource
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ .Values.events.github.name | default "github" }}-repo-registrations-eventsource
+  namespace: {{ .Values.events.namespace | default "argo-events" }}
+  labels:
+    source: repo-registration
+spec:
+  ingressClassName: {{ .Values.events.github.webhook.ingress.className | default "nginx" | quote }}
+  rules:
+  {{- range $h := (.Values.events.github.webhook.ingress.hosts | default list) }}
+    - host: {{ $h }}
+      http:
+        paths:
+          - path: {{ $.Values.events.github.webhook.endpoint | default "/events" }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $.Values.events.github.name | default "github" }}-repo-registrations-eventsource-svc
+                port:
+                  number: {{ $.Values.events.github.webhook.port | default 12000 }}
+  {{- end }}
+  tls: {{ toYaml (.Values.events.github.webhook.ingress.tls | default list) | nindent 4 }}
+{{- end }}
+{{- end }}
